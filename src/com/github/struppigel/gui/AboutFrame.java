@@ -23,21 +23,24 @@ public class AboutFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
-    public static String version = "0.11.2";
+    public static String version = "0.11.3";
     private static final String text = "Portex Analyzer GUI" + "\n\n" + "Version: " + version
-            + "\n\nAuthor: Karsten Hahn"
-            + "\n\nLast update: 17. December 2022"
-            + "\n\nIf you like this software, donate a coffee: https://ko-fi.com/struppigel";
+            + "\nAuthor: Karsten Hahn"
+            + "\nLast update: 17. December 2022"
+            + "\n\nI develop this software as a hobby in my free time."
+            + "\n\nIf you like it, please consider buying me a coffee: https://ko-fi.com/struppigel"
+            + "\n\nThe repo is available at https://github.com/struppigel/PortexAnalyzerGUI";
 
     public AboutFrame() {
+        super("About PortexAnalyzer GUI");
         initGUI();
     }
 
     private void initGUI() {
-        this.setSize(350, 250);
+        this.setSize(350, 280);
         this.setResizable(false);
         this.setVisible(true);
-        setLocationRelativeTo(null);
+        this.setLocationRelativeTo(null);
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         JTextArea area = new JTextArea();

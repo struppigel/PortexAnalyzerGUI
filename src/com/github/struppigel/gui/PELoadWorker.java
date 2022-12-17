@@ -17,14 +17,14 @@
  */
 package com.github.struppigel.gui;
 
-import com.github.katjahahn.parser.ByteArrayUtil;
-import com.github.katjahahn.parser.IOUtil;
-import com.github.katjahahn.parser.PEData;
-import com.github.katjahahn.parser.PELoader;
+import com.github.katjahahn.parser.*;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.katjahahn.parser.sections.debug.CodeviewInfo;
+import com.github.katjahahn.parser.sections.debug.DebugDirectoryKey;
 import com.github.katjahahn.parser.sections.debug.DebugSection;
+import com.github.katjahahn.parser.sections.debug.DebugType;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.edata.ExportNameEntry;
 import com.github.katjahahn.parser.sections.edata.ExportSection;
@@ -35,6 +35,8 @@ import com.github.katjahahn.parser.sections.rsrc.Resource;
 import com.github.katjahahn.parser.sections.rsrc.ResourceSection;
 import com.github.katjahahn.parser.sections.rsrc.version.VersionInfo;
 import com.github.katjahahn.tools.*;
+import com.github.katjahahn.tools.anomalies.Anomaly;
+import com.github.katjahahn.tools.anomalies.PEAnomalyScanner;
 import com.github.katjahahn.tools.sigscanner.FileTypeScanner;
 import com.github.katjahahn.tools.sigscanner.SignatureScanner;
 import com.google.common.base.Optional;
@@ -86,11 +88,15 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
         List<String[]> resourceTableEntries = createResourceTableEntries(data);
         String manifest = readManifest(data);
         String version = readVersionInfo(data);
+        List<String[]> vsInfoTable = createVersionInfoEntries(data);
         setProgress(60);
         List<ExportEntry> exports = getExports(data);
         List<String[]> exportEntries = createExportTableEntries(data);
         setProgress(70);
         String debugInfo = getDebugInfo(data);
+        List<StandardField> debugTableEntries = getDebugTableEntries(data);
+        setProgress(75);
+        List<String[]> anomaliesTable = createAnomalyTableEntries(data);
         setProgress(80);
         String anomalies = r.anomalyReport();
         setProgress(90);
@@ -100,7 +106,45 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
         setProgress(100);
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, getResources(data), manifest, version, exportEntries, exports,
-                debugInfo, anomalies, hashesReport, hashesForSections);
+                debugInfo, anomalies, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable);
+    }
+
+    private List<String[]> createVersionInfoEntries(PEData data){
+        List<Resource> res = getResources(data);
+        List<String[]> entries = new ArrayList<>();
+        for (Resource r : res) {
+            if (r.getType().equals("RT_VERSION")) {
+                VersionInfo versionInfo = VersionInfo.apply(r, data.getFile());
+                Map<String, String> map = versionInfo.getVersionStrings();
+                for( Map.Entry<String, String> e : map.entrySet()) {
+                    String[] entry = {e.getKey(), e.getValue()};
+                    entries.add(entry);
+                }
+            }
+        }
+        return entries;
+    }
+
+    private String readVersionInfo(PEData pedata) {
+        List<Resource> res = getResources(pedata);
+        String versionInfo = "No Version Info";
+        for (Resource r : res) {
+            if (r.getType().equals("RT_VERSION")) {
+                versionInfo = VersionInfo.apply(r, pedata.getFile()).toString();
+                break;
+            }
+        }
+        return versionInfo;
+    }
+
+    private List<String[]> createAnomalyTableEntries(PEData data) {
+        List<String[]> entries = new ArrayList<>();
+        List<Anomaly> anomalies = PEAnomalyScanner.newInstance(data).getAnomalies();
+        for(Anomaly a : anomalies) {
+            String[] entry = {a.description(), String.valueOf(a.getType()), String.valueOf(a.subtype()), String.valueOf(a.key())};
+            entries.add(entry);
+        }
+        return entries;
     }
 
     private String createHashesReport(PEData data) {
@@ -156,18 +200,41 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
     }
 
     private String getDebugInfo(PEData pedata) {
-        String debugStr = "";
         try {
             Optional<DebugSection> sec = new SectionLoader(pedata).maybeLoadDebugSection();
             if (sec.isPresent()) {
-                DebugSection debugSection = sec.get();
-                return debugSection.getInfo();
+                DebugSection d = sec.get();
+                String report = "Time date stamp: " + d.getTimeDateStamp() + NL;
+                report += "Type: " + d.getTypeDescription() + NL + NL;
+                if(d.getDebugType() == DebugType.CODEVIEW) {
+                    CodeviewInfo c = d.getCodeView();
+                    report += "Codeview" + NL + NL;
+                    report += "Path: " + c.filePath() + NL;
+                    report += "Age: " + c.age() + NL;
+                    report += "GUID: " + CodeviewInfo.guidToString(c.guid()) + NL;
+                }
+                return report;
             }
         } catch (IOException e) {
             LOGGER.error(e);
             e.printStackTrace();
         }
-        return debugStr;
+        return "";
+    }
+
+    private List<StandardField> getDebugTableEntries(PEData pedata) {
+        List<StandardField> entries = new ArrayList<>();
+        try {
+            Optional<DebugSection> sec = new SectionLoader(pedata).maybeLoadDebugSection();
+            if (sec.isPresent()) {
+                Map<DebugDirectoryKey, StandardField> dirTable = sec.get().getDirectoryTable();
+                return dirTable.values().stream().collect(Collectors.toList());
+            }
+        } catch (IOException e) {
+            LOGGER.error(e);
+            e.printStackTrace();
+        }
+        return entries;
     }
 
     private List<ExportEntry> getExports(PEData pedata) {
@@ -195,18 +262,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
             entries.add(entry);
         }
         return entries;
-    }
-
-    private String readVersionInfo(PEData pedata) {
-        List<Resource> res = getResources(pedata);
-        String versionInfo = "No Version Info";
-        for (Resource r : res) {
-            if (r.getType().equals("RT_VERSION")) {
-                versionInfo = VersionInfo.apply(r, pedata.getFile()).toString(); // TODO maybe consider several RT_VERSION resources?
-                break;
-            }
-        }
-        return versionInfo;
     }
 
     private boolean isLegitManifest(Resource resource) {

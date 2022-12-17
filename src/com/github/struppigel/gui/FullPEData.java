@@ -18,6 +18,7 @@
 package com.github.struppigel.gui;
 
 import com.github.katjahahn.parser.PEData;
+import com.github.katjahahn.parser.StandardField;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.idata.ImportDLL;
@@ -55,6 +56,12 @@ public class FullPEData {
     private final String versionInfo;
     private final List<ExportEntry> exports;
     private final String hashes;
+
+    private final List<String[]> anomaliesTable;
+
+    private final List<StandardField> debugTableEntries;
+
+    private final List<String[]> vsInfoTable;
     private List<String[]> exportTableEntries;
     private String debugInfo;
     private String anomalyReport;
@@ -64,7 +71,8 @@ public class FullPEData {
                       double[] sectionEntropies, List<ImportDLL> imports, List<String[]> importTableEntries,
                       List<String[]> resourceTableEntries, List<Resource> resources, String manifest,
                       String versionInfo, List<String[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
-                      String anomalyReport, String hashes,List<String[]> sectionHashTableEntries) {
+                      String anomalyReport, String hashes, List<String[]> sectionHashTableEntries,
+                      List<String[]> anomaliesTable, List<StandardField> debugTableEntries, List<String[]> vsInfoTable) {
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -82,6 +90,9 @@ public class FullPEData {
         this.anomalyReport = anomalyReport;
         this.hashes = hashes;
         this.sectionHashTableEntries = sectionHashTableEntries;
+        this.anomaliesTable = anomaliesTable;
+        this.debugTableEntries = debugTableEntries;
+        this.vsInfoTable = vsInfoTable;
     }
 
     public PEData getPeData() {
@@ -208,4 +219,18 @@ public class FullPEData {
     public List<String[]> getSectionHashTableEntries() {
         return this.sectionHashTableEntries;
     }
+
+    public List<String[]> getAnomaliesTable() {
+        return anomaliesTable;
+    }
+
+    public List<StandardField> getDebugTableEntries() {
+        return debugTableEntries;
+    }
+
+
+    public List<String[]> getVersionInfoTable() {
+        return vsInfoTable;
+    }
+
 }

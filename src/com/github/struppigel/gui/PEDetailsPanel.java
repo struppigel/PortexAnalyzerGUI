@@ -138,6 +138,9 @@ public class PEDetailsPanel extends JPanel {
         text += "Machine type: " + header.getMachineType().getDescription() + NL;
         text += "Characteristics: " + NL;
         text += header.getCharacteristics().stream().map(ch -> "\t* " + ch.getDescription()).collect(Collectors.joining(NL));
+        if(header.getCharacteristics().size() == 0) {
+            text += "no characteristics set";
+        }
         String[] tableHeader = {"Description", "Value", "Value offset"};
         showFieldEntriesAndDescription(entries, tableHeader, text);
         LOGGER.debug("COFF File header shown");
@@ -348,6 +351,9 @@ public class PEDetailsPanel extends JPanel {
             for (String s : sigs) {
                 text += s + NL;
             }
+            if(sigs.size() == 0) {
+                text += "no matches";
+            }
 
             descriptionField.setText(text);
             showDescriptionPanel();
@@ -402,8 +408,9 @@ public class PEDetailsPanel extends JPanel {
 
     public void showVersionInfo() {
         if (peData == null) return;
-        descriptionField.setText(peData.getVersionInfo());
-        showDescriptionPanel();
+        String[] vsHeader = {"VsInfo key", "Description"};
+        showTextEntries(peData.getVersionInfoTable(), vsHeader);
+        showTablePanel();
     }
 
     public void showResources() {
@@ -432,14 +439,20 @@ public class PEDetailsPanel extends JPanel {
 
     public void showDebugInfo() {
         if (peData == null) return;
-        descriptionField.setText(peData.getDebugInfo());
-        showDescriptionPanel();
+        String[] tableHeader = {"Description", "Value", "Value offset"};
+        List<StandardField> entries = peData.getDebugTableEntries();
+        String text = peData.getDebugInfo();
+        showFieldEntriesAndDescription(entries, tableHeader, text);
+        showTablePanel();
     }
 
     public void showAnomalies() {
         if (peData == null) return;
-        descriptionField.setText(peData.getAnomalyReport());
-        showDescriptionPanel();
+        String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure "};
+        List<String[]> entries = peData.getAnomaliesTable();
+
+        showTextEntries(entries, tableHeader);
+        showTablePanel();
     }
 
     public void showHashes() {
