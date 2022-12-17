@@ -87,7 +87,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
         setProgress(50);
         List<String[]> resourceTableEntries = createResourceTableEntries(data);
         String manifest = readManifest(data);
-        String version = readVersionInfo(data);
         List<String[]> vsInfoTable = createVersionInfoEntries(data);
         setProgress(60);
         List<ExportEntry> exports = getExports(data);
@@ -105,7 +104,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
         List<String> overlaySignatures = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAt(data.getFile(), overlay.getOffset());
         setProgress(100);
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
-                impEntries, resourceTableEntries, getResources(data), manifest, version, exportEntries, exports,
+                impEntries, resourceTableEntries, getResources(data), manifest, exportEntries, exports,
                 debugInfo, anomalies, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable);
     }
 
@@ -123,18 +122,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
             }
         }
         return entries;
-    }
-
-    private String readVersionInfo(PEData pedata) {
-        List<Resource> res = getResources(pedata);
-        String versionInfo = "No Version Info";
-        for (Resource r : res) {
-            if (r.getType().equals("RT_VERSION")) {
-                versionInfo = VersionInfo.apply(r, pedata.getFile()).toString();
-                break;
-            }
-        }
-        return versionInfo;
     }
 
     private List<String[]> createAnomalyTableEntries(PEData data) {

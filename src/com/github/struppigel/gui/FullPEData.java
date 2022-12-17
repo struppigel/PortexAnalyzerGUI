@@ -37,9 +37,6 @@ import java.util.List;
  * Wrapper for the PEData.
  * This class makes sure to save things that we do not want to compute several times.
  */
-
-// TODO every non-getter method in here probably belongs into PEData! These are API shortcomings
-// TODO preload the special sections with SwingWorker
 public class FullPEData {
     private static final Logger LOGGER = LogManager.getLogger();
     private final PEData pedata;
@@ -49,18 +46,13 @@ public class FullPEData {
     private final double[] sectionEntropies;
     private final List<ImportDLL> imports;
     private final List<String[]> importTableEntries;
-
     private final List<String[]> resourceTableEntries;
     private final List<Resource> resources;
     private final String manifest;
-    private final String versionInfo;
     private final List<ExportEntry> exports;
     private final String hashes;
-
     private final List<String[]> anomaliesTable;
-
     private final List<StandardField> debugTableEntries;
-
     private final List<String[]> vsInfoTable;
     private List<String[]> exportTableEntries;
     private String debugInfo;
@@ -70,7 +62,7 @@ public class FullPEData {
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<String[]> importTableEntries,
                       List<String[]> resourceTableEntries, List<Resource> resources, String manifest,
-                      String versionInfo, List<String[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
+                      List<String[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
                       String anomalyReport, String hashes, List<String[]> sectionHashTableEntries,
                       List<String[]> anomaliesTable, List<StandardField> debugTableEntries, List<String[]> vsInfoTable) {
         this.pedata = data;
@@ -83,7 +75,6 @@ public class FullPEData {
         this.resourceTableEntries = resourceTableEntries;
         this.resources = resources;
         this.manifest = manifest;
-        this.versionInfo = versionInfo;
         this.exportTableEntries = exportTableEntries;
         this.exports = exports;
         this.debugInfo = debugInfo;
@@ -132,24 +123,12 @@ public class FullPEData {
         return manifest;
     }
 
-
-
     /**
      * Check for presence of resources,
      * @return true of at least one resource exists, false if not there or if exceptions occur
      */
     public boolean hasResources() {
-        try {
-            Optional<ResourceSection> res = new SectionLoader(pedata).maybeLoadResourceSection();
-            if (res.isPresent() && !res.get().isEmpty()) {
-                List<Resource> resources = res.get().getResources();
-                return resources.size() > 0;
-            }
-        } catch (IOException e) {
-            LOGGER.error(e);
-            e.printStackTrace();
-        }
-        return false;
+        return resources.size() > 0;
     }
 
     /**
@@ -169,11 +148,7 @@ public class FullPEData {
     }
 
     public boolean hasVersionInfo() {
-        List<Resource> res = getResources();
-        return res.stream().anyMatch(r -> r.getType().equals("RT_VERSION"));
-    }
-    public String getVersionInfo() {
-        return versionInfo;
+        return resources.stream().anyMatch(r -> r.getType().equals("RT_VERSION"));
     }
 
     public double getEntropyForSection(int secNumber) {
