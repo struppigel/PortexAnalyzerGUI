@@ -38,7 +38,7 @@ Many of these features are already provided by PortexAnalyzer CLI version, which
 
 ## Donations
 
-I develop PortEx and PortexAnalyzer as a hobby in my freetime. If you like it, please consider buying me a coffee: https://ko-fi.com/struppigel
+I develop PortEx and PortexAnalyzer as a hobby in my free time. If you like it, please consider buying me a coffee: https://ko-fi.com/struppigel
 
 ## Author
 
