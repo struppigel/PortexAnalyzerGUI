@@ -4,6 +4,10 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 
 ![visualizer example](https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/screenshot.png)
 
+### Download
+
+[Releases page](https://github.com/struppigel/PortexAnalyzerGUI/releases)
+
 ### Features
 
 * Header information from: MSDOS Header, Rich Header, COFF File Header, Optional Header, Section Table
@@ -13,6 +17,10 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 * Calculate Shannon Entropy, imphash, MD5, SHA256, Rich and RichPV hash
 * Overlay and overlay signature scanning
 * Version information and manifest
+
+### Supported OS and JRE
+
+I test this program on Linux and Windows. But it should work on any OS with JRE version 9 or higher.
 
 ### Future
 
