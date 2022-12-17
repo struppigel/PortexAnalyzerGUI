@@ -1,13 +1,13 @@
 /**
  * *****************************************************************************
  * Copyright 2022 Karsten Hahn
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,9 +27,15 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Scanner;
 
 import static javax.swing.SwingUtilities.invokeLater;
 
@@ -47,10 +53,44 @@ public class MainFrame extends JFrame {
     private JFrame progressBarFrame;
     private JProgressBar progressBar;
 
+    private String versionURL = "https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/upd_version.txt";
+    private String currVersion = "/upd_version.txt";
+
     public MainFrame() {
         super("Portex Analyzer v. " + AboutFrame.version);
         initGUI();
         initListener();
+        checkForUpdate();
+    }
+
+    private void checkForUpdate() {
+        // TODO SwingWorker
+        try {
+            URL githubURL = new URL(versionURL);
+
+            try (InputStreamReader is = new InputStreamReader(getClass().getResourceAsStream(currVersion), StandardCharsets.UTF_8);
+                 BufferedReader versIn = new BufferedReader(is);
+                 Scanner s = new Scanner(githubURL.openStream());) {
+
+                int versionHere = Integer.parseInt(versIn.readLine().trim());
+                int githubVersion = s.nextInt();
+
+                if(versionHere < githubVersion) {
+                    // TODO request user to update
+                    LOGGER.debug("update NOW NOW NOW");
+                } else {
+                    LOGGER.debug("NO NEED TO UPDATE");
+                }
+            } catch (IOException | NumberFormatException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+
+        } catch (MalformedURLException e) {
+            LOGGER.error(e);
+            e.printStackTrace();
+        }
+
     }
 
     private void initListener() {
@@ -65,7 +105,7 @@ public class MainFrame extends JFrame {
         PELoadWorker worker = new PELoadWorker(file, this);
         worker.addPropertyChangeListener(evt -> {
             String name = evt.getPropertyName();
-            if (name.equals("progress" ) ){
+            if (name.equals("progress")) {
                 int progress = (Integer) evt.getNewValue();
                 progressBar.setValue(progress);
             } else if (name.equals("state")) {
@@ -123,7 +163,7 @@ public class MainFrame extends JFrame {
         initMenu();
         initProgressBar();
     }
-    
+
     private void initProgressBar() {
         this.progressBarFrame = new JFrame();
         JPanel panel = new JPanel();
@@ -137,7 +177,7 @@ public class MainFrame extends JFrame {
         panel.add(progressBar);
         progressBarFrame.add(panel);
         progressBarFrame.pack();
-        progressBarFrame.setSize(400,90);
+        progressBarFrame.setSize(400, 90);
         progressBarFrame.setLocationRelativeTo(null);
         progressBarFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
     }
