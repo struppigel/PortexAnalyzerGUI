@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Multi-Release: true
+Main-Class: com.github.struppigel.gui.Starter
+
