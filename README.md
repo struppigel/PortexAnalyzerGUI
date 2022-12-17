@@ -4,11 +4,11 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 
 ![visualizer example](https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/screenshot.png)
 
-### Download
+## Download
 
 [Releases page](https://github.com/struppigel/PortexAnalyzerGUI/releases)
 
-### Features
+## Features
 
 * Header information from: MSDOS Header, Rich Header, COFF File Header, Optional Header, Section Table
 * PE Structures: Import Section, Resource Section, Export Section, Debug Section
@@ -18,11 +18,11 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 * Overlay and overlay signature scanning
 * Version information and manifest
 
-### Supported OS and JRE
+## Supported OS and JRE
 
 I test this program on Linux and Windows. But it should work on any OS with JRE version 9 or higher.
 
-### Future
+## Future
 
 I will be including more and more features that PortEx already provides.
 
@@ -36,11 +36,11 @@ These features include among others:
 
 Many of these features are already provided by PortexAnalyzer CLI version, which you can find here: [PortexAnalyzer CLI](https://github.com/struppigel/PortEx/tree/master/progs)
 
-### Donations
+## Donations
 
 I develop PortEx and PortexAnalyzer as a hobby in my freetime. If you like it, please consider buying me a coffee: https://ko-fi.com/struppigel
 
-### Author
+## Author
 
 Karsten Hahn 
 
@@ -50,6 +50,6 @@ Mastodon: [struppigel@infosec.exchange](https://infosec.exchange/@struppigel)
 
 Youtube: [MalwareAnalysisForHedgehogs](https://www.youtube.com/c/MalwareAnalysisForHedgehogs)
 
-### License
+## License
 
 [License](https://github.com/struppigel/PortexAnalyzerGUI/blob/main/LICENSE)
