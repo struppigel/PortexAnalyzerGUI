@@ -137,10 +137,10 @@ public class PEComponentTree extends JPanel {
         root.add(hashes);
         // root.add(vis); // will do this later
 
-        // we expand some paths so it doesn't look empty
-        peTree.expandPath(new TreePath(root));
-        peTree.expandPath(new TreePath(optional)); // TODO this has no effect?
+        // no root
         peTree.setRootVisible(false);
+        // we expand some paths so it doesn't look empty
+        peTree.expandPath(new TreePath(dosStub));
         // reload the tree model to actually show the update
         DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
         model.reload();

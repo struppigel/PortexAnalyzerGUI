@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
+ * <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
  * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -32,12 +32,16 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
 
 import static javax.swing.SwingUtilities.invokeLater;
+import static javax.swing.SwingWorker.StateValue.DONE;
 
 
 public class MainFrame extends JFrame {
@@ -53,8 +57,9 @@ public class MainFrame extends JFrame {
     private JFrame progressBarFrame;
     private JProgressBar progressBar;
 
-    private String versionURL = "https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/upd_version.txt";
-    private String currVersion = "/upd_version.txt";
+    private final static String versionURL = "https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/upd_version.txt";
+    private final static String currVersion = "/upd_version.txt";
+    private final static String releasePage = "https://github.com/struppigel/PortexAnalyzerGUI/releases";
 
     public MainFrame() {
         super("Portex Analyzer v. " + AboutFrame.version);
@@ -64,33 +69,77 @@ public class MainFrame extends JFrame {
     }
 
     private void checkForUpdate() {
-        // TODO SwingWorker
-        try {
-            URL githubURL = new URL(versionURL);
+        UpdateWorker updater = new UpdateWorker();
+        updater.execute();
+    }
 
-            try (InputStreamReader is = new InputStreamReader(getClass().getResourceAsStream(currVersion), StandardCharsets.UTF_8);
-                 BufferedReader versIn = new BufferedReader(is);
-                 Scanner s = new Scanner(githubURL.openStream());) {
+    private static class UpdateWorker extends SwingWorker<Boolean, Void> {
+        @Override
+        protected Boolean doInBackground() {
+            try {
+                URL githubURL = new URL(versionURL);
+                try (InputStreamReader is = new InputStreamReader(getClass().getResourceAsStream(currVersion), StandardCharsets.UTF_8);
+                     BufferedReader versionIn = new BufferedReader(is);
+                     Scanner s = new Scanner(githubURL.openStream())) {
 
-                int versionHere = Integer.parseInt(versIn.readLine().trim());
-                int githubVersion = s.nextInt();
+                    int versionHere = Integer.parseInt(versionIn.readLine().trim());
+                    int githubVersion = s.nextInt();
 
-                if(versionHere < githubVersion) {
-                    // TODO request user to update
-                    LOGGER.debug("update NOW NOW NOW");
-                } else {
-                    LOGGER.debug("NO NEED TO UPDATE");
+                    if (versionHere < githubVersion) {
+                        return true;
+                    }
                 }
             } catch (IOException | NumberFormatException e) {
                 LOGGER.error(e);
                 e.printStackTrace();
             }
+            return false;
+        }
 
-        } catch (MalformedURLException e) {
+        protected void done() {
+            try {
+                if (get()) {
+                    LOGGER.debug("update requested");
+                    String message = "A new version is available. Do you want to download it?";
+                    int response = JOptionPane.showConfirmDialog(null,
+                            message,
+                            "Update available",
+                            JOptionPane.YES_NO_OPTION);
+                    if(response == JOptionPane.YES_OPTION) {
+                        openWebpage(new URL(releasePage));
+                    }
+                } else {
+                    LOGGER.debug("no update necessary");
+                }
+            } catch (InterruptedException | ExecutionException | MalformedURLException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private static boolean openWebpage(URI uri) {
+        Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
+        if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
+            try {
+                desktop.browse(uri);
+                return true;
+            } catch (IOException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+        }
+        return false;
+    }
+
+    private static boolean openWebpage(URL url) {
+        try {
+            return openWebpage(url.toURI());
+        } catch (URISyntaxException e) {
             LOGGER.error(e);
             e.printStackTrace();
         }
-
+        return false;
     }
 
     private void initListener() {
@@ -111,16 +160,15 @@ public class MainFrame extends JFrame {
             } else if (name.equals("state")) {
                 SwingWorker.StateValue state = (SwingWorker.StateValue) evt
                         .getNewValue();
-                switch (state) {
-                    case DONE:
-                        progressBarFrame.setVisible(false);
-                        break;
+                if (state == DONE) {
+                    progressBarFrame.setVisible(false);
                 }
             }
         });
         progressBarFrame.setVisible(true);
         worker.execute();
     }
+
 
     public void setPeData(FullPEData data) {
         try {
@@ -165,7 +213,7 @@ public class MainFrame extends JFrame {
     }
 
     private void initProgressBar() {
-        this.progressBarFrame = new JFrame();
+        this.progressBarFrame = new JFrame("Loading PE file");
         JPanel panel = new JPanel();
         JLabel label = new JLabel("Loading...");
         this.progressBar = new JProgressBar();
