@@ -43,20 +43,18 @@ import java.util.concurrent.ExecutionException;
 import static javax.swing.SwingUtilities.invokeLater;
 import static javax.swing.SwingWorker.StateValue.DONE;
 
-
+/**
+ * The main frame that sets everything in place and holds the main menu.
+ */
 public class MainFrame extends JFrame {
-
     private static final Logger LOGGER = LogManager.getLogger();
     private final JLabel filePathLabel = new JLabel();
-
     private final VisualizerPanel visualizerPanel = new VisualizerPanel();
-    private final PEDetailsPanel peDetailsPanel = new PEDetailsPanel();
-
+    private final PEDetailsPanel peDetailsPanel = new PEDetailsPanel(visualizerPanel);
     private FullPEData pedata = null;
     private PEComponentTree peComponentTree;
     private JFrame progressBarFrame;
     private JProgressBar progressBar;
-
     private final static String versionURL = "https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/upd_version.txt";
     private final static String currVersion = "/upd_version.txt";
     private final static String releasePage = "https://github.com/struppigel/PortexAnalyzerGUI/releases";
@@ -169,7 +167,6 @@ public class MainFrame extends JFrame {
         worker.execute();
     }
 
-
     public void setPeData(FullPEData data) {
         try {
             this.pedata = data;
@@ -256,7 +253,7 @@ public class MainFrame extends JFrame {
         JMenuItem open = new JMenuItem("Open...", new ImageIcon(getClass().getResource("/laptop-bug-icon.png")));
         fileMenu.add(open);
         open.addActionListener(arg0 -> {
-            String path = getFileNameFromUser();
+            String path = PortexSwingUtils.getOpenFileNameFromUser(this);
             if (path != null) {
                 filePathLabel.setText(path);
                 loadFile(new File(path));
@@ -268,21 +265,6 @@ public class MainFrame extends JFrame {
         fileMenu.add(exit);
         exit.addActionListener(arg0 -> dispose());
         return fileMenu;
-    }
-
-    private String getFileNameFromUser() {
-        File userdir = new File(System.getProperty("user.dir"));
-        JFileChooser fc = new JFileChooser(userdir);
-
-        int state = fc.showOpenDialog(this);
-
-        if (state == JFileChooser.APPROVE_OPTION) {
-            File file = fc.getSelectedFile();
-            if (file != null) {
-                return file.getAbsolutePath();
-            }
-        }
-        return null;
     }
 
     private class FileDropper extends DropTarget {

@@ -19,6 +19,9 @@ package com.github.struppigel.gui;
 
 import javax.swing.*;
 
+/**
+ * Small window showing the stuff in the About section
+ */
 public class AboutFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;

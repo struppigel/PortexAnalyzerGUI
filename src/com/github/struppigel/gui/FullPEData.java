@@ -19,13 +19,10 @@ package com.github.struppigel.gui;
 
 import com.github.katjahahn.parser.PEData;
 import com.github.katjahahn.parser.StandardField;
-import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.idata.ImportDLL;
 import com.github.katjahahn.parser.sections.rsrc.Resource;
-import com.github.katjahahn.parser.sections.rsrc.ResourceSection;
 import com.github.katjahahn.tools.Overlay;
-import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -35,7 +32,8 @@ import java.util.List;
 
 /**
  * Wrapper for the PEData.
- * This class makes sure to save things that we do not want to compute several times.
+ * This class makes sure to save things that we do not want to compute several times and
+ * definitely do not want to compute in the event dispatch threat.
  */
 public class FullPEData {
     private static final Logger LOGGER = LogManager.getLogger();

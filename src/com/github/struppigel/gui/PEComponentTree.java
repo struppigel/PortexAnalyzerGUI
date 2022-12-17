@@ -27,6 +27,9 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 
+/**
+ * The tree on the left side
+ */
 public class PEComponentTree extends JPanel {
 
     private static final Logger LOGGER = LogManager.getLogger();
@@ -135,7 +138,7 @@ public class PEComponentTree extends JPanel {
 
         root.add(anomaly);
         root.add(hashes);
-        // root.add(vis); // will do this later
+        root.add(vis);
 
         // no root
         peTree.setRootVisible(false);

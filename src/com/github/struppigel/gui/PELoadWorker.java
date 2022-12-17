@@ -57,6 +57,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Loads and computes all the data related to PE files, so that this code does not run in the event dispatch thread.
+ * Everything that is too complicated here must be improved in the library PortEx.
+ */
 public class PELoadWorker extends SwingWorker<FullPEData, Void> {
     private static final Logger LOGGER = LogManager.getLogger();
     private final String NL = System.getProperty("line.separator");
@@ -166,7 +170,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
             MessageDigest md5 = MessageDigest.getInstance("MD5");
             Hasher hasher = new Hasher(data);
             for (SectionHeader s : sectionTable.getSectionHeaders()) {
-                String secName = s.getName();
+                String secName = s.getNumber() + ". " + s.getName();
                 String md5Str = hash(hasher.sectionHash(s.getNumber(), md5));
                 String sha256Str = hash(hasher.sectionHash(s.getNumber(), sha256));
                 md5Str = md5Str.equals("") ? "empty section" : md5Str;
@@ -397,9 +401,5 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
         }
 
     }
-
-    // TODO build into file loading
-    // TODO add progress bar
-
 
 }

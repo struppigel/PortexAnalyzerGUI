@@ -30,20 +30,27 @@ import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static com.github.katjahahn.parser.optheader.StandardFieldEntryKey.ADDR_OF_ENTRY_POINT;
 
+/**
+ * Displays the data in the middle.
+ */
 public class PEDetailsPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private final String NL = System.getProperty("line.separator");
+    private final VisualizerPanel rightPanel;
     private FullPEData peData;
 
     /**
@@ -62,10 +69,11 @@ public class PEDetailsPanel extends JPanel {
      */
     private final JPanel tablePanel = new JPanel();
     private SectionsTabbedPanel tabbedPanel;
-    //private VisualizerPanel visPanel;
+    private VisualizerPanel visPanel;
 
-    public PEDetailsPanel() {
+    public PEDetailsPanel(VisualizerPanel visualizerPanel) {
         super(new GridLayout(1, 0));
+        this.rightPanel = visualizerPanel;
         initDetails();
     }
 
@@ -76,7 +84,20 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setDragEnabled(true);
         descriptionField.setLineWrap(true);
 
-        //this.visPanel = new VisualizerPanel(true, true, true, 50);  // Will do this later
+        JPanel bigVisuals = new JPanel();
+        visPanel = new VisualizerPanel(true, true, true, 180);
+        bigVisuals.setLayout(new BorderLayout());
+        bigVisuals.add(visPanel, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel();
+        JButton saveImgButton = new JButton("Save to file");
+        saveImgButton.addActionListener(e -> {
+            String path = PortexSwingUtils.getSaveFileNameFromUser(this);
+            new SaveImageFileWorker(path).execute();
+        });
+
+        buttonPanel.add(saveImgButton);
+        bigVisuals.add(buttonPanel, BorderLayout.PAGE_END);
 
         tabbedPanel = new SectionsTabbedPanel();
         tablePanel.setLayout(new GridLayout(0, 1));
@@ -84,13 +105,54 @@ public class PEDetailsPanel extends JPanel {
         cardPanel.add(tablePanel, "TABLE");
         cardPanel.add(scrollPaneDescription, "DESCRIPTION");
         cardPanel.add(tabbedPanel, "TABBED");
-        //cardPanel.add(visPanel, "VISUALIZATION"); // Will do this later
-
+        cardPanel.add(bigVisuals, "VISUALIZATION");
 
         //add the table to the frame
         setLayout(new BorderLayout());
         add(cardPanel, BorderLayout.CENTER);
         showDescriptionPanel();
+    }
+
+    private class SaveImageFileWorker extends SwingWorker<Boolean, Void> {
+        private String path;
+
+        public SaveImageFileWorker(String path) {
+            this.path = path;
+        }
+        @Override
+        protected Boolean doInBackground() {
+            try {
+                if(!path.toLowerCase().endsWith(".png")) {
+                    path += ".png";
+                }
+                ImageIO.write(visPanel.getImage(), "png", new File(path));
+            } catch (IOException ex) {
+                LOGGER.error(ex);
+                ex.printStackTrace();
+                return false;
+            }
+            return true;
+        }
+        @Override
+        protected void done() {
+            try {
+                Boolean success = get();
+                if(success) {
+                    JOptionPane.showMessageDialog(null,
+                            "File successfully saved",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(null,
+                            "Unable to save file :(",
+                            "Something went wrong",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (ExecutionException | InterruptedException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+        }
     }
 
     public static JTable createEmptyTable() { // TODO make this a Table class instead!
@@ -107,13 +169,12 @@ public class PEDetailsPanel extends JPanel {
     public void setPeData(FullPEData peData) {
         this.peData = peData;
         tabbedPanel.setPeData(peData);
-        /*
         try {
             visPanel.visualizePE(peData.getFile());
         } catch (IOException e) {
             e.printStackTrace();
             LOGGER.error(e);
-        }*/
+        }
     }
 
     public void showDosStub() {
@@ -232,17 +293,26 @@ public class PEDetailsPanel extends JPanel {
 
     private void showDescriptionPanel() {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "DESCRIPTION");
+        rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to DESCRIPTION");
     }
 
     private void showTablePanel() {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABLE");
+        rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to TABLE");
     }
 
     private void showTabbedPanel() {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABBED");
+        rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to TABBED");
+    }
+
+    public void showVisualization() {
+        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "VISUALIZATION");
+        rightPanel.setVisible(false);
+        LOGGER.debug("Card panel set to VISUALIZATION");
     }
 
     public void showSectionTable() {
@@ -463,11 +533,6 @@ public class PEDetailsPanel extends JPanel {
         String text = peData.getHashesReport();
         showTextEntriesAndDescription(entries, tableHeader, text);
         showTablePanel();
-    }
-
-    public void showVisualization() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "VISUALIZATION");
-        LOGGER.debug("Card panel set to VISUALIZATION");
     }
 
     public void showPEFormat() {

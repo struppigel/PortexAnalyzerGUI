@@ -31,6 +31,9 @@ import java.util.stream.Stream;
 
 import static com.github.katjahahn.parser.sections.SectionHeaderKey.*;
 
+/**
+ * There can be many sections, so this panel adds tabs at the top.
+ */
 public class SectionsTabbedPanel extends JPanel {
 
     private static final Logger LOGGER = LogManager.getLogger();

@@ -32,6 +32,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
+/**
+ * Panel with byteplot, entropy and PE structure image
+ */
 public class VisualizerPanel extends JPanel {
 
     private static final Logger LOGGER = LogManager.getLogger();
@@ -47,6 +50,7 @@ public class VisualizerPanel extends JPanel {
     private boolean enableEntropy = true;
 
     private int imageWidth = 50;
+    private BufferedImage image;
 
     public VisualizerPanel() {
         super();
@@ -77,6 +81,10 @@ public class VisualizerPanel extends JPanel {
     public void visualizePE(File pefile) throws IOException {
         this.pefile = pefile;
         new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend).execute();
+    }
+
+    public BufferedImage getImage() {
+        return image;
     }
 
     private class VisualizerWorker extends SwingWorker<BufferedImage, Void> {
@@ -124,7 +132,7 @@ public class VisualizerPanel extends JPanel {
         @Override
         protected void done() {
             try {
-                BufferedImage image = get();
+                image = get();
                 if(image == null) return;
                 visLabel.setIcon(new ImageIcon(image));
                 visLabel.repaint();

@@ -24,8 +24,10 @@ import javax.swing.*;
 import javax.swing.UIManager.LookAndFeelInfo;
 import java.awt.*;
 
+/**
+ * Sets the look and feel and starts the GUI
+ */
 public class Starter {
-
     private static final Logger LOGGER = LogManager.getLogger();
 
     public static void main(String[] args) {
