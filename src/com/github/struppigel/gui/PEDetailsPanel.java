@@ -26,7 +26,12 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.katjahahn.parser.sections.rsrc.Resource;
+import com.github.katjahahn.parser.sections.rsrc.icon.GroupIconResource;
+import com.github.katjahahn.parser.sections.rsrc.icon.IcoFile;
+import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
 import com.google.common.base.Optional;
+import net.ifok.image.image4j.codec.ico.ICODecoder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -35,8 +40,10 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -110,6 +117,7 @@ public class PEDetailsPanel extends JPanel {
         //add the table to the frame
         setLayout(new BorderLayout());
         add(cardPanel, BorderLayout.CENTER);
+
         showDescriptionPanel();
     }
 
@@ -169,6 +177,21 @@ public class PEDetailsPanel extends JPanel {
     public void setPeData(FullPEData peData) {
         this.peData = peData;
         tabbedPanel.setPeData(peData);
+
+        /* TODO this is just for testing, remove it after
+        List<GroupIconResource> icoResList = IconParser.extractGroupIcons(peData.getResources(), peData.getFile());
+        IcoFile ico = icoResList.get(0).toIcoFile();
+        InputStream is = ico.getInputStream();
+        try {
+            List<BufferedImage> images = ICODecoder.read(is);
+            JLabel icoPanel = new JLabel(new ImageIcon(images.get(0)));
+            add(icoPanel, BorderLayout.SOUTH);
+            this.repaint();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        */// TODO delete until here
+
         try {
             visPanel.visualizePE(peData.getFile());
         } catch (IOException e) {

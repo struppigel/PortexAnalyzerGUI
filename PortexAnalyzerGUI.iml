@@ -11,7 +11,8 @@
     <orderEntry type="library" name="batik.transcoder" level="project" />
     <orderEntry type="library" name="batik.bridge" level="project" />
     <orderEntry type="library" name="batik.util" level="project" />
-    <orderEntry type="library" name="PortexAnalyzer" level="project" />
     <orderEntry type="library" name="apache.logging.log4j.core" level="project" />
+    <orderEntry type="library" name="PortexAnalyzer" level="project" />
+    <orderEntry type="library" name="net.ifok.image.image4j" level="project" />
   </component>
 </module>

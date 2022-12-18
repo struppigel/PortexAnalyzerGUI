@@ -25,6 +25,8 @@ import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.image.BufferedImage;
@@ -39,11 +41,12 @@ public class VisualizerPanel extends JPanel {
 
     private static final Logger LOGGER = LogManager.getLogger();
 
+    private javax.swing.Timer waitingTimer;
+
     private final JLabel visLabel = new JLabel();
     private File pefile;
 
-    private long timeSinceLastEventManaged = 0;
-    private final static long MINIMUM_TIME = 100;
+    private final static int RESIZE_DELAY = 1000;
 
     private boolean enableLegend = false;
     private boolean enableByteplot = true;
@@ -147,21 +150,38 @@ public class VisualizerPanel extends JPanel {
         }
     }
 
-    private class ResizeListener extends ComponentAdapter {
+    private class ResizeListener extends ComponentAdapter implements ActionListener {
         public void componentResized(ComponentEvent e) {
-            long timeSystem = System.currentTimeMillis();
-            if(timeSystem - timeSinceLastEventManaged > MINIMUM_TIME) {
+            if(waitingTimer == null) {
                 try {
-                    timeSinceLastEventManaged  = timeSystem;
-                    new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend).execute();
+                    waitingTimer = new Timer(RESIZE_DELAY, this);
+                    waitingTimer.start();
                 } catch (Exception ex) {
                     LOGGER.error("Visualization update failed " + ex.getMessage());
                     throw new RuntimeException(ex);
                 }
+            } else {
+                waitingTimer.restart();
             }
         }
-    }
 
+        public void actionPerformed(ActionEvent ae)
+        {
+            /* Timer finished? */
+            if (ae.getSource()==waitingTimer)
+            {
+                /* Stop timer */
+                waitingTimer.stop();
+                waitingTimer = null;
+                /* Resize */
+                applyResize();
+            }
+        }
+
+        private void applyResize() {
+            new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend).execute();
+        }
+    }
 
     public void setEnableLegend(boolean enableLegend) {
         this.enableLegend = enableLegend;
