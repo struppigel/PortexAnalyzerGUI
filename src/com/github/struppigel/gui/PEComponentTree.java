@@ -53,6 +53,7 @@ public class PEComponentTree extends JPanel {
     private static final String HASHES_TEXT = "Hashes";
     private static final String VISUALIZATION_TEXT = "Visualization";
     private static final String PE_FORMAT_TEXT = "PE Format";
+    private static final String ICONS_TEXT = "Icons";
     private final PEDetailsPanel peDetailsPanel;
     private FullPEData peData = null;
     private JTree peTree;
@@ -87,6 +88,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode resources = new DefaultMutableTreeNode(RESOURCES_TEXT);
         DefaultMutableTreeNode manifest = new DefaultMutableTreeNode(MANIFEST_TEXT);
         DefaultMutableTreeNode version = new DefaultMutableTreeNode(VERSIONINFO_TEXT);
+        DefaultMutableTreeNode icons = new DefaultMutableTreeNode(ICONS_TEXT);
 
         DefaultMutableTreeNode imports = new DefaultMutableTreeNode(IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
@@ -116,6 +118,9 @@ public class PEComponentTree extends JPanel {
             }
             if(peData.hasVersionInfo()) {
                 resources.add(version);
+            }
+            if(peData.hasIcons()){
+                resources.add(icons);
             }
         }
 
@@ -241,6 +246,8 @@ public class PEComponentTree extends JPanel {
             case PE_FORMAT_TEXT:
                 peDetailsPanel.showPEFormat();
                 break;
+            case ICONS_TEXT:
+                peDetailsPanel.showIcons();
         }
     }
 }

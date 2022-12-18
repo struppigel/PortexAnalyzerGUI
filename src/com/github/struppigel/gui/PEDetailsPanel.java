@@ -26,12 +26,7 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.katjahahn.parser.sections.rsrc.Resource;
-import com.github.katjahahn.parser.sections.rsrc.icon.GroupIconResource;
-import com.github.katjahahn.parser.sections.rsrc.icon.IcoFile;
-import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
 import com.google.common.base.Optional;
-import net.ifok.image.image4j.codec.ico.ICODecoder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -40,10 +35,8 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -76,7 +69,8 @@ public class PEDetailsPanel extends JPanel {
      */
     private final JPanel tablePanel = new JPanel();
     private SectionsTabbedPanel tabbedPanel;
-    private VisualizerPanel visPanel;
+    private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);;
+    private IconPanel iconPanel = new IconPanel();
 
     public PEDetailsPanel(VisualizerPanel visualizerPanel) {
         super(new GridLayout(1, 0));
@@ -92,18 +86,10 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setLineWrap(true);
 
         JPanel bigVisuals = new JPanel();
-        visPanel = new VisualizerPanel(true, true, true, 180);
         bigVisuals.setLayout(new BorderLayout());
         bigVisuals.add(visPanel, BorderLayout.CENTER);
 
-        JPanel buttonPanel = new JPanel();
-        JButton saveImgButton = new JButton("Save to file");
-        saveImgButton.addActionListener(e -> {
-            String path = PortexSwingUtils.getSaveFileNameFromUser(this);
-            new SaveImageFileWorker(path).execute();
-        });
-
-        buttonPanel.add(saveImgButton);
+        JPanel buttonPanel = initSaveVisualsButtonPanel();
         bigVisuals.add(buttonPanel, BorderLayout.PAGE_END);
 
         tabbedPanel = new SectionsTabbedPanel();
@@ -113,12 +99,25 @@ public class PEDetailsPanel extends JPanel {
         cardPanel.add(scrollPaneDescription, "DESCRIPTION");
         cardPanel.add(tabbedPanel, "TABBED");
         cardPanel.add(bigVisuals, "VISUALIZATION");
+        cardPanel.add(new JScrollPane(iconPanel), "ICONS");
 
         //add the table to the frame
         setLayout(new BorderLayout());
         add(cardPanel, BorderLayout.CENTER);
 
         showDescriptionPanel();
+    }
+
+    private JPanel initSaveVisualsButtonPanel() {
+        JPanel buttonPanel = new JPanel();
+        JButton saveImgButton = new JButton("Save to file");
+        saveImgButton.addActionListener(e -> {
+            String path = PortexSwingUtils.getSaveFileNameFromUser(this);
+            new SaveImageFileWorker(path).execute();
+        });
+
+        buttonPanel.add(saveImgButton);
+        return buttonPanel;
     }
 
     private class SaveImageFileWorker extends SwingWorker<Boolean, Void> {
@@ -177,21 +176,7 @@ public class PEDetailsPanel extends JPanel {
     public void setPeData(FullPEData peData) {
         this.peData = peData;
         tabbedPanel.setPeData(peData);
-
-        /* TODO this is just for testing, remove it after
-        List<GroupIconResource> icoResList = IconParser.extractGroupIcons(peData.getResources(), peData.getFile());
-        IcoFile ico = icoResList.get(0).toIcoFile();
-        InputStream is = ico.getInputStream();
-        try {
-            List<BufferedImage> images = ICODecoder.read(is);
-            JLabel icoPanel = new JLabel(new ImageIcon(images.get(0)));
-            add(icoPanel, BorderLayout.SOUTH);
-            this.repaint();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        */// TODO delete until here
-
+        iconPanel.setPeData(peData);
         try {
             visPanel.visualizePE(peData.getFile());
         } catch (IOException e) {
@@ -324,6 +309,12 @@ public class PEDetailsPanel extends JPanel {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABLE");
         rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to TABLE");
+    }
+
+    private void showIconPanel() {
+        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "ICONS");
+        rightPanel.setVisible(true);
+        LOGGER.debug("Card panel set to ICONS");
     }
 
     private void showTabbedPanel() {
@@ -512,6 +503,11 @@ public class PEDetailsPanel extends JPanel {
         showTextEntries(peData.getResourceTableEntries(), tableHeader);
         showTablePanel();
 
+    }
+
+    public void showIcons() {
+        if (peData == null) return;
+        showIconPanel();
     }
 
     public void showImports() {

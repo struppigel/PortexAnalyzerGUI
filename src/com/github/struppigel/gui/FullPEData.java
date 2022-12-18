@@ -22,6 +22,7 @@ import com.github.katjahahn.parser.StandardField;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.idata.ImportDLL;
 import com.github.katjahahn.parser.sections.rsrc.Resource;
+import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
 import com.github.katjahahn.tools.Overlay;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -206,4 +207,7 @@ public class FullPEData {
         return vsInfoTable;
     }
 
+    public boolean hasIcons() {
+        return resources.stream().anyMatch(r -> IconParser.isGroupIcon(r));
+    }
 }
