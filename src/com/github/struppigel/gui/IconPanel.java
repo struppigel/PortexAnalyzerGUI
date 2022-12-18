@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,6 +28,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -36,12 +37,18 @@ public class IconPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private FullPEData peData;
 
+    private List<BufferedImage> icons;
+
     public void setPeData(FullPEData peData) {
         this.peData = peData;
         new IconUpdateWorker(peData.getPeData()).execute();
     }
 
-     private class IconUpdateWorker extends SwingWorker<List<BufferedImage>, Void> {
+    public List<BufferedImage> getIcons() {
+        return icons;
+    }
+
+    private class IconUpdateWorker extends SwingWorker<List<BufferedImage>, Void> {
         private final PEData data;
 
             public IconUpdateWorker(PEData data){
@@ -62,7 +69,7 @@ public class IconPanel extends JPanel {
         protected void done() {
             try {
                 // get images
-                List<BufferedImage> images = get();
+                icons = get();
 
                 // init Swing components in the icon panel
                 GridLayout grid = new GridLayout(0,2);
@@ -72,7 +79,7 @@ public class IconPanel extends JPanel {
                 IconPanel.this.add(gridPanel);
 
                 // add all icons to the grid
-                for(BufferedImage image : images){
+                for(BufferedImage image : icons){
                     JLabel iconLabel = new JLabel(new ImageIcon(image));
                     gridPanel.add(iconLabel);
                 }

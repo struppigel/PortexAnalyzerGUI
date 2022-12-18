@@ -52,17 +52,18 @@ public class MainFrame extends JFrame {
     private final VisualizerPanel visualizerPanel = new VisualizerPanel();
     private final PEDetailsPanel peDetailsPanel = new PEDetailsPanel(visualizerPanel);
     private FullPEData pedata = null;
-    private PEComponentTree peComponentTree;
+    private PEComponentTree peComponentTree = new PEComponentTree(peDetailsPanel);;
     private JFrame progressBarFrame;
     private JProgressBar progressBar;
     private final static String versionURL = "https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/upd_version.txt";
     private final static String currVersion = "/upd_version.txt";
     private final static String releasePage = "https://github.com/struppigel/PortexAnalyzerGUI/releases";
+    private final JLabel progressText = new JLabel("Loading ...");
 
     public MainFrame() {
         super("Portex Analyzer v. " + AboutFrame.version);
         initGUI();
-        initListener();
+        initDropTargets();
         checkForUpdate();
     }
 
@@ -140,7 +141,7 @@ public class MainFrame extends JFrame {
         return false;
     }
 
-    private void initListener() {
+    private void initDropTargets() {
         // file drag and drop support
         this.setDropTarget(new FileDropper());
         peDetailsPanel.setDropTarget(new FileDropper());
@@ -149,12 +150,13 @@ public class MainFrame extends JFrame {
     }
 
     private void loadFile(File file) {
-        PELoadWorker worker = new PELoadWorker(file, this);
+        PELoadWorker worker = new PELoadWorker(file, this, progressText);
         worker.addPropertyChangeListener(evt -> {
             String name = evt.getPropertyName();
             if (name.equals("progress")) {
                 int progress = (Integer) evt.getNewValue();
                 progressBar.setValue(progress);
+                progressBar.setString(progress + " %");
             } else if (name.equals("state")) {
                 SwingWorker.StateValue state = (SwingWorker.StateValue) evt
                         .getNewValue();
@@ -186,25 +188,27 @@ public class MainFrame extends JFrame {
     }
 
     private void initGUI() {
+        // Main frame settings
         setSize(1024, 600);
         setLocationRelativeTo(null);
         setVisible(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        JPanel inputPathPanel = new JPanel();
-
-        inputPathPanel.add(filePathLabel);
-
+        // Init main panel that holds everything
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout());
+
+        // Set up upper panel with file path
+        JPanel inputPathPanel = new JPanel();
+        inputPathPanel.add(filePathLabel);
         panel.add(inputPathPanel, BorderLayout.PAGE_START);
 
-        this.peComponentTree = new PEComponentTree(peDetailsPanel);
-
+        // Add all other components
         panel.add(peDetailsPanel, BorderLayout.CENTER);
         panel.add(peComponentTree, BorderLayout.LINE_START);
         panel.add(visualizerPanel, BorderLayout.LINE_END);
         this.add(panel, BorderLayout.CENTER);
+
         initMenu();
         initProgressBar();
     }
@@ -212,17 +216,23 @@ public class MainFrame extends JFrame {
     private void initProgressBar() {
         this.progressBarFrame = new JFrame("Loading PE file");
         JPanel panel = new JPanel();
-        JLabel label = new JLabel("Loading...");
         this.progressBar = new JProgressBar();
         progressBar.setPreferredSize(new Dimension(250, 25));
         progressBar.setIndeterminate(false);
-        int max = 100;
-        progressBar.setMaximum(max);
-        panel.add(label);
+        progressBar.setStringPainted(true);
+        progressBar.setMaximum(100);
+
+        panel.setLayout(new GridLayout(0,1));
         panel.add(progressBar);
+
+        // this panel makes sure the text is in the middle
+        JPanel middleText = new JPanel();
+        middleText.add(progressText);
+        panel.add(middleText);
+
         progressBarFrame.add(panel);
         progressBarFrame.pack();
-        progressBarFrame.setSize(400, 90);
+        progressBarFrame.setSize(400, 100);
         progressBarFrame.setLocationRelativeTo(null);
         progressBarFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
     }

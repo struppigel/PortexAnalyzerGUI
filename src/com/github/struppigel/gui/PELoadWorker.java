@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,55 +61,74 @@ import java.util.stream.Stream;
  * Loads and computes all the data related to PE files, so that this code does not run in the event dispatch thread.
  * Everything that is too complicated here must be improved in the library PortEx.
  */
-public class PELoadWorker extends SwingWorker<FullPEData, Void> {
+public class PELoadWorker extends SwingWorker<FullPEData, String> {
     private static final Logger LOGGER = LogManager.getLogger();
     private final String NL = System.getProperty("line.separator");
     private final File file;
     private final MainFrame frame;
 
     public static final int MAX_MANIFEST_SIZE = 0x2000;
+    private final JLabel progressText;
 
-    public PELoadWorker(File file, MainFrame frame) {
+    public PELoadWorker(File file, MainFrame frame, JLabel progressText) {
         this.file = file;
         this.frame = frame;
+        this.progressText = progressText;
     }
 
     @Override
     protected FullPEData doInBackground() throws Exception {
         setProgress(0);
+        publish("Loading Headers...");
         PEData data = PELoader.loadPE(file);
         setProgress(10);
+
+        publish("Calculating Hashes...");
         ReportCreator r = ReportCreator.newInstance(data.getFile());
         String hashesReport = createHashesReport(data);
         List<String[]> hashesForSections = createHashTableEntries(data);
         setProgress(20);
+
+        publish("Calculating Entropies...");
         double[] sectionEntropies = calculateSectionEntropies(data);
         setProgress(30);
+
+        publish("Extracting Imports...");
         List<ImportDLL> importDLLs = extractImports(data);
         setProgress(40);
         List<String[]> impEntries = createImportTableEntries(importDLLs);
         setProgress(50);
+
+        publish("Loading Resources...");
         List<String[]> resourceTableEntries = createResourceTableEntries(data);
         String manifest = readManifest(data);
         List<String[]> vsInfoTable = createVersionInfoEntries(data);
         setProgress(60);
+
+        publish("Loading Exports...");
         List<ExportEntry> exports = getExports(data);
         List<String[]> exportEntries = createExportTableEntries(data);
         setProgress(70);
+
+        publish("Loading Debug Info...");
         String debugInfo = getDebugInfo(data);
         List<StandardField> debugTableEntries = getDebugTableEntries(data);
-        setProgress(75);
-        List<String[]> anomaliesTable = createAnomalyTableEntries(data);
         setProgress(80);
-        String anomalies = r.anomalyReport();
+
+        publish("Scanning for Anomalies...");
+        List<String[]> anomaliesTable = createAnomalyTableEntries(data);
         setProgress(90);
+
+        publish("Scanning Overlay...");
         Overlay overlay = new Overlay(data);
         double overlayEntropy = ShannonEntropy.entropy(data.getFile(), overlay.getOffset(), overlay.getSize());
         List<String> overlaySignatures = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAt(data.getFile(), overlay.getOffset());
         setProgress(100);
+
+        publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, getResources(data), manifest, exportEntries, exports,
-                debugInfo, anomalies, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable);
+                debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable);
     }
 
     private List<String[]> createVersionInfoEntries(PEData data){
@@ -385,15 +404,23 @@ public class PELoadWorker extends SwingWorker<FullPEData, Void> {
     }
 
     @Override
+    protected void process(List<String> statusText) {
+        String lastMsg = statusText.get(statusText.size() - 1);
+        progressText.setText(lastMsg);
+    }
+
+    @Override
     protected void done() {
         try {
             FullPEData data = get();
             frame.setPeData(data);
         } catch (InterruptedException | ExecutionException e) {
             String message = "Could not load PE file! Reason: " + e.getMessage();
+            if(e.getMessage().contains("given file is no PE file")){
+                message = "Could not load PE file! The given file is no PE file";
+            }
             LOGGER.warn(message);
             LOGGER.warn(e);
-            e.printStackTrace();
             JOptionPane.showMessageDialog(null,
                     message,
                     "Unable to load",

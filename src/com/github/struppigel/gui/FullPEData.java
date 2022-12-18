@@ -6,7 +6,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *   <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -55,14 +55,13 @@ public class FullPEData {
     private final List<String[]> vsInfoTable;
     private List<String[]> exportTableEntries;
     private String debugInfo;
-    private String anomalyReport;
     private List<String[]> sectionHashTableEntries;
 
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<String[]> importTableEntries,
                       List<String[]> resourceTableEntries, List<Resource> resources, String manifest,
                       List<String[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
-                      String anomalyReport, String hashes, List<String[]> sectionHashTableEntries,
+                      String hashes, List<String[]> sectionHashTableEntries,
                       List<String[]> anomaliesTable, List<StandardField> debugTableEntries, List<String[]> vsInfoTable) {
         this.pedata = data;
         this.overlay = overlay;
@@ -77,7 +76,6 @@ public class FullPEData {
         this.exportTableEntries = exportTableEntries;
         this.exports = exports;
         this.debugInfo = debugInfo;
-        this.anomalyReport = anomalyReport;
         this.hashes = hashes;
         this.sectionHashTableEntries = sectionHashTableEntries;
         this.anomaliesTable = anomaliesTable;
@@ -180,10 +178,6 @@ public class FullPEData {
 
     public String getDebugInfo() {
         return this.debugInfo;
-    }
-
-    public String getAnomalyReport() {
-        return this.anomalyReport;
     }
 
     public String getHashesReport() {

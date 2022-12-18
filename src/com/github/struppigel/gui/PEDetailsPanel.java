@@ -1,13 +1,13 @@
 /**
  * *****************************************************************************
  * Copyright 2022 Karsten Hahn
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -26,6 +26,7 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.katjahahn.parser.sections.rsrc.icon.IcoFile;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,8 +36,10 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -69,7 +72,8 @@ public class PEDetailsPanel extends JPanel {
      */
     private final JPanel tablePanel = new JPanel();
     private SectionsTabbedPanel tabbedPanel;
-    private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);;
+    private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
+    ;
     private IconPanel iconPanel = new IconPanel();
 
     public PEDetailsPanel(VisualizerPanel visualizerPanel) {
@@ -85,12 +89,20 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setDragEnabled(true);
         descriptionField.setLineWrap(true);
 
+        // visualizer page + button
         JPanel bigVisuals = new JPanel();
         bigVisuals.setLayout(new BorderLayout());
         bigVisuals.add(visPanel, BorderLayout.CENTER);
 
-        JPanel buttonPanel = initSaveVisualsButtonPanel();
-        bigVisuals.add(buttonPanel, BorderLayout.PAGE_END);
+        JPanel visButtonPanel = initSaveVisualsButtonPanel();
+        bigVisuals.add(visButtonPanel, BorderLayout.PAGE_END);
+
+        // icons page + button
+        JPanel iconWrapperPanel = new JPanel();
+        JPanel icoButtonPanel = initSaveIconsButtonPanel();
+        iconWrapperPanel.setLayout(new BorderLayout());
+        iconWrapperPanel.add(new JScrollPane(iconPanel), BorderLayout.CENTER);
+        iconWrapperPanel.add(icoButtonPanel, BorderLayout.PAGE_END);
 
         tabbedPanel = new SectionsTabbedPanel();
         tablePanel.setLayout(new GridLayout(0, 1));
@@ -99,13 +111,77 @@ public class PEDetailsPanel extends JPanel {
         cardPanel.add(scrollPaneDescription, "DESCRIPTION");
         cardPanel.add(tabbedPanel, "TABBED");
         cardPanel.add(bigVisuals, "VISUALIZATION");
-        cardPanel.add(new JScrollPane(iconPanel), "ICONS");
+        cardPanel.add(iconWrapperPanel, "ICONS");
 
         //add the table to the frame
         setLayout(new BorderLayout());
         add(cardPanel, BorderLayout.CENTER);
 
         showDescriptionPanel();
+    }
+
+    private JPanel initSaveIconsButtonPanel() {
+        JPanel buttonPanel = new JPanel();
+        JButton saveImgButton = new JButton("Save all");
+        saveImgButton.addActionListener(e -> {
+            String path = PortexSwingUtils.getSaveFolderNameFromUser(this);
+            new SaveIconsWorker(path, iconPanel.getIcons()).execute();
+        });
+
+        buttonPanel.add(saveImgButton);
+        return buttonPanel;
+    }
+
+    private class SaveIconsWorker extends SwingWorker<Boolean, Void> {
+        private final List<BufferedImage>  icons;
+        private final String folder;
+
+        public SaveIconsWorker(String folder, List<BufferedImage> icons) {
+            this.folder = folder;
+            this.icons = icons;
+        }
+
+        @Override
+        protected Boolean doInBackground() {
+            int counter = 0;
+            boolean successFlag = true;
+            for(BufferedImage icon : icons){
+                File file;
+                // find next file path that does not exist
+                do {
+                    file = Paths.get(folder, counter + ".png").toFile();
+                    counter++;
+                } while(file.exists());
+                try {
+                    ImageIO.write(icon, "png", file);
+                } catch (IOException e) {
+                    LOGGER.error(e);
+                    successFlag = false;
+                }
+            }
+            return successFlag;
+        }
+
+        @Override
+        protected void done() {
+            try {
+                Boolean success = get();
+                if (success) {
+                    JOptionPane.showMessageDialog(null,
+                            "Icons successfully saved",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(null,
+                            "Unable to save some icons :(",
+                            "Something went wrong",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (ExecutionException | InterruptedException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+        }
     }
 
     private JPanel initSaveVisualsButtonPanel() {
@@ -126,10 +202,11 @@ public class PEDetailsPanel extends JPanel {
         public SaveImageFileWorker(String path) {
             this.path = path;
         }
+
         @Override
         protected Boolean doInBackground() {
             try {
-                if(!path.toLowerCase().endsWith(".png")) {
+                if (!path.toLowerCase().endsWith(".png")) {
                     path += ".png";
                 }
                 ImageIO.write(visPanel.getImage(), "png", new File(path));
@@ -140,11 +217,12 @@ public class PEDetailsPanel extends JPanel {
             }
             return true;
         }
+
         @Override
         protected void done() {
             try {
                 Boolean success = get();
-                if(success) {
+                if (success) {
                     JOptionPane.showMessageDialog(null,
                             "File successfully saved",
                             "Success",
@@ -207,7 +285,7 @@ public class PEDetailsPanel extends JPanel {
         text += "Machine type: " + header.getMachineType().getDescription() + NL;
         text += "Characteristics: " + NL;
         text += header.getCharacteristics().stream().map(ch -> "\t* " + ch.getDescription()).collect(Collectors.joining(NL));
-        if(header.getCharacteristics().size() == 0) {
+        if (header.getCharacteristics().size() == 0) {
             text += "no characteristics set";
         }
         String[] tableHeader = {"Description", "Value", "Value offset"};
@@ -435,7 +513,7 @@ public class PEDetailsPanel extends JPanel {
             for (String s : sigs) {
                 text += s + NL;
             }
-            if(sigs.size() == 0) {
+            if (sigs.size() == 0) {
                 text += "no matches";
             }
 
@@ -546,7 +624,7 @@ public class PEDetailsPanel extends JPanel {
 
     public void showHashes() {
         if (peData == null) return;
-        
+
         String[] tableHeader = {"Section", "Type", "Hash value"};
         List<String[]> entries = peData.getSectionHashTableEntries();
         String text = peData.getHashesReport();
