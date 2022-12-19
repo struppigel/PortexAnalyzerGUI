@@ -20,15 +20,18 @@ package com.github.struppigel.gui;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import javax.swing.JTable;
+import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import java.awt.Dimension;
+import java.awt.*;
 
 public class PEFieldsTable extends JTable {
 
     private static final Logger LOGGER = LogManager.getLogger();
-    public PEFieldsTable() {
+    private final boolean enableHex;
+
+    public PEFieldsTable(boolean enableHex) {
+        this.enableHex = enableHex;
         initTable();
     }
 
@@ -38,8 +41,8 @@ public class PEFieldsTable extends JTable {
         setModel(model);
 
         // show long and int as hexadecimal string
-        setDefaultRenderer(Long.class, new HexValueRenderer());
-        setDefaultRenderer(Integer.class, new HexValueRenderer());
+        setDefaultRenderer(Long.class, new HexValueRenderer(enableHex));
+        setDefaultRenderer(Integer.class, new HexValueRenderer(enableHex));
 
         setCellSelectionEnabled(true);
         setPreferredScrollableViewportSize(new Dimension(500, 70));
@@ -49,6 +52,7 @@ public class PEFieldsTable extends JTable {
     }
 
     public static class PETableModel extends DefaultTableModel {
+
         @Override
         public Class<?> getColumnClass(int columnIndex) {
             if (this.getColumnCount() < columnIndex || this.getRowCount() == 0) {
@@ -60,6 +64,12 @@ public class PEFieldsTable extends JTable {
     }
 
     public static class HexValueRenderer extends DefaultTableCellRenderer {
+
+        private boolean enableHex;
+
+        public HexValueRenderer(boolean enableHex){
+            this.enableHex = enableHex;
+        }
         @Override
         public void setValue(Object value){
             if(value == null) {
@@ -67,11 +77,19 @@ public class PEFieldsTable extends JTable {
             }
             if(value.getClass() == Long.class) {
                 Long lvalue = (Long) value;
-                setText(toHex(lvalue));
+                if(enableHex) {
+                    setText(toHex(lvalue));
+                } else {
+                    setText(lvalue.toString());
+                }
             }
             if(value.getClass() == Integer.class) {
                 Integer ivalue = (Integer) value;
-                setText(toHex(ivalue));
+                if(enableHex) {
+                    setText(toHex(ivalue));
+                } else {
+                    setText(ivalue.toString());
+                }
             }
         }
     }

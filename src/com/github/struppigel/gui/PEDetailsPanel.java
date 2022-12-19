@@ -26,7 +26,6 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.katjahahn.parser.sections.rsrc.icon.IcoFile;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -54,6 +53,7 @@ public class PEDetailsPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private final String NL = System.getProperty("line.separator");
     private final VisualizerPanel rightPanel;
+    private final MainFrame parent;
     private FullPEData peData;
 
     /**
@@ -75,10 +75,12 @@ public class PEDetailsPanel extends JPanel {
     private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
     ;
     private IconPanel iconPanel = new IconPanel();
+    private boolean hexEnabled;
 
-    public PEDetailsPanel(VisualizerPanel visualizerPanel) {
+    public PEDetailsPanel(VisualizerPanel visualizerPanel, MainFrame mainFrame) {
         super(new GridLayout(1, 0));
         this.rightPanel = visualizerPanel;
+        this.parent = mainFrame;
         initDetails();
     }
 
@@ -252,6 +254,12 @@ public class PEDetailsPanel extends JPanel {
         }
     }
 
+    public void setToHex(boolean hexEnabled) {
+        tabbedPanel.setToHex(hexEnabled);
+        this.hexEnabled = hexEnabled;
+        parent.refreshSelection();
+    }
+
     public void showDosStub() {
         if (peData != null) {
             MSDOSHeader header = peData.getPeData().getMSDOSHeader();
@@ -418,7 +426,7 @@ public class PEDetailsPanel extends JPanel {
 
     private void showFieldEntries(List<StandardField> entries, String[] tableHeader) {
         cleanUpTablePanel();
-        JTable table = new PEFieldsTable();
+        JTable table = new PEFieldsTable(hexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
@@ -433,7 +441,7 @@ public class PEDetailsPanel extends JPanel {
     private void showFieldEntriesAndDescription(List<StandardField> entries, String[] tableHeader, String text) {
         cleanUpTablePanel();
         tablePanel.add(new JScrollPane(new JTextArea(text)));
-        JTable table = new PEFieldsTable();
+        JTable table = new PEFieldsTable(hexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
@@ -447,7 +455,7 @@ public class PEDetailsPanel extends JPanel {
 
     private void showTextEntries(List<Object[]> entries, String[] tableHeader) {
         cleanUpTablePanel();
-        JTable table = new PEFieldsTable();
+        JTable table = new PEFieldsTable(hexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         model.setColumnIdentifiers(tableHeader);
@@ -466,7 +474,7 @@ public class PEDetailsPanel extends JPanel {
         t.setDragEnabled(true);
         t.setLineWrap(true);
         tablePanel.add(new JScrollPane(t));
-        JTable table = new PEFieldsTable();
+        JTable table = new PEFieldsTable(hexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         model.setColumnIdentifiers(tableHeader);

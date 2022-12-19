@@ -21,11 +21,12 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
-import javax.swing.event.TreeSelectionEvent;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * The tree on the left side
@@ -147,11 +148,34 @@ public class PEComponentTree extends JPanel {
 
         // no root
         peTree.setRootVisible(false);
-        // we expand some paths so it doesn't look empty
-        peTree.expandPath(new TreePath(dosStub));
         // reload the tree model to actually show the update
         DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
         model.reload();
+        // expand the tree per default
+        setTreeExpandedState(peTree, true);
+    }
+
+    // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
+    private static void setTreeExpandedState(JTree tree, boolean expanded) {
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getModel().getRoot();
+        setNodeExpandedState(tree, node, expanded);
+    }
+
+    // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
+    private static void setNodeExpandedState(JTree tree, DefaultMutableTreeNode node, boolean expanded) {
+        List<DefaultMutableTreeNode> list = Collections.list(node.children());
+        for (DefaultMutableTreeNode treeNode : list) {
+            setNodeExpandedState(tree, treeNode, expanded);
+        }
+        if (!expanded && node.isRoot()) {
+            return;
+        }
+        TreePath path = new TreePath(node.getPath());
+        if (expanded) {
+            tree.expandPath(path);
+        } else {
+            tree.collapsePath(path);
+        }
     }
 
     public void setSelectionRow(int i) {
@@ -175,12 +199,11 @@ public class PEComponentTree extends JPanel {
 
         add(peTree);
         peTree.setRootVisible(false);
-        peTree.addTreeSelectionListener(e -> selectionChanged(e));
+        peTree.addTreeSelectionListener(e -> selectionChanged(e.getNewLeadSelectionPath()));
         this.setVisible(true);
     }
 
-    private void selectionChanged(TreeSelectionEvent tse) {
-        TreePath path = tse.getNewLeadSelectionPath();
+    private void selectionChanged(TreePath path) {
         if (path == null)
             return; // this happens when a selected node was removed, e.g., new file with no overlay loaded
         String node = path.getLastPathComponent().toString();
@@ -248,6 +271,14 @@ public class PEComponentTree extends JPanel {
                 break;
             case ICONS_TEXT:
                 peDetailsPanel.showIcons();
+        }
+    }
+
+    public void refreshSelection() {
+        TreePath[] paths = peTree.getSelectionModel().getSelectionPaths();
+        if(paths.length > 0) {
+            // trigger selection change on same element to refresh the view
+            selectionChanged(paths[0]);
         }
     }
 }

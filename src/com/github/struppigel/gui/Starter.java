@@ -58,6 +58,13 @@ public class Starter {
         UIManager.put("nimbusBlueGrey", new Color(170, 0, 0));
         UIManager.put("control", Color.black);
 
+       // UIManager.put("ToggleButton.disabled", Color.yellow);
+        //UIManager.put("ToggleButton.foreground", Color.yellow);
+        //UIManager.put("ToolBar.opaque", true);
+        //UIManager.put("ToolBar.background", new Color(100, 0, 0));
+        //UIManager.put("ToolBar.disabled", Color.green);
+        //UIManager.put("ToolBar.foreground", Color.red);
+
         UIManager.put("text", Color.white);
 
         UIManager.put("nimbusSelectionBackground", Color.gray);
@@ -67,6 +74,12 @@ public class Starter {
         UIManager.put("nimbusSelection", new Color(170, 0, 0));
         UIManager.put("textBackground", Color.darkGray);
         UIManager.put("nimbusLightBackground", Color.black);
+/*
+        UIManager.put("ToolBar.background", Color.blue);
+        UIManager.put("ToolBar.foreground", Color.blue);
+        UIManager.put("ToolBar.disabled", Color.blue);
+        UIManager.put("ToolBar.opaque", false);
+*/
 
         for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
             if ("Nimbus".equals(info.getName())) {

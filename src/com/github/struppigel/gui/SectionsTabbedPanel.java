@@ -43,6 +43,7 @@ public class SectionsTabbedPanel extends JPanel {
 
     private static final int SECTIONS_PER_TABLE = 4;
     private static final int TABLES_PER_TAB = 2;
+    private boolean hexEnabled;
 
     public SectionsTabbedPanel() {
         this.setLayout(new GridLayout(0,1));
@@ -154,7 +155,8 @@ public class SectionsTabbedPanel extends JPanel {
     }
 
     private void addSingleTableForSections(List<SectionHeader> sections, JPanel tab) {
-        JTable table = new PEFieldsTable();
+        LOGGER.info("Setting hex enabled to " + hexEnabled);
+        JTable table = new PEFieldsTable(hexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
 
         createTableHeaderForSections(sections, model);
@@ -181,54 +183,54 @@ public class SectionsTabbedPanel extends JPanel {
         addStreamToRow(entropyRow, rows, "Entropy");
 
         // collect Pointer To Raw Data
-        Stream<String> ptrToRawRow = sections.stream().map(s -> toHex(s.get(SectionHeaderKey.POINTER_TO_RAW_DATA)));
+        Stream<String> ptrToRawRow = sections.stream().map(s -> toHexIfEnabled(s.get(SectionHeaderKey.POINTER_TO_RAW_DATA)));
         addStreamToRow(ptrToRawRow, rows, "Pointer To Raw Data");
 
         // collect aligned Pointer To Raw Data
 
-        Stream<String> alignedPtrRaw = sections.stream().map(s -> toHex(s.getAlignedPointerToRaw(lowAlign)));
+        Stream<String> alignedPtrRaw = sections.stream().map(s -> toHexIfEnabled(s.getAlignedPointerToRaw(lowAlign)));
         addStreamToRow(alignedPtrRaw, rows, "-> Aligned (act. start)");
 
         // collect Size of Raw Data
-        Stream<String> sizeRawRow = sections.stream().map(s -> toHex(s.get(SIZE_OF_RAW_DATA)));
+        Stream<String> sizeRawRow = sections.stream().map(s -> toHexIfEnabled(s.get(SIZE_OF_RAW_DATA)));
         addStreamToRow(sizeRawRow, rows, "Size Of Raw Data");
 
         // collect actual read size
-        Stream<String> readSizeRow = sections.stream().map(s -> s.get(SIZE_OF_RAW_DATA) != loader.getReadSize(s) ? toHex(loader.getReadSize(s)) : "");
+        Stream<String> readSizeRow = sections.stream().map(s -> s.get(SIZE_OF_RAW_DATA) != loader.getReadSize(s) ? toHexIfEnabled(loader.getReadSize(s)) : "");
         addStreamToRow(readSizeRow, rows, "-> Actual Read Size");
 
         // collect Physical End
-        Stream<String> endRow = sections.stream().map(s -> toHex(loader.getReadSize(s) + s.getAlignedPointerToRaw(lowAlign)));
+        Stream<String> endRow = sections.stream().map(s -> toHexIfEnabled(loader.getReadSize(s) + s.getAlignedPointerToRaw(lowAlign)));
         addStreamToRow(endRow, rows, "-> Physical End");
 
         // collect VA
-        Stream<String> vaRow = sections.stream().map(s -> toHex(s.get(VIRTUAL_ADDRESS)));
+        Stream<String> vaRow = sections.stream().map(s -> toHexIfEnabled(s.get(VIRTUAL_ADDRESS)));
         addStreamToRow(vaRow, rows, "Virtual Address");
 
         // collect alligned VA
-        Stream<String> vaAlignedRow = sections.stream().map(s -> s.get(VIRTUAL_ADDRESS) != s.getAlignedVirtualAddress(lowAlign) ? toHex(s.getAlignedVirtualAddress(lowAlign)) : "");
+        Stream<String> vaAlignedRow = sections.stream().map(s -> s.get(VIRTUAL_ADDRESS) != s.getAlignedVirtualAddress(lowAlign) ? toHexIfEnabled(s.getAlignedVirtualAddress(lowAlign)) : "");
         addStreamToRow(vaAlignedRow, rows, "-> Aligned");
 
         // collect Virtual Size
-        Stream<String> vSizeRow = sections.stream().map(s -> toHex(s.get(VIRTUAL_SIZE)));
+        Stream<String> vSizeRow = sections.stream().map(s -> toHexIfEnabled(s.get(VIRTUAL_SIZE)));
         addStreamToRow(vSizeRow, rows, "Virtual Size");
         // collect Actual Virtual Size
-        Stream<String> actSizeRow = sections.stream().map(s -> s.get(VIRTUAL_SIZE) != loader.getActualVirtSize(s) ? toHex(loader.getActualVirtSize(s)) : "");
+        Stream<String> actSizeRow = sections.stream().map(s -> s.get(VIRTUAL_SIZE) != loader.getActualVirtSize(s) ? toHexIfEnabled(loader.getActualVirtSize(s)) : "");
         addStreamToRow(actSizeRow, rows, "-> Actual Virtual Size");
         // collect Virtual End
-        Stream<String> veRow = sections.stream().map(s -> toHex(s.getAlignedVirtualAddress(lowAlign) + loader.getActualVirtSize(s)));
+        Stream<String> veRow = sections.stream().map(s -> toHexIfEnabled(s.getAlignedVirtualAddress(lowAlign) + loader.getActualVirtSize(s)));
         addStreamToRow(veRow, rows, "-> Virtual End");
         // collect Pointer To Relocations
-        Stream<String> relocRow = sections.stream().map(s -> toHex(s.get(POINTER_TO_RELOCATIONS)));
+        Stream<String> relocRow = sections.stream().map(s -> toHexIfEnabled(s.get(POINTER_TO_RELOCATIONS)));
         addStreamToRow(relocRow, rows, "Pointer To Relocations");
         // collect Number Of Relocations
-        Stream<String> numreRow = sections.stream().map(s -> toHex(s.get(NUMBER_OF_RELOCATIONS)));
+        Stream<String> numreRow = sections.stream().map(s -> toHexIfEnabled(s.get(NUMBER_OF_RELOCATIONS)));
         addStreamToRow(numreRow, rows, "Number Of Relocations");
         // collect Pointer To Line Numbers
-        Stream<String> linRow = sections.stream().map(s -> toHex(s.get(POINTER_TO_LINE_NUMBERS)));
+        Stream<String> linRow = sections.stream().map(s -> toHexIfEnabled(s.get(POINTER_TO_LINE_NUMBERS)));
         addStreamToRow(linRow, rows, "Pointer To Line Numbers");
         // collect Number Of Line Numbers
-        Stream<String> numLinRow = sections.stream().map(s -> toHex(s.get(NUMBER_OF_LINE_NUMBERS)));
+        Stream<String> numLinRow = sections.stream().map(s -> toHexIfEnabled(s.get(NUMBER_OF_LINE_NUMBERS)));
         addStreamToRow(numLinRow, rows, "Number Of Line Numbers");
 
         for(SectionCharacteristic ch : SectionCharacteristic.values()) {
@@ -257,8 +259,11 @@ public class SectionsTabbedPanel extends JPanel {
         }
     }
 
-    private String toHex(Long num) {
-        return "0x" + Long.toHexString(num);
+    private String toHexIfEnabled(Long num) {
+        if(hexEnabled) {
+            return "0x" + Long.toHexString(num);
+        }
+        return num.toString();
     }
 
     private void createTableHeaderForSections(List<SectionHeader> sections, DefaultTableModel model) {
@@ -267,5 +272,9 @@ public class SectionsTabbedPanel extends JPanel {
         String[] tableHeader = names.toArray(new String[0]);
         model.setColumnIdentifiers(tableHeader);
     }
-    
+
+    public void setToHex(boolean hexEnabled) {
+        this.hexEnabled = hexEnabled;
+        initializeContent();
+    }
 }

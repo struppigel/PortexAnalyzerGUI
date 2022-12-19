@@ -27,6 +27,7 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
+import java.awt.event.ItemEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -50,7 +51,7 @@ public class MainFrame extends JFrame {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JLabel filePathLabel = new JLabel();
     private final VisualizerPanel visualizerPanel = new VisualizerPanel();
-    private final PEDetailsPanel peDetailsPanel = new PEDetailsPanel(visualizerPanel);
+    private final PEDetailsPanel peDetailsPanel = new PEDetailsPanel(visualizerPanel, this);
     private FullPEData pedata = null;
     private PEComponentTree peComponentTree = new PEComponentTree(peDetailsPanel);;
     private JFrame progressBarFrame;
@@ -70,6 +71,10 @@ public class MainFrame extends JFrame {
     private void checkForUpdate() {
         UpdateWorker updater = new UpdateWorker();
         updater.execute();
+    }
+
+    public void refreshSelection() {
+        peComponentTree.refreshSelection();
     }
 
     private static class UpdateWorker extends SwingWorker<Boolean, Void> {
@@ -209,8 +214,46 @@ public class MainFrame extends JFrame {
         panel.add(visualizerPanel, BorderLayout.LINE_END);
         this.add(panel, BorderLayout.CENTER);
 
+
+        JToolBar toolBar = new JToolBar();
+
+        ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-24.png"));
+        JToggleButton hexButton = new JToggleButton(ico);
+        hexButton.addItemListener(e -> {
+            int state = e.getStateChange();
+            if (state == ItemEvent.SELECTED) {
+                setToHex(true);
+            }
+            else if (state == ItemEvent.DESELECTED) {
+                setToHex(false);
+            }
+        });
+        toolBar.add(hexButton);
+        toolBar.setOpaque(true);
+
+        add(toolBar, BorderLayout.PAGE_START);
+
+/*
+        toolBar.setUI ( new BasicToolBarUI() {
+            @Override
+            protected void paintDragWindow(Graphics g) {
+                g.setColor(Color.blue);
+                int w = dragWindow.getWidth();
+                int h = dragWindow.getHeight();
+                g.fillRect(0, 0, w, h);
+                g.setColor(dragWindow.getBorderColor());
+                g.drawRect(0, 0, w - 1, h - 1);
+            }
+        } );*/
+
+        toolBar.repaint();
+
         initMenu();
         initProgressBar();
+    }
+
+    private void setToHex(boolean hexEnabled) {
+        peDetailsPanel.setToHex(hexEnabled);
     }
 
     private void initProgressBar() {
@@ -241,8 +284,15 @@ public class MainFrame extends JFrame {
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = createFileMenu();
         JMenu help = createHelpMenu();
+
         menuBar.add(fileMenu);
         menuBar.add(help);
+
+        // this puts it on the right side
+        //menuBar.add(Box.createHorizontalGlue());
+        //ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-16.png"));
+        //menuBar.add(new JToggleButton(ico));
+
         this.setJMenuBar(menuBar);
     }
 
