@@ -29,7 +29,7 @@ public class AboutFrame extends JFrame {
     public static String version = "0.12.5";
     private static final String text = "Portex Analyzer GUI" + "\n\n" + "Version: " + version
             + "\nAuthor: Karsten Hahn"
-            + "\nLast update: 17. December 2022"
+            + "\nLast update: 19. December 2022"
             + "\n\nI develop this software as a hobby in my free time."
             + "\n\nIf you like it, please consider buying me a coffee: https://ko-fi.com/struppigel"
             + "\n\nThe repo is available at https://github.com/struppigel/PortexAnalyzerGUI";

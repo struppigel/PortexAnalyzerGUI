@@ -14,11 +14,12 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 
 * Header information from: MSDOS Header, Rich Header, COFF File Header, Optional Header, Section Table
 * PE Structures: Import Section, Resource Section, Export Section, Debug Section
-* Scanning for file format anomalies, including structural anomalies, deprecated, reserved, wrong or non-default values.
+* Scanning for file format anomalies
 * Visualize file structure, local entropies and byteplot, and save it as PNG
-* Calculate Shannon Entropy, imphash, MD5, SHA256, Rich and RichPV hash
+* Calculate Shannon Entropy, Imphash, MD5, SHA256, Rich and RichPV hash
 * Overlay and overlay signature scanning
 * Version information and manifest
+* Icon extraction and saving as PNG
 
 ## Supported OS and JRE
 
