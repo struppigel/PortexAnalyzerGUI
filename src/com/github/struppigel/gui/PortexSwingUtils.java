@@ -56,7 +56,6 @@ public class PortexSwingUtils {
         JFileChooser fc = new JFileChooser(userdir);
         fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
         fc.setAcceptAllFileFilterUsed(false);
-        //fc.setDialogTitle("Open directory");
         int state = fc.showSaveDialog(parent);
         if (state == JFileChooser.APPROVE_OPTION) {
             File file = fc.getSelectedFile();

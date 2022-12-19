@@ -240,17 +240,6 @@ public class PEDetailsPanel extends JPanel {
         }
     }
 
-    public static JTable createEmptyTable() { // TODO make this a Table class instead!
-        DefaultTableModel model = new DefaultTableModel();
-        JTable table = new JTable(model);
-        table.setCellSelectionEnabled(true);
-        table.setPreferredScrollableViewportSize(new Dimension(500, 70));
-        table.setFillsViewportHeight(true);
-        table.setAutoCreateRowSorter(true);
-        table.setDefaultEditor(Object.class, null); // make not editable
-        return table;
-    }
-
     public void setPeData(FullPEData peData) {
         this.peData = peData;
         tabbedPanel.setPeData(peData);
@@ -349,15 +338,15 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         OptionalHeader header = peData.getPeData().getOptionalHeader();
         SectionTable secTable = peData.getPeData().getSectionTable();
-        List<String[]> dirEntries = new ArrayList<>();
+        List<Object[]> dirEntries = new ArrayList<>();
         for (DataDirEntry de : header.getDataDirectory().values()) {
-            String offset = toHex(de.getFileOffset(secTable));
-            String size = toHex(de.getDirectorySize());
-            String va = toHex(de.getVirtualAddress());
+            Long offset = de.getFileOffset(secTable);
+            Long size = de.getDirectorySize();
+            Long va = de.getVirtualAddress();
             Optional<SectionHeader> hOpt = de.maybeGetSectionTableEntry(secTable);
             String section = hOpt.isPresent() ? hOpt.get().getNumber() + ". " + hOpt.get().getName() : "NaN";
-            String valueOffset = toHex(de.getTableEntryOffset());
-            String[] row = {de.getKey().toString(), va, offset, size, section, valueOffset};
+            Long valueOffset = de.getTableEntryOffset();
+            Object[] row = {de.getKey(), va, offset, size, section, valueOffset};
             dirEntries.add(row);
         }
         String[] tableHeader = {"Data directory", "RVA", "-> Offset", "Size", "In section", "Value offset"};
@@ -371,10 +360,6 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setDropTarget(dt);
         tablePanel.setDropTarget(dt);
         tabbedPanel.setDropTarget(dt);
-    }
-
-    private String toHex(Long num) {
-        return "0x" + Long.toHexString(num);
     }
 
     private void showDescriptionPanel() {
@@ -433,11 +418,11 @@ public class PEDetailsPanel extends JPanel {
 
     private void showFieldEntries(List<StandardField> entries, String[] tableHeader) {
         cleanUpTablePanel();
-        JTable table = createEmptyTable();
-        DefaultTableModel model = new DefaultTableModel();
+        JTable table = new PEFieldsTable();
+        DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
-            String[] row = {field.getDescription(), "0x" + Long.toHexString(field.getValue()), "0x" + Long.toHexString(field.getOffset())};
+            Object[] row = {field.getDescription(), field.getValue(), field.getOffset()};
             model.addRow(row);
         }
         table.setModel(model);
@@ -448,11 +433,11 @@ public class PEDetailsPanel extends JPanel {
     private void showFieldEntriesAndDescription(List<StandardField> entries, String[] tableHeader, String text) {
         cleanUpTablePanel();
         tablePanel.add(new JScrollPane(new JTextArea(text)));
-        JTable table = createEmptyTable();
-        DefaultTableModel model = new DefaultTableModel();
+        JTable table = new PEFieldsTable();
+        DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
-            String[] row = {field.getDescription(), "0x" + Long.toHexString(field.getValue()), "0x" + Long.toHexString(field.getOffset())};
+            Object[] row = {field.getDescription(), field.getValue(), field.getOffset()};
             model.addRow(row);
         }
         table.setModel(model);
@@ -460,13 +445,13 @@ public class PEDetailsPanel extends JPanel {
         showUpdatesInTablePanel();
     }
 
-    private void showTextEntries(List<String[]> entries, String[] tableHeader) {
+    private void showTextEntries(List<Object[]> entries, String[] tableHeader) {
         cleanUpTablePanel();
-        JTable table = createEmptyTable();
-        DefaultTableModel model = new DefaultTableModel();
+        JTable table = new PEFieldsTable();
+        DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         model.setColumnIdentifiers(tableHeader);
-        for (String[] row : entries) {
+        for (Object[] row : entries) {
             model.addRow(row);
         }
         table.setModel(model);
@@ -474,18 +459,18 @@ public class PEDetailsPanel extends JPanel {
         showUpdatesInTablePanel();
     }
 
-    private void showTextEntriesAndDescription(List<String[]> entries, String[] tableHeader, String text) {
+    private void showTextEntriesAndDescription(List<Object[]> entries, String[] tableHeader, String text) {
         cleanUpTablePanel();
         JTextArea t = new JTextArea(text); // if you end up using this again, create a class instead
         t.setEditable(false);
         t.setDragEnabled(true);
         t.setLineWrap(true);
         tablePanel.add(new JScrollPane(t));
-        JTable table = createEmptyTable();
-        DefaultTableModel model = new DefaultTableModel();
+        JTable table = new PEFieldsTable();
+        DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         model.setColumnIdentifiers(tableHeader);
-        for (String[] row : entries) {
+        for (Object[] row : entries) {
             model.addRow(row);
         }
         table.setModel(model);
@@ -496,6 +481,10 @@ public class PEDetailsPanel extends JPanel {
     public void showPEHeaders() {
         descriptionField.setText("");
         showDescriptionPanel();
+    }
+
+    private static String toHex(Long num) {
+        return "0x" + Long.toHexString(num);
     }
 
     public void showOverlay() {
@@ -545,8 +534,8 @@ public class PEDetailsPanel extends JPanel {
             if (formats.size() > 0) {
                 text += "XOR key known to be emitted by: " + formats.stream().collect(Collectors.joining(", ")) + NL + NL;
             }
-            List<String[]> entries = richEntries.stream()
-                    .map(e -> new String[]{e.getProductIdStr(), e.getBuildStr(), e.count() + ""})
+            List<Object[]> entries = richEntries.stream()
+                    .map(e -> new Object[]{e.getProductIdStr(), e.getBuildStr(), e.count()})
                     .collect(Collectors.toList());
             String[] tableHeader = {"Product id", "Build id", "File count"};
             showTextEntriesAndDescription(entries, tableHeader, text);
@@ -616,7 +605,7 @@ public class PEDetailsPanel extends JPanel {
     public void showAnomalies() {
         if (peData == null) return;
         String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure "};
-        List<String[]> entries = peData.getAnomaliesTable();
+        List<Object[]> entries = peData.getAnomaliesTable();
 
         showTextEntries(entries, tableHeader);
         showTablePanel();
@@ -626,7 +615,7 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
 
         String[] tableHeader = {"Section", "Type", "Hash value"};
-        List<String[]> entries = peData.getSectionHashTableEntries();
+        List<Object[]> entries = peData.getSectionHashTableEntries();
         String text = peData.getHashesReport();
         showTextEntriesAndDescription(entries, tableHeader, text);
         showTablePanel();

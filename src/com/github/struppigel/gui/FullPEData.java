@@ -44,25 +44,25 @@ public class FullPEData {
     private final List<String> overlaySignatures;
     private final double[] sectionEntropies;
     private final List<ImportDLL> imports;
-    private final List<String[]> importTableEntries;
-    private final List<String[]> resourceTableEntries;
+    private final List<Object[]> importTableEntries;
+    private final List<Object[]> resourceTableEntries;
     private final List<Resource> resources;
     private final String manifest;
     private final List<ExportEntry> exports;
     private final String hashes;
-    private final List<String[]> anomaliesTable;
+    private final List<Object[]> anomaliesTable;
     private final List<StandardField> debugTableEntries;
-    private final List<String[]> vsInfoTable;
-    private List<String[]> exportTableEntries;
+    private final List<Object[]> vsInfoTable;
+    private List<Object[]> exportTableEntries;
     private String debugInfo;
-    private List<String[]> sectionHashTableEntries;
+    private List<Object[]> sectionHashTableEntries;
 
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
-                      double[] sectionEntropies, List<ImportDLL> imports, List<String[]> importTableEntries,
-                      List<String[]> resourceTableEntries, List<Resource> resources, String manifest,
-                      List<String[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
-                      String hashes, List<String[]> sectionHashTableEntries,
-                      List<String[]> anomaliesTable, List<StandardField> debugTableEntries, List<String[]> vsInfoTable) {
+                      double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries,
+                      List<Object[]> resourceTableEntries, List<Resource> resources, String manifest,
+                      List<Object[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
+                      String hashes, List<Object[]> sectionHashTableEntries,
+                      List<Object[]> anomaliesTable, List<StandardField> debugTableEntries, List<Object[]> vsInfoTable) {
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -103,7 +103,7 @@ public class FullPEData {
         return pedata.getFile();
     }
 
-    public List<String[]> getImportTableEntries() {
+    public List<Object[]> getImportTableEntries() {
         return importTableEntries;
     }
 
@@ -156,7 +156,7 @@ public class FullPEData {
         return imports.size() > 0;
     }
 
-    public List<String[]> getResourceTableEntries() {
+    public List<Object[]> getResourceTableEntries() {
         return resourceTableEntries;
     }
 
@@ -168,7 +168,7 @@ public class FullPEData {
         return exports.size() > 0;
     }
 
-    public List<String[]> getExportTableEntries() {
+    public List<Object[]> getExportTableEntries() {
         return this.exportTableEntries;
     }
 
@@ -184,11 +184,11 @@ public class FullPEData {
         return this.hashes;
     }
 
-    public List<String[]> getSectionHashTableEntries() {
+    public List<Object[]> getSectionHashTableEntries() {
         return this.sectionHashTableEntries;
     }
 
-    public List<String[]> getAnomaliesTable() {
+    public List<Object[]> getAnomaliesTable() {
         return anomaliesTable;
     }
 
@@ -197,7 +197,7 @@ public class FullPEData {
     }
 
 
-    public List<String[]> getVersionInfoTable() {
+    public List<Object[]> getVersionInfoTable() {
         return vsInfoTable;
     }
 

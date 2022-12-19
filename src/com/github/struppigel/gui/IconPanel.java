@@ -60,8 +60,12 @@ public class IconPanel extends JPanel {
             List<IcoFile> icons = IconParser.extractIcons(data);
             List<BufferedImage> images = new ArrayList<>();
             for(IcoFile icon : icons) {
-                List<BufferedImage> result = ICODecoder.read(icon.getInputStream());
-                images.addAll(result);
+                try {
+                    List<BufferedImage> result = ICODecoder.read(icon.getInputStream());
+                    images.addAll(result);
+                } catch(IOException e) {
+                    LOGGER.error(e);
+                }
             }
             return images;
         }

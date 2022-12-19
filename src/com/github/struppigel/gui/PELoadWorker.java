@@ -86,7 +86,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Calculating Hashes...");
         ReportCreator r = ReportCreator.newInstance(data.getFile());
         String hashesReport = createHashesReport(data);
-        List<String[]> hashesForSections = createHashTableEntries(data);
+        List<Object[]> hashesForSections = createHashTableEntries(data);
         setProgress(20);
 
         publish("Calculating Entropies...");
@@ -96,18 +96,18 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Extracting Imports...");
         List<ImportDLL> importDLLs = extractImports(data);
         setProgress(40);
-        List<String[]> impEntries = createImportTableEntries(importDLLs);
+        List<Object[]> impEntries = createImportTableEntries(importDLLs);
         setProgress(50);
 
         publish("Loading Resources...");
-        List<String[]> resourceTableEntries = createResourceTableEntries(data);
+        List<Object[]> resourceTableEntries = createResourceTableEntries(data);
         String manifest = readManifest(data);
-        List<String[]> vsInfoTable = createVersionInfoEntries(data);
+        List<Object[]> vsInfoTable = createVersionInfoEntries(data);
         setProgress(60);
 
         publish("Loading Exports...");
         List<ExportEntry> exports = getExports(data);
-        List<String[]> exportEntries = createExportTableEntries(data);
+        List<Object[]> exportEntries = createExportTableEntries(data);
         setProgress(70);
 
         publish("Loading Debug Info...");
@@ -116,7 +116,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(80);
 
         publish("Scanning for Anomalies...");
-        List<String[]> anomaliesTable = createAnomalyTableEntries(data);
+        List<Object[]> anomaliesTable = createAnomalyTableEntries(data);
         setProgress(90);
 
         publish("Scanning Overlay...");
@@ -131,15 +131,15 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                 debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable);
     }
 
-    private List<String[]> createVersionInfoEntries(PEData data){
+    private List<Object[]> createVersionInfoEntries(PEData data){
         List<Resource> res = getResources(data);
-        List<String[]> entries = new ArrayList<>();
+        List<Object[]> entries = new ArrayList<>();
         for (Resource r : res) {
             if (r.getType().equals("RT_VERSION")) {
                 VersionInfo versionInfo = VersionInfo.apply(r, data.getFile());
                 Map<String, String> map = versionInfo.getVersionStrings();
                 for( Map.Entry<String, String> e : map.entrySet()) {
-                    String[] entry = {e.getKey(), e.getValue()};
+                    Object[] entry = {e.getKey(), e.getValue()};
                     entries.add(entry);
                 }
             }
@@ -147,11 +147,11 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return entries;
     }
 
-    private List<String[]> createAnomalyTableEntries(PEData data) {
-        List<String[]> entries = new ArrayList<>();
+    private List<Object[]> createAnomalyTableEntries(PEData data) {
+        List<Object[]> entries = new ArrayList<>();
         List<Anomaly> anomalies = PEAnomalyScanner.newInstance(data).getAnomalies();
         for(Anomaly a : anomalies) {
-            String[] entry = {a.description(), String.valueOf(a.getType()), String.valueOf(a.subtype()), String.valueOf(a.key())};
+            Object[] entry = {a.description(), a.getType(), a.subtype(), a.key()};
             entries.add(entry);
         }
         return entries;
@@ -181,8 +181,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return text;
     }
 
-    private List<String[]> createHashTableEntries(PEData data) {
-        List<String[]> entries = new ArrayList<>();
+    private List<Object[]> createHashTableEntries(PEData data) {
+        List<Object[]> entries = new ArrayList<>();
         SectionTable sectionTable = data.getSectionTable();
         try {
             MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
@@ -261,14 +261,14 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return new ArrayList<>();
     }
 
-    private List<String[]> createExportTableEntries(PEData pedata) {
-        List<String[]> entries = new ArrayList<>();
+    private List<Object[]> createExportTableEntries(PEData pedata) {
+        List<Object[]> entries = new ArrayList<>();
         List<ExportEntry> exports = getExports(pedata);
         for (ExportEntry e : exports) {
             // TODO this is a hack because of lacking support to check for export names, *facepalm*
             String name = e instanceof ExportNameEntry ? ((ExportNameEntry) e).name() : "";
             String forwarder = e.maybeGetForwarder().isPresent() ? e.maybeGetForwarder().get() : "";
-            String[] entry = {name, String.valueOf(e.ordinal()), toHex(e.symbolRVA()), forwarder};
+            Object[] entry = {name, e.ordinal(), e.symbolRVA(), forwarder};
             entries.add(entry);
         }
         return entries;
@@ -289,10 +289,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                 new RandomAccessFile(pedata.getFile(), "r"));
     }
 
-    private String toHex(Long num) {
-        return "0x" + Long.toHexString(num);
-    }
-
     private String readManifest(PEData pedata) {
         try {
             Optional<ResourceSection> res = new SectionLoader(pedata).maybeLoadResourceSection();
@@ -311,9 +307,9 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return "";
     }
 
-    private List<String[]> createResourceTableEntries(PEData pedata) {
+    private List<Object[]> createResourceTableEntries(PEData pedata) {
         List<Resource> resources = getResources(pedata);
-        List<String[]> entries = new ArrayList<>();
+        List<Object[]> entries = new ArrayList<>();
         for (Resource r : resources) {
             Map<Level, IDOrName> lvlIds = r.getLevelIDs();
             String nameId = lvlIds.get(Level.nameLevel()).toString();
@@ -327,7 +323,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     // TODO this is a hack because lack of support from PortEx for scanAt function
                     .map(s -> s.contains("bytes matched:") ? s.split("bytes matched:")[0] : s);
             signatures = scanresults.collect(Collectors.joining(", "));
-            String[] entry = {r.getType(), nameId, langId, toHex(offset), toHex(size), signatures};
+            Object[] entry = {r.getType(), nameId, langId, offset, size, signatures};
             entries.add(entry);
         }
         return entries;
@@ -351,8 +347,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return new ArrayList<>();
     }
 
-    private List<String[]> createImportTableEntries(List<ImportDLL> imports) {
-        List<String[]> entries = new ArrayList<>();
+    private List<Object[]> createImportTableEntries(List<ImportDLL> imports) {
+        List<Object[]> entries = new ArrayList<>();
         for (ImportDLL dll : imports) {
             for (NameImport imp : dll.getNameImports()) {
                 Optional<SymbolDescription> symbol = ImportDLL.getSymbolDescriptionForName(imp.getName());
@@ -367,11 +363,11 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                         category += " -> " + subcategory;
                     }
                 }
-                String[] entry = {dll.getName(), category, imp.getName(), description, toHex(imp.getRVA()), imp.getHint() + ""};
+                Object[] entry = {dll.getName(), category, imp.getName(), description, imp.getRVA(), imp.getHint()};
                 entries.add(entry);
             }
             for (OrdinalImport imp : dll.getOrdinalImports()) {
-                String[] entry = {dll.getName(), "", imp.getOrdinal() + "", "", toHex(imp.getRVA()), ""};
+                Object[] entry = {dll.getName(), "", imp.getOrdinal() + "", "", imp.getRVA(), ""};
                 entries.add(entry);
             }
         }

@@ -154,8 +154,8 @@ public class SectionsTabbedPanel extends JPanel {
     }
 
     private void addSingleTableForSections(List<SectionHeader> sections, JPanel tab) {
-        JTable table = createEmptyTable();
-        DefaultTableModel model = new DefaultTableModel();
+        JTable table = new PEFieldsTable();
+        DefaultTableModel model = new PEFieldsTable.PETableModel();
 
         createTableHeaderForSections(sections, model);
         createRowsForSections(sections, model);
@@ -170,11 +170,8 @@ public class SectionsTabbedPanel extends JPanel {
         tab.add(sPane);
     }
 
-    private JTable createEmptyTable() {
-        return PEDetailsPanel.createEmptyTable();
-    }
-
     private void createRowsForSections(List<SectionHeader> sections, DefaultTableModel model) {
+        // Section tables should only use string based sorting because there are mixed data types --> keep String[] type for rows
         List<String[]> rows = new ArrayList<>();
         SectionLoader loader = new SectionLoader(peData.getPeData());
         boolean lowAlign = peData.getPeData().getOptionalHeader().isLowAlignmentMode();
