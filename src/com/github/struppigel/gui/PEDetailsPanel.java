@@ -75,7 +75,7 @@ public class PEDetailsPanel extends JPanel {
     private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
     ;
     private IconPanel iconPanel = new IconPanel();
-    private boolean hexEnabled;
+    private boolean hexEnabled = true;
 
     public PEDetailsPanel(VisualizerPanel visualizerPanel, MainFrame mainFrame) {
         super(new GridLayout(1, 0));

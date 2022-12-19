@@ -32,10 +32,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Scanner;
@@ -93,7 +90,10 @@ public class MainFrame extends JFrame {
                         return true;
                     }
                 }
-            } catch (IOException | NumberFormatException e) {
+            } catch (UnknownHostException e) {
+                LOGGER.info("unknown host or no internet connection: " + e.getMessage());
+            }
+            catch (IOException | NumberFormatException e) {
                 LOGGER.error(e);
                 e.printStackTrace();
             }
@@ -117,7 +117,6 @@ public class MainFrame extends JFrame {
                 }
             } catch (InterruptedException | ExecutionException | MalformedURLException e) {
                 LOGGER.error(e);
-                e.printStackTrace();
             }
         }
     }
@@ -194,7 +193,7 @@ public class MainFrame extends JFrame {
 
     private void initGUI() {
         // Main frame settings
-        setSize(1024, 600);
+        setSize(1024, 800);
         setLocationRelativeTo(null);
         setVisible(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -203,22 +202,23 @@ public class MainFrame extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout());
 
-        // Set up upper panel with file path
-        JPanel inputPathPanel = new JPanel();
-        inputPathPanel.add(filePathLabel);
-        panel.add(inputPathPanel, BorderLayout.PAGE_START);
-
         // Add all other components
         panel.add(peDetailsPanel, BorderLayout.CENTER);
         panel.add(peComponentTree, BorderLayout.LINE_START);
         panel.add(visualizerPanel, BorderLayout.LINE_END);
         this.add(panel, BorderLayout.CENTER);
 
+        /* Set up filepath
+        JPanel inputPathPanel = new JPanel();
+        inputPathPanel.add(filePathLabel);
+        panel.add(inputPathPanel, BorderLayout.PAGE_START); */
 
+        // set up toolbar
         JToolBar toolBar = new JToolBar();
 
         ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-24.png"));
         JToggleButton hexButton = new JToggleButton(ico);
+        hexButton.setSelected(true);
         hexButton.addItemListener(e -> {
             int state = e.getStateChange();
             if (state == ItemEvent.SELECTED) {
@@ -229,7 +229,11 @@ public class MainFrame extends JFrame {
             }
         });
         toolBar.add(hexButton);
+        toolBar.add(Box.createHorizontalGlue());
+        toolBar.add(filePathLabel);
+        toolBar.add(Box.createHorizontalGlue());
         toolBar.setOpaque(true);
+
 
         add(toolBar, BorderLayout.PAGE_START);
 
@@ -287,11 +291,6 @@ public class MainFrame extends JFrame {
 
         menuBar.add(fileMenu);
         menuBar.add(help);
-
-        // this puts it on the right side
-        //menuBar.add(Box.createHorizontalGlue());
-        //ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-16.png"));
-        //menuBar.add(new JToggleButton(ico));
 
         this.setJMenuBar(menuBar);
     }
