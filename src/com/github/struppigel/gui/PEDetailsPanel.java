@@ -26,6 +26,7 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.struppigel.gui.signatures.SignaturesPanel;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -75,7 +76,8 @@ public class PEDetailsPanel extends JPanel {
     private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
     ;
     private IconPanel iconPanel = new IconPanel();
-    private boolean hexEnabled = true;
+    private final SignaturesPanel signaturesPanel = new SignaturesPanel();
+    private boolean isHexEnabled = true;
 
     public PEDetailsPanel(VisualizerPanel visualizerPanel, MainFrame mainFrame) {
         super(new GridLayout(1, 0));
@@ -114,6 +116,7 @@ public class PEDetailsPanel extends JPanel {
         cardPanel.add(tabbedPanel, "TABBED");
         cardPanel.add(bigVisuals, "VISUALIZATION");
         cardPanel.add(iconWrapperPanel, "ICONS");
+        cardPanel.add(signaturesPanel, "SIGNATURES");
 
         //add the table to the frame
         setLayout(new BorderLayout());
@@ -135,7 +138,7 @@ public class PEDetailsPanel extends JPanel {
     }
 
     private class SaveIconsWorker extends SwingWorker<Boolean, Void> {
-        private final List<BufferedImage>  icons;
+        private final List<BufferedImage> icons;
         private final String folder;
 
         public SaveIconsWorker(String folder, List<BufferedImage> icons) {
@@ -147,13 +150,13 @@ public class PEDetailsPanel extends JPanel {
         protected Boolean doInBackground() {
             int counter = 0;
             boolean successFlag = true;
-            for(BufferedImage icon : icons){
+            for (BufferedImage icon : icons) {
                 File file;
                 // find next file path that does not exist
                 do {
                     file = Paths.get(folder, counter + ".png").toFile();
                     counter++;
-                } while(file.exists());
+                } while (file.exists());
                 try {
                     ImageIO.write(icon, "png", file);
                 } catch (IOException e) {
@@ -225,7 +228,7 @@ public class PEDetailsPanel extends JPanel {
             try {
                 Boolean success = get();
                 if (success) {
-                    JOptionPane.showMessageDialog(null,
+                    JOptionPane.showMessageDialog(PEDetailsPanel.this,
                             "File successfully saved",
                             "Success",
                             JOptionPane.INFORMATION_MESSAGE);
@@ -246,6 +249,7 @@ public class PEDetailsPanel extends JPanel {
         this.peData = peData;
         tabbedPanel.setPeData(peData);
         iconPanel.setPeData(peData);
+        signaturesPanel.setPeData(peData);
         try {
             visPanel.visualizePE(peData.getFile());
         } catch (IOException e) {
@@ -254,9 +258,10 @@ public class PEDetailsPanel extends JPanel {
         }
     }
 
-    public void setToHex(boolean hexEnabled) {
-        tabbedPanel.setToHex(hexEnabled);
-        this.hexEnabled = hexEnabled;
+    public void setHexEnabled(boolean hexEnabled) {
+        this.isHexEnabled = hexEnabled;
+        tabbedPanel.setHexEnabled(hexEnabled);
+        signaturesPanel.setHexEnabled(hexEnabled);
         parent.refreshSelection();
     }
 
@@ -368,6 +373,8 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setDropTarget(dt);
         tablePanel.setDropTarget(dt);
         tabbedPanel.setDropTarget(dt);
+        iconPanel.setDropTarget(dt);
+        signaturesPanel.setDropTarget(dt);
     }
 
     private void showDescriptionPanel() {
@@ -392,6 +399,12 @@ public class PEDetailsPanel extends JPanel {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABBED");
         rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to TABBED");
+    }
+
+    private void showSignaturesPanel() {
+        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "SIGNATURES");
+        rightPanel.setVisible(true);
+        LOGGER.debug("Card panel set to SIGNATURES");
     }
 
     public void showVisualization() {
@@ -426,7 +439,7 @@ public class PEDetailsPanel extends JPanel {
 
     private void showFieldEntries(List<StandardField> entries, String[] tableHeader) {
         cleanUpTablePanel();
-        JTable table = new PEFieldsTable(hexEnabled);
+        JTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
@@ -441,7 +454,7 @@ public class PEDetailsPanel extends JPanel {
     private void showFieldEntriesAndDescription(List<StandardField> entries, String[] tableHeader, String text) {
         cleanUpTablePanel();
         tablePanel.add(new JScrollPane(new JTextArea(text)));
-        JTable table = new PEFieldsTable(hexEnabled);
+        JTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
@@ -455,7 +468,7 @@ public class PEDetailsPanel extends JPanel {
 
     private void showTextEntries(List<Object[]> entries, String[] tableHeader) {
         cleanUpTablePanel();
-        JTable table = new PEFieldsTable(hexEnabled);
+        JTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         model.setColumnIdentifiers(tableHeader);
@@ -474,7 +487,7 @@ public class PEDetailsPanel extends JPanel {
         t.setDragEnabled(true);
         t.setLineWrap(true);
         tablePanel.add(new JScrollPane(t));
-        JTable table = new PEFieldsTable(hexEnabled);
+        JTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         model.setColumnIdentifiers(tableHeader);
@@ -491,8 +504,11 @@ public class PEDetailsPanel extends JPanel {
         showDescriptionPanel();
     }
 
-    private static String toHex(Long num) {
-        return "0x" + Long.toHexString(num);
+    private String toHexIfEnabled(Long num) {
+        if (isHexEnabled) {
+            return "0x" + Long.toHexString(num);
+        }
+        return num.toString();
     }
 
     public void showOverlay() {
@@ -503,7 +519,7 @@ public class PEDetailsPanel extends JPanel {
             double entropy = peData.getOverlayEntropy() * 8;
             List<String> sigs = peData.getOverlaySignatures();
 
-            String text = "Offset: " + toHex(offset) + NL + "Size: " + toHex(size) + NL;
+            String text = "Offset: " + toHexIfEnabled(offset) + NL + "Size: " + toHexIfEnabled(size) + NL;
             String packed = entropy >= 7.0 ? " (packed)" : "";
             text += "Entropy: " + String.format("%1.2f", entropy) + packed + NL + NL;
             text += "Signatures: " + NL;
@@ -518,12 +534,8 @@ public class PEDetailsPanel extends JPanel {
             showDescriptionPanel();
         } catch (IOException e) {
             String message = "Could not read Overlay! Reason: " + e.getMessage();
-            LOGGER.error(e);
+            LOGGER.error(message);
             e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                    message,
-                    "Overlay reading error",
-                    JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -627,6 +639,10 @@ public class PEDetailsPanel extends JPanel {
         String text = peData.getHashesReport();
         showTextEntriesAndDescription(entries, tableHeader, text);
         showTablePanel();
+    }
+
+    public void showSignatures() {
+        showSignaturesPanel();
     }
 
     public void showPEFormat() {

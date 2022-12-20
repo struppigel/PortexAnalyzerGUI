@@ -43,7 +43,7 @@ public class SectionsTabbedPanel extends JPanel {
 
     private static final int SECTIONS_PER_TABLE = 4;
     private static final int TABLES_PER_TAB = 2;
-    private boolean hexEnabled;
+    private boolean hexEnabled = true;
 
     public SectionsTabbedPanel() {
         this.setLayout(new GridLayout(0,1));
@@ -273,7 +273,7 @@ public class SectionsTabbedPanel extends JPanel {
         model.setColumnIdentifiers(tableHeader);
     }
 
-    public void setToHex(boolean hexEnabled) {
+    public void setHexEnabled(boolean hexEnabled) {
         this.hexEnabled = hexEnabled;
         initializeContent();
     }

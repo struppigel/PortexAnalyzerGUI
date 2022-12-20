@@ -257,7 +257,7 @@ public class MainFrame extends JFrame {
     }
 
     private void setToHex(boolean hexEnabled) {
-        peDetailsPanel.setToHex(hexEnabled);
+        peDetailsPanel.setHexEnabled(hexEnabled);
     }
 
     private void initProgressBar() {

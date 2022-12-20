@@ -95,8 +95,11 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Extracting Imports...");
         List<ImportDLL> importDLLs = extractImports(data);
-        setProgress(40);
         List<Object[]> impEntries = createImportTableEntries(importDLLs);
+        setProgress(40);
+
+        publish("Scanning for signatures...");
+        String signatureReport = r.peidReport();
         setProgress(50);
 
         publish("Loading Resources...");
@@ -128,7 +131,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, getResources(data), manifest, exportEntries, exports,
-                debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable);
+                debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable, signatureReport);
     }
 
     private List<Object[]> createVersionInfoEntries(PEData data){

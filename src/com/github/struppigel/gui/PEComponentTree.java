@@ -55,6 +55,7 @@ public class PEComponentTree extends JPanel {
     private static final String VISUALIZATION_TEXT = "Visualization";
     private static final String PE_FORMAT_TEXT = "PE Format";
     private static final String ICONS_TEXT = "Icons";
+    private static final String SIGNATURES_TEXT = "Signatures";
     private final PEDetailsPanel peDetailsPanel;
     private FullPEData peData = null;
     private JTree peTree;
@@ -98,6 +99,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode anomaly = new DefaultMutableTreeNode(ANOMALY_TEXT);
         DefaultMutableTreeNode hashes = new DefaultMutableTreeNode(HASHES_TEXT);
         DefaultMutableTreeNode vis = new DefaultMutableTreeNode(VISUALIZATION_TEXT);
+        DefaultMutableTreeNode signatures = new DefaultMutableTreeNode(SIGNATURES_TEXT);
 
         optional.add(standard);
         optional.add(windows);
@@ -145,6 +147,7 @@ public class PEComponentTree extends JPanel {
         root.add(anomaly);
         root.add(hashes);
         root.add(vis);
+        root.add(signatures);
 
         // no root
         peTree.setRootVisible(false);
@@ -271,6 +274,10 @@ public class PEComponentTree extends JPanel {
                 break;
             case ICONS_TEXT:
                 peDetailsPanel.showIcons();
+                break;
+            case SIGNATURES_TEXT:
+                peDetailsPanel.showSignatures();
+                break;
         }
     }
 

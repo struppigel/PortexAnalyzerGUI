@@ -31,6 +31,7 @@ public class Starter {
     private static final Logger LOGGER = LogManager.getLogger();
 
     public static void main(String[] args) {
+
         LOGGER.debug("starting program");
         setLookAndFeel2();
         initMainFrame();
