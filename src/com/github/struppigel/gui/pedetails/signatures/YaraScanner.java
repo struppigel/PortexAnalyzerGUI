@@ -15,7 +15,7 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui.signatures;
+package com.github.struppigel.gui.pedetails.signatures;
 
 import com.github.struppigel.gui.FullPEData;
 import org.apache.logging.log4j.LogManager;
@@ -126,11 +126,11 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
     @Override
     protected void done() {
         try {
-            signaturesPanel.buildTables(get());
+            signaturesPanel.buildYaraTables(get());
         } catch (ExecutionException e) {
             // most commonly when user did not choose valid yara path or signature path
             // so we request them again
-            signaturesPanel.requestPathes();
+            signaturesPanel.requestPaths();
             JOptionPane.showMessageDialog(signaturesPanel,
                     e.getMessage(),
                     "IO Error",

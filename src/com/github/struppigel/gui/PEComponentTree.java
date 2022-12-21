@@ -17,6 +17,7 @@
  */
 package com.github.struppigel.gui;
 
+import com.github.struppigel.gui.pedetails.PEDetailsPanel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,7 +45,7 @@ public class PEComponentTree extends JPanel {
     private static final String PE_HEADERS_TEXT = "PE Headers";
     private static final String OVERLAY_TEXT = "Overlay";
     private static final String RICH_TEXT = "Rich Header";
-    private static final String MANIFEST_TEXT = "Manifest";
+    private static final String MANIFEST_TEXT = "Manifests";
     private static final String RESOURCES_TEXT = "Resources";
     private static final String VERSIONINFO_TEXT = "Version Info";
     private static final String IMPORTS_TEXT = "Imports";
@@ -243,7 +244,7 @@ public class PEComponentTree extends JPanel {
                 peDetailsPanel.showOverlay();
                 break;
             case MANIFEST_TEXT:
-                peDetailsPanel.showManifest();
+                peDetailsPanel.showManifests();
                 break;
             case RESOURCES_TEXT:
                 peDetailsPanel.showResources();

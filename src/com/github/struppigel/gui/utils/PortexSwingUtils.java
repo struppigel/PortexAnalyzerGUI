@@ -15,7 +15,9 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui;
+package com.github.struppigel.gui.utils;
+
+import com.github.struppigel.gui.pedetails.PEDetailsPanel;
 
 import javax.swing.*;
 import java.awt.*;

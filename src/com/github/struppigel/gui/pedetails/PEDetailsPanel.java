@@ -15,7 +15,7 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui;
+package com.github.struppigel.gui.pedetails;
 
 import com.github.katjahahn.parser.RichHeader;
 import com.github.katjahahn.parser.StandardField;
@@ -26,7 +26,13 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.struppigel.gui.signatures.SignaturesPanel;
+import com.github.struppigel.gui.FullPEData;
+import com.github.struppigel.gui.MainFrame;
+import com.github.struppigel.gui.PEFieldsTable;
+import com.github.struppigel.gui.VisualizerPanel;
+import com.github.struppigel.gui.pedetails.signatures.SignaturesPanel;
+import com.github.struppigel.gui.utils.PortexSwingUtils;
+import com.github.struppigel.settings.PortexSettings;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -55,6 +61,7 @@ public class PEDetailsPanel extends JPanel {
     private final String NL = System.getProperty("line.separator");
     private final VisualizerPanel rightPanel;
     private final MainFrame parent;
+    private final PortexSettings settings;
     private FullPEData peData;
 
     /**
@@ -76,13 +83,15 @@ public class PEDetailsPanel extends JPanel {
     private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
     ;
     private IconPanel iconPanel = new IconPanel();
-    private final SignaturesPanel signaturesPanel = new SignaturesPanel();
+    private final SignaturesPanel signaturesPanel;
     private boolean isHexEnabled = true;
 
-    public PEDetailsPanel(VisualizerPanel visualizerPanel, MainFrame mainFrame) {
+    public PEDetailsPanel(VisualizerPanel visualizerPanel, MainFrame mainFrame, PortexSettings settings) {
         super(new GridLayout(1, 0));
         this.rightPanel = visualizerPanel;
         this.parent = mainFrame;
+        this.settings = settings;
+        signaturesPanel = new SignaturesPanel(settings);
         initDetails();
     }
 
@@ -571,9 +580,11 @@ public class PEDetailsPanel extends JPanel {
         return result;
     }
 
-    public void showManifest() {
+    public void showManifests() {
         if (peData == null) return;
-        descriptionField.setText(peData.getManifest());
+        List<String> manifests = peData.getManifests();
+        String MANIFEST_DELIMITER = "\n\n------------------------------------------------------------------------------------------------------------\n\n";
+        descriptionField.setText(String.join(MANIFEST_DELIMITER, manifests));
         showDescriptionPanel();
     }
 

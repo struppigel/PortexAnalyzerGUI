@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Configuration status="FATAL">
+<Configuration status="ERROR">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
+            <RegexFilter regex=".*katjahahn.*" onMatch="DENY" onMismatch="ACCEPT"/>
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
     </Appenders>
     <Loggers>
-        <Root level="DEBUG">
+        <Root level="ERROR">
             <AppenderRef ref="Console"/>
         </Root>
     </Loggers>

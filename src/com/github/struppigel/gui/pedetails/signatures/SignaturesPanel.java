@@ -15,11 +15,14 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui.signatures;
+package com.github.struppigel.gui.pedetails.signatures;
 
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.PEFieldsTable;
-import com.github.struppigel.gui.PortexSwingUtils;
+import com.github.struppigel.gui.utils.PortexSwingUtils;
+import com.github.struppigel.gui.utils.WriteSettingsWorker;
+import com.github.struppigel.settings.PortexSettings;
+import com.github.struppigel.settings.PortexSettingsKey;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -35,13 +38,14 @@ import java.util.Vector;
 public class SignaturesPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JProgressBar scanRunningBar = new JProgressBar();
+    private final PortexSettings settings;
     private FullPEData pedata;
 
     private String rulePath; // TODO set a default path
     private String yaraPath;
 
     // e.g. Yara|PEiD, XORedPE, Full file|EP
-    private final String[] summaryHeaders = {"Source", "Match name", "Description", "Scan mode"};
+    private final String[] summaryHeaders = {"Source", "Match name", "Scan mode"};
 
     //e.g. XORedPE, "This program", "0xcafebabe", "Resource"
     private final String[] patternHeaders = {"Rule name", "Pattern", "Content", "Offset"}; //, "Location"};
@@ -49,10 +53,23 @@ public class SignaturesPanel extends JPanel {
     private JTextField yaraPathTextField = new JTextField(30);
     private JTextField rulePathTextField = new JTextField(30);
 
-    private List<YaraRuleMatch> scanResults = new ArrayList<>();
+    private List<YaraRuleMatch> yaraResults = null;
+    // TODO put this here in result table!
+    private List<PEidRuleMatch> peidResults = null;
+    public SignaturesPanel(PortexSettings settings) {
+        this.settings = settings;
+        applyLoadedSettings();
+    }
 
-    public SignaturesPanel() {
-        // nothing
+    private void applyLoadedSettings() {
+        if(settings.containsKey(PortexSettingsKey.YARA_PATH)) {
+            yaraPath = settings.get(PortexSettingsKey.YARA_PATH);
+            yaraPathTextField.setText(yaraPath);
+        }
+        if(settings.containsKey(PortexSettingsKey.YARA_SIGNATURE_PATH)) {
+            rulePath = settings.get(PortexSettingsKey.YARA_SIGNATURE_PATH);
+            rulePathTextField.setText(rulePath);
+        }
     }
 
     private void initProgressBar() {
@@ -64,8 +81,7 @@ public class SignaturesPanel extends JPanel {
         this.repaint();
     }
 
-    void buildTables(List<YaraRuleMatch> scanResults) {
-        this.scanResults = scanResults;
+    private void buildTables() {
         showNoMatchesIfNotFound();
         this.removeAll(); //remove progress bar
 
@@ -85,13 +101,12 @@ public class SignaturesPanel extends JPanel {
 
         fillTableModelsWithData(sumModel, patModel);
 
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(summaryTable),
+                new JScrollPane(patternTable));
+        splitPane.setDividerLocation(200);
 
-        JPanel tablePanel = new JPanel();
-        tablePanel.setLayout(new GridLayout(0, 1));
-        tablePanel.add(new JScrollPane(summaryTable));
-        tablePanel.add(new JScrollPane(patternTable));
         this.setLayout(new BorderLayout());
-        this.add(tablePanel, BorderLayout.CENTER);
+        this.add(splitPane, BorderLayout.CENTER);
 
         // set up buttons
         JPanel buttonPanel = new JPanel();
@@ -99,7 +114,7 @@ public class SignaturesPanel extends JPanel {
         JButton pathSettings = new JButton("Settings");
         buttonPanel.add(rescan);
         buttonPanel.add(pathSettings);
-        pathSettings.addActionListener(e -> requestPathes());
+        pathSettings.addActionListener(e -> requestPaths());
         rescan.addActionListener(e -> scan());
 
         this.add(buttonPanel, BorderLayout.SOUTH);
@@ -109,7 +124,10 @@ public class SignaturesPanel extends JPanel {
     }
 
     private void fillTableModelsWithData(DefaultTableModel sumModel, DefaultTableModel patModel) {
-        for (YaraRuleMatch match : this.scanResults) {
+        List<RuleMatch> allResults = new ArrayList<>();
+        allResults.addAll(yaraResults);
+        allResults.addAll(peidResults);
+        for (RuleMatch match : allResults) {
             sumModel.addRow(match.toSummaryRow());
             for (Object[] row : match.toPatternRows()) {
                 patModel.addRow(row);
@@ -118,7 +136,7 @@ public class SignaturesPanel extends JPanel {
     }
 
     private void showNoMatchesIfNotFound() {
-        if (scanResults.isEmpty()) {
+        if (yaraResults.isEmpty() && peidResults.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "No matches found",
                     "No matches",
@@ -126,7 +144,7 @@ public class SignaturesPanel extends JPanel {
         }
     }
 
-    void requestPathes() {
+    void requestPaths() {
         this.removeAll();
 
         JPanel tablePanel = new JPanel();
@@ -154,7 +172,7 @@ public class SignaturesPanel extends JPanel {
         JPanel thirdRow = new JPanel();
         thirdRow.add(scanButton);
         tablePanel.add(thirdRow);
-        setButtonListeners(scanButton, yaraPathButton, rulePathButton);
+        setButtonListenersForRequestPath(scanButton, yaraPathButton, rulePathButton);
 
         this.setLayout(new BorderLayout());
         this.add(tablePanel, BorderLayout.NORTH);
@@ -163,9 +181,12 @@ public class SignaturesPanel extends JPanel {
         repaint();
     }
 
-    private void setButtonListeners(JButton scanButton, JButton yaraPathButton, JButton rulePathButton) {
+    private void setButtonListenersForRequestPath(JButton scanButton, JButton yaraPathButton, JButton rulePathButton) {
 
-        scanButton.addActionListener(e -> scan());
+        scanButton.addActionListener(e -> {
+            writeSettings();
+            scan();
+        });
 
         yaraPathButton.addActionListener(e -> {
             String result = PortexSwingUtils.getOpenFileNameFromUser(this);
@@ -183,6 +204,14 @@ public class SignaturesPanel extends JPanel {
                 rulePathTextField.setText(rulePath);
             }
         });
+    }
+
+    private void writeSettings() {
+        if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
+            settings.put(PortexSettingsKey.YARA_PATH, yaraPath);
+            settings.put(PortexSettingsKey.YARA_SIGNATURE_PATH, rulePath);
+            new WriteSettingsWorker(settings).execute();
+        }
     }
 
     private void initListener(JTable summaryTable, JTable patternTable) {
@@ -234,8 +263,9 @@ public class SignaturesPanel extends JPanel {
         if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
             initProgressBar();
             new YaraScanner(this, pedata, yaraPath, rulePath).execute();
+            new PEidScanner(this, pedata).execute();
         } else {
-            requestPathes();
+            requestPaths();
         }
 
     }
@@ -247,7 +277,21 @@ public class SignaturesPanel extends JPanel {
 
     public void setHexEnabled(boolean hexEnabled) {
         this.hexEnabled = hexEnabled;
-        buildTables(scanResults); // new renderer settings, refresh the panel
+        buildTables(); // new renderer settings, refresh the panel
     }
 
+    public void buildPEiDTables(List<PEidRuleMatch> signatureMatches) {
+        this.peidResults = signatureMatches;
+        if(yaraResults != null) {
+            buildTables();
+        }
+    }
+
+
+    void buildYaraTables(List<YaraRuleMatch> scanResults) {
+        this.yaraResults = scanResults;
+        if(peidResults != null) {
+            buildTables();
+        }
+    }
 }

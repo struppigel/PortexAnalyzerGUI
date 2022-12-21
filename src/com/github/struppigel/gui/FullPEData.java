@@ -47,12 +47,12 @@ public class FullPEData {
     private final List<Object[]> importTableEntries;
     private final List<Object[]> resourceTableEntries;
     private final List<Resource> resources;
-    private final String manifest;
     private final List<ExportEntry> exports;
     private final String hashes;
     private final List<Object[]> anomaliesTable;
     private final List<StandardField> debugTableEntries;
     private final List<Object[]> vsInfoTable;
+    private final List<String> manifests;
     private List<Object[]> exportTableEntries;
     private String debugInfo;
     private List<Object[]> sectionHashTableEntries;
@@ -60,7 +60,7 @@ public class FullPEData {
 
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries,
-                      List<Object[]> resourceTableEntries, List<Resource> resources, String manifest,
+                      List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
                       List<Object[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
                       String hashes, List<Object[]> sectionHashTableEntries,
                       List<Object[]> anomaliesTable, List<StandardField> debugTableEntries, List<Object[]> vsInfoTable,
@@ -74,7 +74,7 @@ public class FullPEData {
         this.importTableEntries = importTableEntries;
         this.resourceTableEntries = resourceTableEntries;
         this.resources = resources;
-        this.manifest = manifest;
+        this.manifests = manifests;
         this.exportTableEntries = exportTableEntries;
         this.exports = exports;
         this.debugInfo = debugInfo;
@@ -112,15 +112,15 @@ public class FullPEData {
 
 
     public boolean hasManifest() {
-        return !getManifest().equals("");
+        return getManifests().size() > 0;
     }
 
     /**
      * Obtain manifest as string. Returns empty string if no manifest exists, could not be read or is too large.
      * @return UTF-8 string of manifest, or empty string if not exists
      */
-    public String getManifest() {
-        return manifest;
+    public List<String> getManifests() {
+        return manifests;
     }
 
     /**

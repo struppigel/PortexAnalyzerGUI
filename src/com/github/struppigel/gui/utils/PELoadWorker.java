@@ -15,9 +15,12 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui;
+package com.github.struppigel.gui.utils;
 
-import com.github.katjahahn.parser.*;
+import com.github.katjahahn.parser.ByteArrayUtil;
+import com.github.katjahahn.parser.PEData;
+import com.github.katjahahn.parser.PELoader;
+import com.github.katjahahn.parser.StandardField;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
@@ -27,18 +30,21 @@ import com.github.katjahahn.parser.sections.debug.DebugSection;
 import com.github.katjahahn.parser.sections.debug.DebugType;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.edata.ExportNameEntry;
-import com.github.katjahahn.parser.sections.edata.ExportSection;
-import com.github.katjahahn.parser.sections.idata.*;
+import com.github.katjahahn.parser.sections.idata.ImportDLL;
+import com.github.katjahahn.parser.sections.idata.NameImport;
+import com.github.katjahahn.parser.sections.idata.OrdinalImport;
+import com.github.katjahahn.parser.sections.idata.SymbolDescription;
 import com.github.katjahahn.parser.sections.rsrc.IDOrName;
 import com.github.katjahahn.parser.sections.rsrc.Level;
 import com.github.katjahahn.parser.sections.rsrc.Resource;
-import com.github.katjahahn.parser.sections.rsrc.ResourceSection;
 import com.github.katjahahn.parser.sections.rsrc.version.VersionInfo;
 import com.github.katjahahn.tools.*;
 import com.github.katjahahn.tools.anomalies.Anomaly;
 import com.github.katjahahn.tools.anomalies.PEAnomalyScanner;
 import com.github.katjahahn.tools.sigscanner.FileTypeScanner;
 import com.github.katjahahn.tools.sigscanner.SignatureScanner;
+import com.github.struppigel.gui.FullPEData;
+import com.github.struppigel.gui.MainFrame;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -46,8 +52,6 @@ import org.apache.logging.log4j.Logger;
 import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -94,7 +98,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(30);
 
         publish("Extracting Imports...");
-        List<ImportDLL> importDLLs = extractImports(data);
+        List<ImportDLL> importDLLs = data.loadImports();
         List<Object[]> impEntries = createImportTableEntries(importDLLs);
         setProgress(40);
 
@@ -104,12 +108,12 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Loading Resources...");
         List<Object[]> resourceTableEntries = createResourceTableEntries(data);
-        String manifest = readManifest(data);
+        List<String> manifests = data.loadManifests();
         List<Object[]> vsInfoTable = createVersionInfoEntries(data);
         setProgress(60);
 
         publish("Loading Exports...");
-        List<ExportEntry> exports = getExports(data);
+        List<ExportEntry> exports = data.loadExports();
         List<Object[]> exportEntries = createExportTableEntries(data);
         setProgress(70);
 
@@ -125,17 +129,17 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Scanning Overlay...");
         Overlay overlay = new Overlay(data);
         double overlayEntropy = ShannonEntropy.entropy(data.getFile(), overlay.getOffset(), overlay.getSize());
-        List<String> overlaySignatures = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAt(data.getFile(), overlay.getOffset());
+        List<String> overlaySignatures = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAtToString(data.getFile(), overlay.getOffset());
         setProgress(100);
 
         publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
-                impEntries, resourceTableEntries, getResources(data), manifest, exportEntries, exports,
+                impEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
                 debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable, signatureReport);
     }
 
     private List<Object[]> createVersionInfoEntries(PEData data){
-        List<Resource> res = getResources(data);
+        List<Resource> res = data.loadResources();
         List<Object[]> entries = new ArrayList<>();
         for (Resource r : res) {
             if (r.getType().equals("RT_VERSION")) {
@@ -250,23 +254,9 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return entries;
     }
 
-    private List<ExportEntry> getExports(PEData pedata) {
-        try {
-            Optional<ExportSection> maybeEdata = new SectionLoader(pedata).maybeLoadExportSection();
-            if (maybeEdata.isPresent()) {
-                ExportSection edata = maybeEdata.get();
-                return edata.getExportEntries();
-            }
-        } catch (IOException e) {
-            LOGGER.error(e);
-            e.printStackTrace();
-        }
-        return new ArrayList<>();
-    }
-
     private List<Object[]> createExportTableEntries(PEData pedata) {
         List<Object[]> entries = new ArrayList<>();
-        List<ExportEntry> exports = getExports(pedata);
+        List<ExportEntry> exports = pedata.loadExports();
         for (ExportEntry e : exports) {
             // TODO this is a hack because of lacking support to check for export names, *facepalm*
             String name = e instanceof ExportNameEntry ? ((ExportNameEntry) e).name() : "";
@@ -277,41 +267,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return entries;
     }
 
-    private boolean isLegitManifest(Resource resource) {
-        long offset = resource.rawBytesLocation().from();
-        long size = resource.rawBytesLocation().size();
-        return resource.getType().equals("RT_MANIFEST") && offset > 0 && size > 0 && size < MAX_MANIFEST_SIZE;
-    }
-
-    private String bytesToUTF8(byte[] bytes) {
-        return new String(bytes, StandardCharsets.UTF_8).trim();
-    }
-
-    private byte[] readBytes(Resource resource, PEData pedata) throws IOException {
-        return IOUtil.loadBytesSafely(resource.rawBytesLocation().from(), (int) resource.rawBytesLocation().size(),
-                new RandomAccessFile(pedata.getFile(), "r"));
-    }
-
-    private String readManifest(PEData pedata) {
-        try {
-            Optional<ResourceSection> res = new SectionLoader(pedata).maybeLoadResourceSection();
-            if (res.isPresent() && !res.get().isEmpty()) {
-                List<Resource> resources = res.get().getResources();
-                for (Resource r : resources) {
-                    if (isLegitManifest(r)) {
-                        return bytesToUTF8(readBytes(r, pedata));
-                    }
-                }
-            }
-        } catch (IOException e) {
-            LOGGER.error(e);
-            e.printStackTrace();
-        }
-        return "";
-    }
-
     private List<Object[]> createResourceTableEntries(PEData pedata) {
-        List<Resource> resources = getResources(pedata);
+        List<Resource> resources = pedata.loadResources();
         List<Object[]> entries = new ArrayList<>();
         for (Resource r : resources) {
             Map<Level, IDOrName> lvlIds = r.getLevelIDs();
@@ -330,24 +287,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             entries.add(entry);
         }
         return entries;
-    }
-
-    /**
-     * Obtain a list of resources without having to deal with exceptions.
-     *
-     * @return List of resources. Empty list if resources do not exist or could not be read
-     */
-    private List<Resource> getResources(PEData pedata) {
-        try {
-            Optional<ResourceSection> res = new SectionLoader(pedata).maybeLoadResourceSection();
-            if (res.isPresent() && !res.get().isEmpty()) {
-                return res.get().getResources();
-            }
-        } catch (IOException e) {
-            LOGGER.error(e);
-            e.printStackTrace();
-        }
-        return new ArrayList<>();
     }
 
     private List<Object[]> createImportTableEntries(List<ImportDLL> imports) {
@@ -375,21 +314,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             }
         }
         return entries;
-    }
-
-    private List<ImportDLL> extractImports(PEData data) {
-        SectionLoader loader = new SectionLoader(data);
-        try {
-            Optional<ImportSection> maybeImports = loader.maybeLoadImportSection();
-            if (maybeImports.isPresent() && !maybeImports.get().isEmpty()) {
-                ImportSection importSection = maybeImports.get();
-                return importSection.getImports();
-            }
-        } catch (IOException e) {
-            LOGGER.error(e);
-            e.printStackTrace();
-        }
-        return new ArrayList<>();
     }
 
     private double[] calculateSectionEntropies(PEData data) {
@@ -420,6 +344,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             }
             LOGGER.warn(message);
             LOGGER.warn(e);
+            e.printStackTrace();
             JOptionPane.showMessageDialog(null,
                     message,
                     "Unable to load",

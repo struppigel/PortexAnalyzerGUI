@@ -17,6 +17,7 @@
  */
 package com.github.struppigel.gui;
 
+import com.github.struppigel.settings.PortexSettings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -33,12 +34,13 @@ public class Starter {
     public static void main(String[] args) {
 
         LOGGER.debug("starting program");
+        PortexSettings s = new PortexSettings();
         setLookAndFeel2();
-        initMainFrame();
+        initMainFrame(s);
     }
 
-    private static void initMainFrame() {
-        SwingUtilities.invokeLater(() -> new MainFrame());
+    private static void initMainFrame(PortexSettings s) {
+        SwingUtilities.invokeLater(() -> new MainFrame(s));
     }
 
     private static void setLookAndFeel() {

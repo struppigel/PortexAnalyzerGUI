@@ -15,9 +15,11 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui;
+package com.github.struppigel.gui.pedetails;
 
 import com.github.katjahahn.parser.sections.*;
+import com.github.struppigel.gui.FullPEData;
+import com.github.struppigel.gui.PEFieldsTable;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

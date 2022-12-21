@@ -17,6 +17,10 @@
  */
 package com.github.struppigel.gui;
 
+import com.github.struppigel.gui.pedetails.PEDetailsPanel;
+import com.github.struppigel.gui.utils.PELoadWorker;
+import com.github.struppigel.gui.utils.PortexSwingUtils;
+import com.github.struppigel.settings.PortexSettings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -47,10 +51,12 @@ import static javax.swing.SwingWorker.StateValue.DONE;
 public class MainFrame extends JFrame {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JLabel filePathLabel = new JLabel();
-    private final VisualizerPanel visualizerPanel = new VisualizerPanel();
-    private final PEDetailsPanel peDetailsPanel = new PEDetailsPanel(visualizerPanel, this);
+    private final VisualizerPanel visualizerPanel;
+    private final PEDetailsPanel peDetailsPanel;
+    private final PortexSettings settings;
     private FullPEData pedata = null;
-    private PEComponentTree peComponentTree = new PEComponentTree(peDetailsPanel);;
+    private PEComponentTree peComponentTree;
+    ;
     private JFrame progressBarFrame;
     private JProgressBar progressBar;
     private final static String versionURL = "https://github.com/struppigel/PortexAnalyzerGUI/raw/main/resources/upd_version.txt";
@@ -58,8 +64,14 @@ public class MainFrame extends JFrame {
     private final static String releasePage = "https://github.com/struppigel/PortexAnalyzerGUI/releases";
     private final JLabel progressText = new JLabel("Loading ...");
 
-    public MainFrame() {
+    public MainFrame(PortexSettings settings) {
         super("Portex Analyzer v. " + AboutFrame.version);
+
+        this.settings = settings;
+        visualizerPanel = new VisualizerPanel();
+        peDetailsPanel = new PEDetailsPanel(visualizerPanel, this, settings);
+        peComponentTree = new PEComponentTree(peDetailsPanel);
+
         initGUI();
         initDropTargets();
         checkForUpdate();
@@ -92,8 +104,7 @@ public class MainFrame extends JFrame {
                 }
             } catch (UnknownHostException e) {
                 LOGGER.info("unknown host or no internet connection: " + e.getMessage());
-            }
-            catch (IOException | NumberFormatException e) {
+            } catch (IOException | NumberFormatException e) {
                 LOGGER.error(e);
                 e.printStackTrace();
             }
@@ -109,7 +120,7 @@ public class MainFrame extends JFrame {
                             message,
                             "Update available",
                             JOptionPane.YES_NO_OPTION);
-                    if(response == JOptionPane.YES_OPTION) {
+                    if (response == JOptionPane.YES_OPTION) {
                         openWebpage(new URL(releasePage));
                     }
                 } else {
@@ -223,8 +234,7 @@ public class MainFrame extends JFrame {
             int state = e.getStateChange();
             if (state == ItemEvent.SELECTED) {
                 setToHex(true);
-            }
-            else if (state == ItemEvent.DESELECTED) {
+            } else if (state == ItemEvent.DESELECTED) {
                 setToHex(false);
             }
         });
@@ -269,7 +279,7 @@ public class MainFrame extends JFrame {
         progressBar.setStringPainted(true);
         progressBar.setMaximum(100);
 
-        panel.setLayout(new GridLayout(0,1));
+        panel.setLayout(new GridLayout(0, 1));
         panel.add(progressBar);
 
         // this panel makes sure the text is in the middle

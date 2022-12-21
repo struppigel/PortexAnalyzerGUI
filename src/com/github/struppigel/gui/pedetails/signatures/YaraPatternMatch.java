@@ -15,7 +15,7 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui.signatures;
+package com.github.struppigel.gui.pedetails.signatures;
 
 public class YaraPatternMatch {
     final long offset;

@@ -15,29 +15,31 @@
  * limitations under the License.
  * ****************************************************************************
  */
-package com.github.struppigel.gui.signatures;
+package com.github.struppigel.gui.utils;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.github.struppigel.settings.PortexSettings;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-public class YaraRuleMatch {
-    final String ruleName;
-    final List<YaraPatternMatch> patterns;
-    final List<String> tags;
+import javax.swing.*;
+import java.io.IOException;
 
-    public YaraRuleMatch(String ruleName, List<YaraPatternMatch> patterns, List<String> tags) {
-        this.ruleName = ruleName;
-        this.patterns = patterns;
-        this.tags = tags;
+public class WriteSettingsWorker extends SwingWorker<Boolean, Void> {
+    private static final Logger LOGGER = LogManager.getLogger();
+    private final PortexSettings settings;
+
+    public WriteSettingsWorker(PortexSettings settings) {
+        this.settings = settings;
     }
-
-    // {"Source", "Match name", "Tags", "Scan mode"};
-    public Object[] toSummaryRow() {
-        Object[] row = {"Yara", ruleName, tags.toString(), "Full file"};
-        return row;
-    }
-
-    public List<Object[]> toPatternRows() {
-        return patterns.stream().map(p -> p.toPatternRow(ruleName)).collect(Collectors.toList());
+    @Override
+    protected Boolean doInBackground() {
+        try {
+            settings.writeSettings();
+            return true;
+        } catch (IOException e) {
+        e.printStackTrace();
+        LOGGER.error(e);
+        }
+        return false;
     }
 }
