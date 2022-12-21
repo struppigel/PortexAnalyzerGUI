@@ -17,13 +17,13 @@
  */
 package com.github.struppigel.gui.pedetails.signatures;
 
-public class YaraPatternMatch {
+public class PatternMatch {
     final long offset;
     final String patternContent;
-    final String patternName;
+    String patternName;
     String location = "NaN";
 
-    public YaraPatternMatch(long offset, String patternName, String patternContent) {
+    public PatternMatch(long offset, String patternName, String patternContent) {
         this.offset = offset;
         this.patternName = patternName;
         this.patternContent = patternContent;

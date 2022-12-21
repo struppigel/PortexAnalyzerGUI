@@ -53,7 +53,7 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
             process = pbuilder.start();
             // stdin handling
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                List<YaraPatternMatch> patterns = new ArrayList<>();
+                List<PatternMatch> patterns = new ArrayList<>();
                 String line;
                 while ((line = reader.readLine()) != null) {
 
@@ -62,7 +62,7 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
                         patterns = new ArrayList<>(); // fresh patterns
                         matches.add(new YaraRuleMatch(rulename, patterns, new ArrayList<>()));
                     } else if (isPattern(line)) {
-                        YaraPatternMatch pattern = parsePattern(line);
+                        PatternMatch pattern = parsePattern(line);
                         patterns.add(pattern);
                     }
                 }
@@ -86,14 +86,14 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
         return matches;
     }
 
-    private YaraPatternMatch parsePattern(String line) {
+    private PatternMatch parsePattern(String line) {
         assert isPattern(line);
         String[] split = line.split(":");
         String longStr = split[0].substring(2);
         long offset = Long.parseLong(longStr, 16);
         String name = split[1];
         String content = String.join(":", Arrays.copyOfRange(split, 2, split.length));
-        return new YaraPatternMatch(offset, name, content);
+        return new PatternMatch(offset, name, content);
     }
 
     private boolean isPattern(String line) {

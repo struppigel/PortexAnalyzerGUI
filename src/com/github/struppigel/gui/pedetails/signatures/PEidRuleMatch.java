@@ -1,31 +1,27 @@
 package com.github.struppigel.gui.pedetails.signatures;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class PEidRuleMatch implements RuleMatch {
     final String ruleName;
-    private final String pattern;
-    private final String location;
-    private final Long offset;
+    private final List<PatternMatch> patterns;
+    private final String scanMode;
 
-    public PEidRuleMatch(String ruleName, String pattern, String location, Long offset) {
+
+    public PEidRuleMatch(String ruleName, String scanMode, List<PatternMatch> patterns) {
         this.ruleName = ruleName;
-        this.pattern = pattern;
-        this.location = location;
-        this.offset = offset;
+        this.patterns = patterns;
+        this.scanMode = scanMode;
     }
 
     // {"Source", "Match name", "Scan mode"};
     public Object[] toSummaryRow() {
-        Object[] row = {"PEiD", ruleName, location};
+        Object[] row = {"PEiD", ruleName, scanMode};
         return row;
     }
     // {"Rule name", "Pattern", "Content", "Offset"}
     public List<Object[]> toPatternRows() {
-        List<Object[]> resultList = new ArrayList<>();
-        Object[] row = {ruleName, "", pattern, offset};
-        resultList.add(row);
-        return resultList;
+        return patterns.stream().map(p -> p.toPatternRow(ruleName)).collect(Collectors.toList());
     }
 }

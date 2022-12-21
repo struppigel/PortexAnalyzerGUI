@@ -22,10 +22,10 @@ import java.util.stream.Collectors;
 
 public class YaraRuleMatch implements RuleMatch {
     final String ruleName;
-    final List<YaraPatternMatch> patterns;
+    final List<PatternMatch> patterns;
     final List<String> tags;
 
-    public YaraRuleMatch(String ruleName, List<YaraPatternMatch> patterns, List<String> tags) {
+    public YaraRuleMatch(String ruleName, List<PatternMatch> patterns, List<String> tags) {
         this.ruleName = ruleName;
         this.patterns = patterns;
         this.tags = tags;

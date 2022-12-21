@@ -48,7 +48,7 @@ public class SignaturesPanel extends JPanel {
     private final String[] summaryHeaders = {"Source", "Match name", "Scan mode"};
 
     //e.g. XORedPE, "This program", "0xcafebabe", "Resource"
-    private final String[] patternHeaders = {"Rule name", "Pattern", "Content", "Offset"}; //, "Location"};
+    private final String[] patternHeaders = {"Rule name", "Pattern name", "Pattern content", "Offset"}; //, "Location"};
     private boolean hexEnabled = true;
     private JTextField yaraPathTextField = new JTextField(30);
     private JTextField rulePathTextField = new JTextField(30);
@@ -82,7 +82,6 @@ public class SignaturesPanel extends JPanel {
     }
 
     private void buildTables() {
-        showNoMatchesIfNotFound();
         this.removeAll(); //remove progress bar
 
         PEFieldsTable summaryTable = new PEFieldsTable(hexEnabled);
@@ -127,20 +126,14 @@ public class SignaturesPanel extends JPanel {
         List<RuleMatch> allResults = new ArrayList<>();
         allResults.addAll(yaraResults);
         allResults.addAll(peidResults);
+        if(allResults.isEmpty()) {
+            allResults.add(new EmptyRuleMatch());
+        }
         for (RuleMatch match : allResults) {
             sumModel.addRow(match.toSummaryRow());
             for (Object[] row : match.toPatternRows()) {
                 patModel.addRow(row);
             }
-        }
-    }
-
-    private void showNoMatchesIfNotFound() {
-        if (yaraResults.isEmpty() && peidResults.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "No matches found",
-                    "No matches",
-                    JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
