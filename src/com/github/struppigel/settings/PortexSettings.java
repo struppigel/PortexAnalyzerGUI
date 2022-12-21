@@ -38,7 +38,11 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
     public PortexSettings() {
         try {
             File app = new File(appPath.toURI());
-            settingsFile = Paths.get(app.getAbsolutePath(), SETTINGS_FILE_NAME).toFile();
+            File folder = app.getAbsoluteFile();
+            if(!folder.isDirectory()) { // different behaviour Win vs Linux here
+                folder = folder.getParentFile();
+            }
+            settingsFile = Paths.get(folder.getAbsolutePath(), SETTINGS_FILE_NAME).toFile();
             loadSettings();
         } catch (URISyntaxException e) {
             LOGGER.fatal(e); // must never happen
@@ -76,13 +80,18 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
     }
 
     public void writeSettings() throws IOException {
-        settingsFile.delete();
-        settingsFile.createNewFile();
-        try (PrintStream out = new PrintStream(new FileOutputStream(settingsFile))) {
-            for (Map.Entry<PortexSettingsKey, String> entry : this.entrySet()) {
-                out.println(entry.getKey() + SETTINGS_DELIMITER + entry.getValue().trim());
+        try {
+            settingsFile.delete();
+            settingsFile.createNewFile();
+            try (PrintStream out = new PrintStream(new FileOutputStream(settingsFile))) {
+                for (Map.Entry<PortexSettingsKey, String> entry : this.entrySet()) {
+                    out.println(entry.getKey() + SETTINGS_DELIMITER + entry.getValue().trim());
+                }
+                LOGGER.info("Settings written to " + settingsFile.getAbsolutePath());
             }
-            LOGGER.info("Settings written to " + settingsFile.getAbsolutePath());
+        } catch (IOException e) {
+            LOGGER.error("problem with writing " + settingsFile.toString());
+            throw e;
         }
     }
 }

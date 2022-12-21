@@ -114,7 +114,7 @@ public class SignaturesPanel extends JPanel {
         buttonPanel.add(rescan);
         buttonPanel.add(pathSettings);
         pathSettings.addActionListener(e -> requestPaths());
-        rescan.addActionListener(e -> scan());
+        rescan.addActionListener(e -> scan(false));
 
         this.add(buttonPanel, BorderLayout.SOUTH);
 
@@ -177,8 +177,11 @@ public class SignaturesPanel extends JPanel {
     private void setButtonListenersForRequestPath(JButton scanButton, JButton yaraPathButton, JButton rulePathButton) {
 
         scanButton.addActionListener(e -> {
+            // this button is used in settings dialog and acts also as save button
+            yaraPath = yaraPathTextField.getText();
+            rulePath = rulePathTextField.getText();
             writeSettings();
-            scan();
+            scan(true);
         });
 
         yaraPathButton.addActionListener(e -> {
@@ -252,20 +255,30 @@ public class SignaturesPanel extends JPanel {
         return -1;
     }
 
-    private void scan() {
+    private void scan(boolean warnUser) {
         if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
             initProgressBar();
             new YaraScanner(this, pedata, yaraPath, rulePath).execute();
             new PEidScanner(this, pedata).execute();
-        } else {
-            requestPaths();
+        } else if(warnUser) {
+            String message = "Cannot scan";
+            if(yaraPath == null) { message += ", because no yara path set"; }
+            else if(rulePath == null) { message += ", because no rule path set"; }
+            else if(!new File(yaraPath).exists()) { message += ", because yara path is not an existing file: " + yaraPath; }
+            else if(!new File(rulePath).exists()) { message += ", because rule path is not an existing file: " + rulePath; }
+            else { message += ". The reason is unknown :("; }
+            JOptionPane.showMessageDialog(this,
+                    message,
+                    "Cannot scan",
+                    JOptionPane.WARNING_MESSAGE);
         }
+        requestPaths();
 
     }
 
     public void setPeData(FullPEData data) {
         this.pedata = data;
-        scan();
+        scan(false);
     }
 
     public void setHexEnabled(boolean hexEnabled) {

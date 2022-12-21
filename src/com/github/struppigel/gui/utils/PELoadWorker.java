@@ -1,13 +1,13 @@
 /**
  * *****************************************************************************
  * Copyright 2022 Karsten Hahn
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
- *
+ * <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,10 +24,7 @@ import com.github.katjahahn.parser.StandardField;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.katjahahn.parser.sections.debug.CodeviewInfo;
-import com.github.katjahahn.parser.sections.debug.DebugDirectoryKey;
-import com.github.katjahahn.parser.sections.debug.DebugSection;
-import com.github.katjahahn.parser.sections.debug.DebugType;
+import com.github.katjahahn.parser.sections.debug.*;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.edata.ExportNameEntry;
 import com.github.katjahahn.parser.sections.idata.ImportDLL;
@@ -138,14 +135,14 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                 debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable, signatureReport);
     }
 
-    private List<Object[]> createVersionInfoEntries(PEData data){
+    private List<Object[]> createVersionInfoEntries(PEData data) {
         List<Resource> res = data.loadResources();
         List<Object[]> entries = new ArrayList<>();
         for (Resource r : res) {
             if (r.getType().equals("RT_VERSION")) {
                 VersionInfo versionInfo = VersionInfo.apply(r, data.getFile());
                 Map<String, String> map = versionInfo.getVersionStrings();
-                for( Map.Entry<String, String> e : map.entrySet()) {
+                for (Map.Entry<String, String> e : map.entrySet()) {
                     Object[] entry = {e.getKey(), e.getValue()};
                     entries.add(entry);
                 }
@@ -157,7 +154,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
     private List<Object[]> createAnomalyTableEntries(PEData data) {
         List<Object[]> entries = new ArrayList<>();
         List<Anomaly> anomalies = PEAnomalyScanner.newInstance(data).getAnomalies();
-        for(Anomaly a : anomalies) {
+        for (Anomaly a : anomalies) {
             Object[] entry = {a.description(), a.getType(), a.subtype(), a.key()};
             entries.add(entry);
         }
@@ -174,10 +171,10 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             text += "SHA256: " + hash(hasher.fileHash(sha256)) + NL;
             text += "ImpHash: " + ImpHash.createString(data.getFile()) + NL;
             java.util.Optional<byte[]> maybeRich = hasher.maybeRichHash();
-            if(maybeRich.isPresent()) {
+            if (maybeRich.isPresent()) {
                 text += "Rich: " + hash(maybeRich.get()) + NL;
                 java.util.Optional<byte[]> maybeRichPV = hasher.maybeRichPVHash();
-                if(maybeRichPV.isPresent()) {
+                if (maybeRichPV.isPresent()) {
                     text += "RichPV: " + hash(maybeRichPV.get()) + NL;
                 }
             }
@@ -220,16 +217,19 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         try {
             Optional<DebugSection> sec = new SectionLoader(pedata).maybeLoadDebugSection();
             if (sec.isPresent()) {
-                DebugSection d = sec.get();
+                DebugSection debugSec = sec.get();
+                Stream<DebugDirectoryEntry> debugStream = debugSec.getEntries().stream().filter(e -> e.getDebugType() == DebugType.CODEVIEW);
+                List<DebugDirectoryEntry> debugList = debugStream.collect(Collectors.toList());
+                if (debugList.isEmpty()) return "";
+                DebugDirectoryEntry d = debugList.get(0);
                 String report = "Time date stamp: " + d.getTimeDateStamp() + NL;
                 report += "Type: " + d.getTypeDescription() + NL + NL;
-                if(d.getDebugType() == DebugType.CODEVIEW) {
-                    CodeviewInfo c = d.getCodeView();
-                    report += "Codeview" + NL + NL;
-                    report += "Path: " + c.filePath() + NL;
-                    report += "Age: " + c.age() + NL;
-                    report += "GUID: " + CodeviewInfo.guidToString(c.guid()) + NL;
-                }
+                CodeviewInfo c = d.getCodeView();
+                report += "Codeview" + NL + NL;
+                report += "Path: " + c.filePath() + NL;
+                report += "Age: " + c.age() + NL;
+                report += "GUID: " + CodeviewInfo.guidToString(c.guid()) + NL;
+
                 return report;
             }
         } catch (IOException e) {
@@ -244,7 +244,13 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         try {
             Optional<DebugSection> sec = new SectionLoader(pedata).maybeLoadDebugSection();
             if (sec.isPresent()) {
-                Map<DebugDirectoryKey, StandardField> dirTable = sec.get().getDirectoryTable();
+                // TODO extract all entries, this is only codeview
+                DebugSection debugSec = sec.get();
+                Stream<DebugDirectoryEntry> debugStream = debugSec.getEntries().stream().filter(e -> e.getDebugType() == DebugType.CODEVIEW);
+                List<DebugDirectoryEntry> debugList = debugStream.collect(Collectors.toList());
+                if (debugList.isEmpty()) return entries;
+                DebugDirectoryEntry d = debugList.get(0);
+                Map<DebugDirectoryKey, StandardField> dirTable = d.getDirectoryTable();
                 return dirTable.values().stream().collect(Collectors.toList());
             }
         } catch (IOException e) {
@@ -339,7 +345,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             frame.setPeData(data);
         } catch (InterruptedException | ExecutionException e) {
             String message = "Could not load PE file! Reason: " + e.getMessage();
-            if(e.getMessage().contains("given file is no PE file")){
+            if (e.getMessage().contains("given file is no PE file")) {
                 message = "Could not load PE file! The given file is no PE file";
             }
             LOGGER.warn(message);

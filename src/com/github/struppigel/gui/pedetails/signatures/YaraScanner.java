@@ -51,46 +51,56 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
         List<YaraRuleMatch> matches = new ArrayList<>();
         try {
             process = pbuilder.start();
-            // stdin handling
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                List<PatternMatch> patterns = new ArrayList<>();
-                String line;
-                while ((line = reader.readLine()) != null) {
-
-                    if (isRuleName(line)) {
-                        String rulename = parseRulename(line);
-                        patterns = new ArrayList<>(); // fresh patterns
-                        matches.add(new YaraRuleMatch(rulename, patterns, new ArrayList<>()));
-                    } else if (isPattern(line)) {
-                        PatternMatch pattern = parsePattern(line);
-                        patterns.add(pattern);
-                    }
-                }
-            }
-            // stderr handling
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    LOGGER.error("Error while parsing yara rules: " + line);
-                        JOptionPane.showMessageDialog(signaturesPanel,
-                                line,
-                                "Rule parsing error",
-                                JOptionPane.ERROR_MESSAGE);
-                }
-            }
+            stdInHandling(process, matches);
+            stdErrHandling(process);
         } finally {
-            if(process != null) {
+            if (process != null) {
                 process.destroy();
             }
         }
         return matches;
     }
 
+    private void stdErrHandling(Process process) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                LOGGER.error("Error while parsing yara rules: " + line);
+                JOptionPane.showMessageDialog(signaturesPanel,
+                        line,
+                        "Rule parsing error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void stdInHandling(Process process, List<YaraRuleMatch> matches) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            List<PatternMatch> patterns = new ArrayList<>();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                patterns = scanLine(matches, patterns, line);
+            }
+        }
+    }
+
+    private List<PatternMatch> scanLine(List<YaraRuleMatch> matches, List<PatternMatch> patterns, String line) {
+        if (isRuleName(line)) {
+            String rulename = parseRulename(line);
+            patterns = new ArrayList<>(); // fresh patterns
+            matches.add(new YaraRuleMatch(rulename, patterns, new ArrayList<>()));
+        } else if (isPattern(line)) {
+            PatternMatch pattern = parsePattern(line);
+            patterns.add(pattern);
+        }
+        return patterns;
+    }
+
     private PatternMatch parsePattern(String line) {
         assert isPattern(line);
         String[] split = line.split(":");
-        String longStr = split[0].substring(2);
-        long offset = Long.parseLong(longStr, 16);
+        String longStr = split[0].substring(2);// remove '0x'
+        long offset = Long.parseLong(longStr, 16); // convert from hex
         String name = split[1];
         String content = String.join(":", Arrays.copyOfRange(split, 2, split.length));
         return new PatternMatch(offset, name, content);
