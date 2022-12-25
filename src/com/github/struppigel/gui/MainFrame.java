@@ -20,6 +20,7 @@ package com.github.struppigel.gui;
 import com.github.struppigel.gui.pedetails.PEDetailsPanel;
 import com.github.struppigel.gui.utils.PELoadWorker;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
+import com.github.struppigel.gui.utils.WorkerKiller;
 import com.github.struppigel.settings.PortexSettings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -181,6 +182,8 @@ public class MainFrame extends JFrame {
             }
         });
         progressBarFrame.setVisible(true);
+        WorkerKiller.getInstance().cancelAndDeleteWorkers();
+        WorkerKiller.getInstance().addWorker(worker); // need to add this in case a user loads another PE during load process
         worker.execute();
     }
 

@@ -32,6 +32,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.github.katjahahn.parser.sections.SectionHeaderKey.*;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 /**
  * There can be many sections, so this panel adds tabs at the top.
@@ -45,6 +47,7 @@ public class SectionsTabbedPanel extends JPanel {
 
     private static final int SECTIONS_PER_TABLE = 4;
     private static final int TABLES_PER_TAB = 2;
+    private static final int SECTION_NR_MAX = 200;
     private boolean hexEnabled = true;
 
     public SectionsTabbedPanel() {
@@ -125,7 +128,8 @@ public class SectionsTabbedPanel extends JPanel {
     }
 
     private List<JPanel> initTabs(List<SectionHeader> sections) {
-        int nrOfTabs = new Double(Math.ceil(sections.size()/(double)(TABLES_PER_TAB * SECTIONS_PER_TABLE))).intValue();
+        int secNr = min(sections.size(), SECTION_NR_MAX);
+        int nrOfTabs = new Double(Math.ceil(secNr/(double)(TABLES_PER_TAB * SECTIONS_PER_TABLE))).intValue();
         LOGGER.debug("Number of tabs to create: " + nrOfTabs);
         if(nrOfTabs == 0){ nrOfTabs = 1;}
         List<JPanel> tabs = new ArrayList<>();

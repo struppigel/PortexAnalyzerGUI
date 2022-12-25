@@ -20,6 +20,7 @@ package com.github.struppigel.gui;
 import com.github.katjahahn.tools.visualizer.ImageUtil;
 import com.github.katjahahn.tools.visualizer.Visualizer;
 import com.github.katjahahn.tools.visualizer.VisualizerBuilder;
+import com.github.struppigel.gui.utils.WorkerKiller;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -83,7 +84,9 @@ public class VisualizerPanel extends JPanel {
 
     public void visualizePE(File pefile) throws IOException {
         this.pefile = pefile;
-        new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend).execute();
+        SwingWorker worker = new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend);
+        WorkerKiller.getInstance().addWorker(worker);
+        worker.execute();
     }
 
     public BufferedImage getImage() {
@@ -179,7 +182,9 @@ public class VisualizerPanel extends JPanel {
         }
 
         private void applyResize() {
-            new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend).execute();
+            SwingWorker worker = new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend);
+            WorkerKiller.getInstance().addWorker(worker);
+            worker.execute();
         }
     }
 

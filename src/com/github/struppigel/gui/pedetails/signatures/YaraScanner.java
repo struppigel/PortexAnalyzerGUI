@@ -97,7 +97,7 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
     }
 
     private PatternMatch parsePattern(String line) {
-        assert isPattern(line);
+        assert isPattern(line); // make sure the pattern is 0xcafebabe:...:...
         String[] split = line.split(":");
         String longStr = split[0].substring(2);// remove '0x'
         long offset = Long.parseLong(longStr, 16); // convert from hex

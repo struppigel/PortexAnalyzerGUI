@@ -20,6 +20,7 @@ package com.github.struppigel.gui.pedetails.signatures;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.PEFieldsTable;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
+import com.github.struppigel.gui.utils.WorkerKiller;
 import com.github.struppigel.gui.utils.WriteSettingsWorker;
 import com.github.struppigel.settings.PortexSettings;
 import com.github.struppigel.settings.PortexSettingsKey;
@@ -258,8 +259,12 @@ public class SignaturesPanel extends JPanel {
     private void scan(boolean warnUser) {
         if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
             initProgressBar();
-            new YaraScanner(this, pedata, yaraPath, rulePath).execute();
-            new PEidScanner(this, pedata).execute();
+            YaraScanner yaraScanner = new YaraScanner(this, pedata, yaraPath, rulePath);
+            PEidScanner peidScanner = new PEidScanner(this, pedata);
+            yaraScanner.execute();
+            peidScanner.execute();
+            WorkerKiller.getInstance().addWorker(yaraScanner);
+            WorkerKiller.getInstance().addWorker(peidScanner);
         } else if(warnUser) {
             String message = "Cannot scan";
             if(yaraPath == null) { message += ", because no yara path set"; }

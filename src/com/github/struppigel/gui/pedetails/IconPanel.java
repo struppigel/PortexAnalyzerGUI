@@ -21,6 +21,7 @@ import com.github.katjahahn.parser.PEData;
 import com.github.katjahahn.parser.sections.rsrc.icon.IcoFile;
 import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
 import com.github.struppigel.gui.FullPEData;
+import com.github.struppigel.gui.utils.WorkerKiller;
 import net.ifok.image.image4j.codec.ico.ICODecoder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,7 +42,9 @@ public class IconPanel extends JPanel {
 
     public void setPeData(FullPEData peData) {
         this.peData = peData;
-        new IconUpdateWorker(peData.getPeData()).execute();
+        SwingWorker worker = new IconUpdateWorker(peData.getPeData());
+        WorkerKiller.getInstance().addWorker(worker);
+        worker.execute();
     }
 
     public List<BufferedImage> getIcons() {
