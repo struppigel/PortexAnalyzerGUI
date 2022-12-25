@@ -38,7 +38,7 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
     private List<PEidRuleMatch> entryPointScan() {
         List<PEidRuleMatch> result;
         List<SignatureScanner.SignatureMatch> matches = SignatureScanner.newInstance().scanAll(pedata.getFile(), true);
-        result = toPeidRuleMatches(toPatternMatches(matches), "Entry Point");
+        result = toPeidRuleMatches(toPatternMatches(matches), "Entry Point", "PEiD");
         return result;
     }
 
@@ -48,7 +48,7 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
         try {
             long offset = overlay.getOffset();
             List<SignatureScanner.SignatureMatch> overlayMatches = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAt(pedata.getFile(), offset);
-            List<PEidRuleMatch> oMatch = toPeidRuleMatches(toPatternMatches(overlayMatches), "Overlay");
+            List<PEidRuleMatch> oMatch = toPeidRuleMatches(toPatternMatches(overlayMatches), "Overlay", "Filetype");
             result.addAll(oMatch);
         } catch (IOException e) {
             LOGGER.error("something went wrong while scanning the overlay " + e);
@@ -63,7 +63,7 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
             List<SignatureScanner.SignatureMatch> filetypes = FileTypeScanner.apply(pedata.getFile()).scanAt(resOffset);
             resMatches.addAll(toPatternMatches(filetypes));
         }
-        return toPeidRuleMatches(resMatches, "Resource");
+        return toPeidRuleMatches(resMatches, "Resource", "Filetype");
     }
 
 
@@ -81,7 +81,7 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
         return new PatternMatch(offset, rulename, pattern);
     }
 
-    private List<PEidRuleMatch> toPeidRuleMatches(List<PatternMatch> patterns, String scanMode) {
+    private List<PEidRuleMatch> toPeidRuleMatches(List<PatternMatch> patterns, String scanMode, String scannerName) {
         List<PEidRuleMatch> result = new ArrayList<>();
         // create unique list of all rule names
         Set<String> uniqueRulenames = new HashSet<>();
@@ -94,7 +94,7 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
             // make pattern name empty string because it looks weird to see the same value for rule name and pattern name
             rulePatterns =  rulePatterns.stream().map(p -> new PatternMatch(p.offset, "", p.patternContent)).collect(Collectors.toList());
             // create a PEiD rule match out of these patterns
-            result.add(new PEidRuleMatch(rule, scanMode, rulePatterns));
+            result.add(new PEidRuleMatch(rule, scanMode, rulePatterns, scannerName));
         }
         return result;
     }

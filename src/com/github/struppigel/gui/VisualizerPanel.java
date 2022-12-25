@@ -48,6 +48,7 @@ public class VisualizerPanel extends JPanel {
     private File pefile;
 
     private final static int RESIZE_DELAY = 1000;
+    private JProgressBar scanRunningBar = new JProgressBar();
 
     private boolean enableLegend = false;
     private boolean enableByteplot = true;
@@ -71,6 +72,7 @@ public class VisualizerPanel extends JPanel {
     }
 
     private void initPanel(){
+        this.removeAll();
         setLayout(new BorderLayout());
         add(visLabel, BorderLayout.CENTER);
         addComponentListener(new ResizeListener());
@@ -87,6 +89,16 @@ public class VisualizerPanel extends JPanel {
         SwingWorker worker = new VisualizerWorker(getHeight(), imageWidth, pefile, enableEntropy, enableByteplot, enableLegend);
         WorkerKiller.getInstance().addWorker(worker);
         worker.execute();
+        initProgressBar();
+    }
+
+    private void initProgressBar() {
+        this.removeAll();
+        this.add(scanRunningBar);
+        this.setLayout(new FlowLayout());
+        scanRunningBar.setIndeterminate(true);
+        scanRunningBar.setVisible(true);
+        this.repaint();
     }
 
     public BufferedImage getImage() {
@@ -137,9 +149,11 @@ public class VisualizerPanel extends JPanel {
 
         @Override
         protected void done() {
+            if(isCancelled()){return;}
             try {
                 image = get();
                 if(image == null) return;
+                initPanel();
                 visLabel.setIcon(new ImageIcon(image));
                 visLabel.repaint();
             } catch (InterruptedException e) {

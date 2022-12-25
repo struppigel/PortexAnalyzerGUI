@@ -49,7 +49,7 @@ public class SignaturesPanel extends JPanel {
     private final String[] summaryHeaders = {"Source", "Match name", "Scan mode"};
 
     //e.g. XORedPE, "This program", "0xcafebabe", "Resource"
-    private final String[] patternHeaders = {"Rule name", "Pattern name", "Pattern content", "Offset"}; //, "Location"};
+    private final String[] patternHeaders = {"Match name", "Pattern name", "Pattern content", "Offset"}; //, "Location"};
     private boolean hexEnabled = true;
     private JTextField yaraPathTextField = new JTextField(30);
     private JTextField rulePathTextField = new JTextField(30);
@@ -158,7 +158,7 @@ public class SignaturesPanel extends JPanel {
         tablePanel.add(firstRow);
         JPanel secondRow = new JPanel();
         secondRow.setLayout(new FlowLayout());
-        secondRow.add(new JLabel("Rule path:"));
+        secondRow.add(new JLabel("Signature path:"));
         secondRow.add(rulePathTextField);
         secondRow.add(rulePathButton);
         tablePanel.add(secondRow);
@@ -276,9 +276,10 @@ public class SignaturesPanel extends JPanel {
                     message,
                     "Cannot scan",
                     JOptionPane.WARNING_MESSAGE);
+            requestPaths();
+        } else {
+            requestPaths();
         }
-        requestPaths();
-
     }
 
     public void setPeData(FullPEData data) {
