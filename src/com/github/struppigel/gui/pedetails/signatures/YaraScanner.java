@@ -135,6 +135,7 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
 
     @Override
     protected void done() {
+        if(isCancelled()){return;}
         try {
             signaturesPanel.buildYaraTables(get());
         } catch (ExecutionException e) {

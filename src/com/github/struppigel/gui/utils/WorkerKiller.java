@@ -30,7 +30,7 @@ public class WorkerKiller {
     }
 
     private void cleanDoneWorkers() {
-        List<SwingWorker> toRemove = workers.stream().filter(w -> w.isDone()).collect(Collectors.toList());
+        List<SwingWorker> toRemove = workers.stream().filter(w -> w.isCancelled() || w.isDone()).collect(Collectors.toList());
         for(SwingWorker w : toRemove) {
             workers.remove(w);
         }

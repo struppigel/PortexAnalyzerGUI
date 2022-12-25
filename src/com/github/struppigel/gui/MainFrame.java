@@ -173,6 +173,8 @@ public class MainFrame extends JFrame {
                 int progress = (Integer) evt.getNewValue();
                 progressBar.setValue(progress);
                 progressBar.setString(progress + " %");
+                progressBarFrame.toFront();
+                progressBarFrame.setAlwaysOnTop(true);
             } else if (name.equals("state")) {
                 SwingWorker.StateValue state = (SwingWorker.StateValue) evt
                         .getNewValue();

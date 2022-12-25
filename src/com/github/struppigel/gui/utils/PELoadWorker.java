@@ -340,6 +340,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
     @Override
     protected void done() {
+        if(isCancelled()) {return;}
         try {
             FullPEData data = get();
             frame.setPeData(data);

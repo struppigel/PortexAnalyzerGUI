@@ -101,6 +101,7 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
 
     @Override
     protected void done() {
+        if(isCancelled()){return;}
         try {
             List<PEidRuleMatch> matches = get();
             signaturesPanel.buildPEiDTables(get());

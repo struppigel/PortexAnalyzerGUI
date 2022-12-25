@@ -1,13 +1,13 @@
 /**
  * *****************************************************************************
  * Copyright 2022 Karsten Hahn
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
- *
+ * <a href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -54,7 +54,7 @@ public class IconPanel extends JPanel {
     private class IconUpdateWorker extends SwingWorker<List<BufferedImage>, Void> {
         private final PEData data;
 
-            public IconUpdateWorker(PEData data){
+        public IconUpdateWorker(PEData data) {
             this.data = data;
         }
 
@@ -62,31 +62,35 @@ public class IconPanel extends JPanel {
         protected List<BufferedImage> doInBackground() throws IOException {
             List<IcoFile> icons = IconParser.extractIcons(data);
             List<BufferedImage> images = new ArrayList<>();
-            for(IcoFile icon : icons) {
+            for (IcoFile icon : icons) {
                 try {
                     List<BufferedImage> result = ICODecoder.read(icon.getInputStream());
                     images.addAll(result);
-                } catch(IOException e) {
+                } catch (IOException e) {
                     LOGGER.error(e);
                 }
             }
             return images;
         }
+
         @Override
         protected void done() {
+            if (isCancelled()) {
+                return;
+            }
             try {
                 // get images
                 icons = get();
 
                 // init Swing components in the icon panel
-                GridLayout grid = new GridLayout(0,2);
+                GridLayout grid = new GridLayout(0, 2);
                 JPanel gridPanel = new JPanel(grid);
                 //gridPanel.setPreferredSize(new Dimension(getWidth(), getHeight()));
                 IconPanel.this.removeAll();
                 IconPanel.this.add(gridPanel);
 
                 // add all icons to the grid
-                for(BufferedImage image : icons){
+                for (BufferedImage image : icons) {
                     JLabel iconLabel = new JLabel(new ImageIcon(image));
                     gridPanel.add(iconLabel);
                 }
