@@ -20,6 +20,7 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 * Overlay and overlay signature scanning
 * Version information and manifest
 * Icon extraction and saving as PNG
+* Customized signature scanning via Yara. Internal signature scans using PEiD signatures and an internal filetype scanner.
 
 ## Supported OS and JRE
 
@@ -34,7 +35,6 @@ These features include among others:
 * customized visualization
 * extraction and conversion of icons to .ICO files
 * dumping of sections, overlay, resources
-* customized signature scanning
 * export reports to txt, json, csv
 
 Some of these features are already provided by PortexAnalyzer CLI version, which you can find here: [PortexAnalyzer CLI](https://github.com/struppigel/PortEx/tree/master/progs)
