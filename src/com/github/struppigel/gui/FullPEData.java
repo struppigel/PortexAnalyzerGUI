@@ -57,6 +57,7 @@ public class FullPEData {
     private String debugInfo;
     private List<Object[]> sectionHashTableEntries;
     private String signatureReport;
+    private List<Object[]> stringTableEntries;
 
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries,
@@ -64,7 +65,7 @@ public class FullPEData {
                       List<Object[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
                       String hashes, List<Object[]> sectionHashTableEntries,
                       List<Object[]> anomaliesTable, List<StandardField> debugTableEntries, List<Object[]> vsInfoTable,
-                      String signatureReport) {
+                      String signatureReport, List<Object[]> stringTableEntries) {
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -84,6 +85,7 @@ public class FullPEData {
         this.debugTableEntries = debugTableEntries;
         this.vsInfoTable = vsInfoTable;
         this.signatureReport = signatureReport;
+        this.stringTableEntries = stringTableEntries;
     }
 
     public PEData getPeData() {
@@ -210,5 +212,13 @@ public class FullPEData {
 
     public String getSignatureReport() {
         return this.signatureReport;
+    }
+
+    public boolean hasRTStrings() {
+        return !stringTableEntries.isEmpty();
+    }
+
+    public List<Object[]> getRTStringTableEntries() {
+        return this.stringTableEntries;
     }
 }

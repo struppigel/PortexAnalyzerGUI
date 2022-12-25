@@ -332,6 +332,16 @@ public class PEDetailsPanel extends JPanel {
 
     }
 
+    public void showRTStrings() {
+        if (peData == null) return;
+        List<Object[]> entries = peData.getRTStringTableEntries();
+        String[] tableHeader = {"ID", "String"};
+        showTextEntries(entries, tableHeader);
+        LOGGER.debug("RT_STRINGS shown");
+
+        showTablePanel();
+    }
+
     public void showWindowsFieldsTable() {
         if (peData == null) return;
         OptionalHeader header = peData.getPeData().getOptionalHeader();

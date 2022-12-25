@@ -91,6 +91,10 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
         }
     }
 
+    public boolean valueEquals(PortexSettingsKey key, String value) {
+        return this.containsKey(key) && this.get(key).equals(value);
+    }
+
     public void writeSettings() throws IOException {
         HashMap<PortexSettingsKey, String> map = new HashMap<>(this); // shallow copy
         new SettingsWriter(settingsFile, map).execute();

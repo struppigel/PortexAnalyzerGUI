@@ -47,6 +47,7 @@ public class PEComponentTree extends JPanel {
     private static final String RICH_TEXT = "Rich Header";
     private static final String MANIFEST_TEXT = "Manifests";
     private static final String RESOURCES_TEXT = "Resources";
+    private static final String RT_STRING_TEXT = "String Table";
     private static final String VERSIONINFO_TEXT = "Version Info";
     private static final String IMPORTS_TEXT = "Imports";
     private static final String EXPORTS_TEXT = "Exports";
@@ -92,6 +93,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode manifest = new DefaultMutableTreeNode(MANIFEST_TEXT);
         DefaultMutableTreeNode version = new DefaultMutableTreeNode(VERSIONINFO_TEXT);
         DefaultMutableTreeNode icons = new DefaultMutableTreeNode(ICONS_TEXT);
+        DefaultMutableTreeNode rtstrings = new DefaultMutableTreeNode(RT_STRING_TEXT);
 
         DefaultMutableTreeNode imports = new DefaultMutableTreeNode(IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
@@ -125,6 +127,9 @@ public class PEComponentTree extends JPanel {
             }
             if(peData.hasIcons()){
                 resources.add(icons);
+            }
+            if(peData.hasRTStrings()) {
+                resources.add(rtstrings);
             }
         }
 
@@ -278,6 +283,9 @@ public class PEComponentTree extends JPanel {
                 break;
             case SIGNATURES_TEXT:
                 peDetailsPanel.showSignatures();
+                break;
+            case RT_STRING_TEXT:
+                peDetailsPanel.showRTStrings();
                 break;
         }
     }

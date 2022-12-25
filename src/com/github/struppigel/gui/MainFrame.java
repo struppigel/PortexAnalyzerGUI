@@ -83,7 +83,7 @@ public class MainFrame extends JFrame {
 
     private void checkForUpdate() {
         // only update if setting does not prevent it
-        if(settings.containsKey(PortexSettingsKey.DISABLE_UPDATE) && settings.get(PortexSettingsKey.DISABLE_UPDATE).equals("1")) {
+        if(settings.valueEquals(PortexSettingsKey.DISABLE_UPDATE,"1")) {
             return;
         }
         UpdateWorker updater = new UpdateWorker();
@@ -304,14 +304,12 @@ public class MainFrame extends JFrame {
         JMenu settingsMenu = new JMenu("Settings");
         JCheckBoxMenuItem disableYaraWarn = new JCheckBoxMenuItem("Disable Yara warnings");
         JCheckBoxMenuItem disableUpdateCheck = new JCheckBoxMenuItem("Disable update check");
-        if(settings.containsKey(PortexSettingsKey.DISABLE_UPDATE)) {
-            disableUpdateCheck.setState(settings.get(PortexSettingsKey.DISABLE_UPDATE).equals("1"));
-        }
-        if(settings.containsKey(PortexSettingsKey.DISABLE_YARA_WARNINGS)) {
-            disableYaraWarn.setState(settings.get(PortexSettingsKey.DISABLE_YARA_WARNINGS).equals("1"));
-        }
+        disableUpdateCheck.setState(settings.valueEquals(PortexSettingsKey.DISABLE_UPDATE, "1"));
+        disableYaraWarn.setState(settings.valueEquals(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1"));
+
         settingsMenu.add(disableYaraWarn);
         settingsMenu.add(disableUpdateCheck);
+
         disableYaraWarn.addActionListener(e -> {
             if(disableYaraWarn.getState()) {
                 settings.put(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1");
@@ -324,6 +322,7 @@ public class MainFrame extends JFrame {
                 LOGGER.error(e);
             }
         });
+
         disableUpdateCheck.addActionListener(e -> {
             if(disableUpdateCheck.getState()) {
                 settings.put(PortexSettingsKey.DISABLE_UPDATE, "1");

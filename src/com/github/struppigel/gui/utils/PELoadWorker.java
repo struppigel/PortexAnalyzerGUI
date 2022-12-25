@@ -17,10 +17,7 @@
  */
 package com.github.struppigel.gui.utils;
 
-import com.github.katjahahn.parser.ByteArrayUtil;
-import com.github.katjahahn.parser.PEData;
-import com.github.katjahahn.parser.PELoader;
-import com.github.katjahahn.parser.StandardField;
+import com.github.katjahahn.parser.*;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
@@ -107,6 +104,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         List<Object[]> resourceTableEntries = createResourceTableEntries(data);
         List<String> manifests = data.loadManifests();
         List<Object[]> vsInfoTable = createVersionInfoEntries(data);
+        List<Object[]> stringTableEntries = createStringTableEntries(data);
         setProgress(60);
 
         publish("Loading Exports...");
@@ -132,7 +130,18 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
-                debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable, signatureReport);
+                debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
+                signatureReport, stringTableEntries);
+    }
+
+    private List<Object[]> createStringTableEntries(PEData data) {
+        List<Object[]> entries = new ArrayList<>();
+        Map<Long, String> strTable = data.loadStringTable();
+        for(Map.Entry<Long, String> entry : strTable.entrySet()){
+            Object[] row = {entry.getKey(), entry.getValue()};
+            entries.add(row);
+        }
+        return entries;
     }
 
     private List<Object[]> createVersionInfoEntries(PEData data) {
