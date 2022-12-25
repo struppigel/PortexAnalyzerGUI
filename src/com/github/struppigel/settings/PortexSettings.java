@@ -19,13 +19,18 @@ package com.github.struppigel.settings;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import scala.math.Ordering;
 
+import javax.swing.*;
 import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+
+import static com.github.struppigel.settings.PortexSettingsKey.DISABLE_UPDATE;
+import static com.github.struppigel.settings.PortexSettingsKey.DISABLE_YARA_WARNINGS;
 
 public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
@@ -71,6 +76,13 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
                         }
                     }
                 }
+                // apply defaults
+                if(!this.containsKey(DISABLE_YARA_WARNINGS)) {
+                    this.put(DISABLE_YARA_WARNINGS, "0");
+                }
+                if(!this.containsKey(DISABLE_UPDATE)) {
+                    this.put(DISABLE_UPDATE, "0");
+                }
                 LOGGER.info("Settings read successfully from " + settingsFile.getAbsolutePath());
             }
         } catch (IOException e) {
@@ -80,18 +92,36 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
     }
 
     public void writeSettings() throws IOException {
-        try {
-            settingsFile.delete();
-            settingsFile.createNewFile();
-            try (PrintStream out = new PrintStream(new FileOutputStream(settingsFile))) {
-                for (Map.Entry<PortexSettingsKey, String> entry : this.entrySet()) {
-                    out.println(entry.getKey() + SETTINGS_DELIMITER + entry.getValue().trim());
+        HashMap<PortexSettingsKey, String> map = new HashMap<>(this); // shallow copy
+        new SettingsWriter(settingsFile, map).execute();
+    }
+
+    private static class SettingsWriter extends SwingWorker<Void, Void> {
+
+        private final File settingsFile;
+        private final HashMap<PortexSettingsKey, String> map;
+
+        public SettingsWriter(File settingsFile, HashMap<PortexSettingsKey, String> map) {
+            this.settingsFile = settingsFile;
+            this.map = map;
+        }
+
+        @Override
+        protected Void doInBackground() throws Exception {
+            try {
+                settingsFile.delete();
+                settingsFile.createNewFile();
+                try (PrintStream out = new PrintStream(new FileOutputStream(settingsFile))) {
+                    for (Map.Entry<PortexSettingsKey, String> entry : map.entrySet()) {
+                        out.println(entry.getKey() + SETTINGS_DELIMITER + entry.getValue().trim());
+                    }
+                    LOGGER.info("Settings written to " + settingsFile.getAbsolutePath());
                 }
-                LOGGER.info("Settings written to " + settingsFile.getAbsolutePath());
+            } catch (IOException e) {
+                LOGGER.error("problem with writing " + settingsFile);
+                throw e;
             }
-        } catch (IOException e) {
-            LOGGER.error("problem with writing " + settingsFile.toString());
-            throw e;
+            return null;
         }
     }
 }

@@ -259,7 +259,7 @@ public class SignaturesPanel extends JPanel {
     private void scan(boolean warnUser) {
         if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
             initProgressBar();
-            YaraScanner yaraScanner = new YaraScanner(this, pedata, yaraPath, rulePath);
+            YaraScanner yaraScanner = new YaraScanner(this, pedata, yaraPath, rulePath, settings);
             PEidScanner peidScanner = new PEidScanner(this, pedata);
             yaraScanner.execute();
             peidScanner.execute();

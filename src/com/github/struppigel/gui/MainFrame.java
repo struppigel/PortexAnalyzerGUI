@@ -22,6 +22,7 @@ import com.github.struppigel.gui.utils.PELoadWorker;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
 import com.github.struppigel.gui.utils.WorkerKiller;
 import com.github.struppigel.settings.PortexSettings;
+import com.github.struppigel.settings.PortexSettingsKey;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -32,6 +33,8 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.io.BufferedReader;
 import java.io.File;
@@ -79,6 +82,10 @@ public class MainFrame extends JFrame {
     }
 
     private void checkForUpdate() {
+        // only update if setting does not prevent it
+        if(settings.containsKey(PortexSettingsKey.DISABLE_UPDATE) && settings.get(PortexSettingsKey.DISABLE_UPDATE).equals("1")) {
+            return;
+        }
         UpdateWorker updater = new UpdateWorker();
         updater.execute();
     }
@@ -224,11 +231,6 @@ public class MainFrame extends JFrame {
         panel.add(visualizerPanel, BorderLayout.LINE_END);
         this.add(panel, BorderLayout.CENTER);
 
-        /* Set up filepath
-        JPanel inputPathPanel = new JPanel();
-        inputPathPanel.add(filePathLabel);
-        panel.add(inputPathPanel, BorderLayout.PAGE_START); */
-
         // set up toolbar
         JToolBar toolBar = new JToolBar();
 
@@ -249,21 +251,7 @@ public class MainFrame extends JFrame {
         toolBar.add(Box.createHorizontalGlue());
         toolBar.setOpaque(true);
 
-
         add(toolBar, BorderLayout.PAGE_START);
-
-/*
-        toolBar.setUI ( new BasicToolBarUI() {
-            @Override
-            protected void paintDragWindow(Graphics g) {
-                g.setColor(Color.blue);
-                int w = dragWindow.getWidth();
-                int h = dragWindow.getHeight();
-                g.fillRect(0, 0, w, h);
-                g.setColor(dragWindow.getBorderColor());
-                g.drawRect(0, 0, w - 1, h - 1);
-            }
-        } );*/
 
         toolBar.repaint();
 
@@ -303,11 +291,52 @@ public class MainFrame extends JFrame {
         JMenuBar menuBar = new JMenuBar();
         JMenu fileMenu = createFileMenu();
         JMenu help = createHelpMenu();
+        JMenu settingsMenu = createSettingsMenu();
 
         menuBar.add(fileMenu);
+        menuBar.add(settingsMenu);
         menuBar.add(help);
 
         this.setJMenuBar(menuBar);
+    }
+
+    private JMenu createSettingsMenu() {
+        JMenu settingsMenu = new JMenu("Settings");
+        JCheckBoxMenuItem disableYaraWarn = new JCheckBoxMenuItem("Disable Yara warnings");
+        JCheckBoxMenuItem disableUpdateCheck = new JCheckBoxMenuItem("Disable update check");
+        if(settings.containsKey(PortexSettingsKey.DISABLE_UPDATE)) {
+            disableUpdateCheck.setState(settings.get(PortexSettingsKey.DISABLE_UPDATE).equals("1"));
+        }
+        if(settings.containsKey(PortexSettingsKey.DISABLE_YARA_WARNINGS)) {
+            disableYaraWarn.setState(settings.get(PortexSettingsKey.DISABLE_YARA_WARNINGS).equals("1"));
+        }
+        settingsMenu.add(disableYaraWarn);
+        settingsMenu.add(disableUpdateCheck);
+        disableYaraWarn.addActionListener(e -> {
+            if(disableYaraWarn.getState()) {
+                settings.put(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1");
+            } else {
+                settings.put(PortexSettingsKey.DISABLE_YARA_WARNINGS, "0");
+            }
+            try {
+                settings.writeSettings();
+            } catch (IOException ex) {
+                LOGGER.error(e);
+            }
+        });
+        disableUpdateCheck.addActionListener(e -> {
+            if(disableUpdateCheck.getState()) {
+                settings.put(PortexSettingsKey.DISABLE_UPDATE, "1");
+            } else {
+                settings.put(PortexSettingsKey.DISABLE_UPDATE, "0");
+            }
+            try {
+                settings.writeSettings();
+            } catch (IOException ex) {
+                LOGGER.error(e);
+            }
+        });
+        return settingsMenu;
     }
 
     private JMenu createHelpMenu() {

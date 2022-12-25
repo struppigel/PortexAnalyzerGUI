@@ -18,6 +18,8 @@
 package com.github.struppigel.gui.pedetails.signatures;
 
 import com.github.struppigel.gui.FullPEData;
+import com.github.struppigel.settings.PortexSettings;
+import com.github.struppigel.settings.PortexSettingsKey;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -30,6 +32,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import static com.github.struppigel.settings.PortexSettingsKey.DISABLE_YARA_WARNINGS;
+
 class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
     private static final Logger LOGGER = LogManager.getLogger();
     private final SignaturesPanel signaturesPanel;
@@ -37,11 +41,14 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
     private final String yaraPath;
     private final String rulePath;
 
-    public YaraScanner(SignaturesPanel signaturesPanel, FullPEData data, String yaraPath, String rulePath) {
+    private PortexSettings settings;
+
+    public YaraScanner(SignaturesPanel signaturesPanel, FullPEData data, String yaraPath, String rulePath, PortexSettings settings) {
         this.signaturesPanel = signaturesPanel;
         this.pedata = data;
         this.yaraPath = yaraPath;
         this.rulePath = rulePath;
+        this.settings = settings;
     }
 
     @Override
@@ -65,11 +72,23 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                LOGGER.error("Error while parsing yara rules: " + line);
-                JOptionPane.showMessageDialog(signaturesPanel,
-                        line,
-                        "Rule parsing error",
-                        JOptionPane.ERROR_MESSAGE);
+
+                if (line.contains("warning:")) {
+                    LOGGER.warn("Warning while parsing yara rules: " + line);
+                    if (settings.containsKey(DISABLE_YARA_WARNINGS) && settings.get(DISABLE_YARA_WARNINGS).equals("1")) {
+                        return;
+                    }
+                    JOptionPane.showMessageDialog(signaturesPanel,
+                            line,
+                            "Rule parsing warning",
+                            JOptionPane.WARNING_MESSAGE);
+                } else {
+                    LOGGER.error("Error while parsing yara rules: " + line);
+                    JOptionPane.showMessageDialog(signaturesPanel,
+                            line,
+                            "Rule parsing error",
+                            JOptionPane.ERROR_MESSAGE);
+                }
             }
         }
     }
@@ -135,7 +154,9 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
 
     @Override
     protected void done() {
-        if(isCancelled()){return;}
+        if (isCancelled()) {
+            return;
+        }
         try {
             signaturesPanel.buildYaraTables(get());
         } catch (ExecutionException e) {
