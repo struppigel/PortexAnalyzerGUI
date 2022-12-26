@@ -17,6 +17,7 @@
  */
 package com.github.struppigel.gui;
 
+import com.github.struppigel.gui.pedetails.FileContentPreviewPanel;
 import com.github.struppigel.gui.pedetails.PEDetailsPanel;
 import com.github.struppigel.gui.utils.PELoadWorker;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
@@ -55,7 +56,7 @@ import static javax.swing.SwingWorker.StateValue.DONE;
 public class MainFrame extends JFrame {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JLabel filePathLabel = new JLabel();
-    private final VisualizerPanel visualizerPanel;
+    private final VisualizerPanel visualizerPanel = new VisualizerPanel();;
     private final PEDetailsPanel peDetailsPanel;
     private final PortexSettings settings;
     private FullPEData pedata = null;
@@ -67,13 +68,14 @@ public class MainFrame extends JFrame {
     private final static String currVersion = "/upd_version.txt";
     private final static String releasePage = "https://github.com/struppigel/PortexAnalyzerGUI/releases";
     private final JLabel progressText = new JLabel("Loading ...");
+    private final JPanel cardPanel = new JPanel(new CardLayout());
+    private FileContentPreviewPanel fileContent = new FileContentPreviewPanel();
 
     public MainFrame(PortexSettings settings) {
         super("Portex Analyzer v. " + AboutFrame.version);
 
         this.settings = settings;
-        visualizerPanel = new VisualizerPanel();
-        peDetailsPanel = new PEDetailsPanel(visualizerPanel, this, settings);
+        peDetailsPanel = new PEDetailsPanel(cardPanel, this, settings, fileContent);
         peComponentTree = new PEComponentTree(peDetailsPanel);
 
         initGUI();
@@ -203,6 +205,7 @@ public class MainFrame extends JFrame {
             peDetailsPanel.setPeData(pedata);
             peComponentTree.setPeData(pedata);
             peComponentTree.setSelectionRow(0);
+            fileContent.setPeData(pedata);
         } catch (IOException e) {
             String message = "Could not load PE file! Reason: " + e.getMessage();
             LOGGER.error(message);
@@ -225,13 +228,22 @@ public class MainFrame extends JFrame {
         JPanel panel = new JPanel();
         panel.setLayout(new BorderLayout());
 
+        // init Card Panel on the right
+        this.cardPanel.add(visualizerPanel, "VISUALIZER");
+        this.cardPanel.add(fileContent, "FILE_CONTENT");
+
         // Add all other components
         panel.add(peDetailsPanel, BorderLayout.CENTER);
         panel.add(peComponentTree, BorderLayout.LINE_START);
-        panel.add(visualizerPanel, BorderLayout.LINE_END);
+        panel.add(cardPanel, BorderLayout.LINE_END);
         this.add(panel, BorderLayout.CENTER);
 
-        // set up toolbar
+        initToolbar();
+        initMenu();
+        initProgressBar();
+    }
+
+    private void initToolbar() {
         JToolBar toolBar = new JToolBar();
 
         ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-24.png"));
@@ -245,7 +257,22 @@ public class MainFrame extends JFrame {
                 setToHex(false);
             }
         });
+        ImageIcon imgIco = new ImageIcon(getClass().getResource("/icons8-image-24.png"));
+        JToggleButton imgButton = new JToggleButton(imgIco);
+        imgButton.setSelected(true);
+        imgButton.addItemListener(e -> {
+            int state = e.getStateChange();
+            if(state == ItemEvent.SELECTED){
+                ((CardLayout) cardPanel.getLayout()).show(cardPanel, "VISUALIZER");
+            } else {
+                ((CardLayout) cardPanel.getLayout()).show(cardPanel, "FILE_CONTENT");
+            }
+            cardPanel.repaint();
+            fileContent.repaint();
+        });
+
         toolBar.add(hexButton);
+        toolBar.add(imgButton);
         toolBar.add(Box.createHorizontalGlue());
         toolBar.add(filePathLabel);
         toolBar.add(Box.createHorizontalGlue());
@@ -254,9 +281,6 @@ public class MainFrame extends JFrame {
         add(toolBar, BorderLayout.PAGE_START);
 
         toolBar.repaint();
-
-        initMenu();
-        initProgressBar();
     }
 
     private void setToHex(boolean hexEnabled) {

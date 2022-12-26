@@ -281,6 +281,7 @@ public class SectionsTabbedPanel extends JPanel {
 
     public void setHexEnabled(boolean hexEnabled) {
         this.hexEnabled = hexEnabled;
+        if(peData == null) {return;}
         initializeContent();
     }
 }

@@ -19,6 +19,7 @@ package com.github.struppigel.gui.pedetails.signatures;
 
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.PEFieldsTable;
+import com.github.struppigel.gui.pedetails.FileContentPreviewPanel;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
 import com.github.struppigel.gui.utils.WorkerKiller;
 import com.github.struppigel.gui.utils.WriteSettingsWorker;
@@ -40,6 +41,7 @@ public class SignaturesPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JProgressBar scanRunningBar = new JProgressBar();
     private final PortexSettings settings;
+    private final FileContentPreviewPanel previewPanel;
     private FullPEData pedata;
 
     private String rulePath; // TODO set a default path
@@ -57,8 +59,9 @@ public class SignaturesPanel extends JPanel {
     private List<YaraRuleMatch> yaraResults = null;
     // TODO put this here in result table!
     private List<PEidRuleMatch> peidResults = null;
-    public SignaturesPanel(PortexSettings settings) {
+    public SignaturesPanel(PortexSettings settings, FileContentPreviewPanel previewPanel) {
         this.settings = settings;
+        this.previewPanel = previewPanel;
         applyLoadedSettings();
     }
 
@@ -87,6 +90,7 @@ public class SignaturesPanel extends JPanel {
 
         PEFieldsTable summaryTable = new PEFieldsTable(hexEnabled);
         PEFieldsTable patternTable = new PEFieldsTable(hexEnabled);
+        patternTable.setPreviewOffsetColumn(3, previewPanel);
 
         DefaultTableModel sumModel = new PEFieldsTable.PETableModel();
         sumModel.setColumnIdentifiers(summaryHeaders);
@@ -250,7 +254,6 @@ public class SignaturesPanel extends JPanel {
         int rowIndex = table.getSelectedRow();
         if (rowIndex >= 0) {
             return table.convertRowIndexToModel(rowIndex);
-            //
 
         }
         return -1;
@@ -289,6 +292,7 @@ public class SignaturesPanel extends JPanel {
 
     public void setHexEnabled(boolean hexEnabled) {
         this.hexEnabled = hexEnabled;
+        if(pedata == null){return;}
         buildTables(); // new renderer settings, refresh the panel
     }
 
