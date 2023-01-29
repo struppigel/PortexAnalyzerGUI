@@ -39,8 +39,9 @@ public class PortexSwingUtils {
         return null;
     }
 
-    public static String getSaveFileNameFromUser(Component parent) {
+    public static String getSaveFileNameFromUser(Component parent, String defaultFileName) {
         JFileChooser fc = new JFileChooser(userdir);
+        fc.setSelectedFile(new File(defaultFileName));
         int state = fc.showSaveDialog(parent);
         if (state == JFileChooser.APPROVE_OPTION) {
             File dir = fc.getCurrentDirectory();

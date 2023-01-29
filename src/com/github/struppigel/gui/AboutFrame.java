@@ -26,13 +26,13 @@ public class AboutFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
-    public static String version = "0.12.6";
+    public static String version = "0.12.7";
     private static final String text = "Portex Analyzer GUI" + "\n\n" + "Version: " + version
             + "\nAuthor: Karsten Hahn"
-            + "\nLast update: 25. December 2022"
+            + "\nLast update: 29. January 2023"
             + "\n\nI develop this software as a hobby in my free time."
             + "\n\nIf you like it, please consider buying me a coffee: https://ko-fi.com/struppigel"
-            + "\n\nThe repo is available at https://github.com/struppigel/PortexAnalyzerGUI";
+            + "\n\nThe repository is available at https://github.com/struppigel/PortexAnalyzerGUI";
 
     public AboutFrame() {
         super("About PortexAnalyzer GUI");
@@ -40,7 +40,7 @@ public class AboutFrame extends JFrame {
     }
 
     private void initGUI() {
-        this.setSize(350, 280);
+        this.setSize(350, 320);
         this.setResizable(false);
         this.setVisible(true);
         this.setLocationRelativeTo(null);

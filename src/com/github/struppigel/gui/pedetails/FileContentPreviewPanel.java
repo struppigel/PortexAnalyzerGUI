@@ -32,9 +32,10 @@ public class FileContentPreviewPanel extends JPanel {
 
     private static final Logger LOGGER = LogManager.getLogger();
     private static final int PREVIEW_SIZE = 0x2000;
-    private JTextArea contentDisplay = new JTextArea("test");
+    private JTextArea contentDisplay = new JTextArea("Offset: 0");
 
     private FullPEData pedata;
+    private boolean isHexEnabled = true;
 
     public FileContentPreviewPanel() {
         contentDisplay.setLineWrap(true);
@@ -64,7 +65,8 @@ public class FileContentPreviewPanel extends JPanel {
             protected void done() {
                 try {
                     String contentStr = get();
-                    contentDisplay.setText(contentStr);
+                    String offsetStr = isHexEnabled ? "Offset: 0x" + Long.toHexString(offset) : "Offset: " + offset;
+                    contentDisplay.setText(offsetStr + "\n" + contentStr);
                     contentDisplay.repaint();
                 } catch (InterruptedException | ExecutionException e) {
                     LOGGER.error(e);
@@ -89,5 +91,9 @@ public class FileContentPreviewPanel extends JPanel {
             LOGGER.error(e);
         }
         return new byte[0];
+    }
+
+    public void setHexEnabled(boolean hexEnabled) {
+        this.isHexEnabled = hexEnabled;
     }
 }

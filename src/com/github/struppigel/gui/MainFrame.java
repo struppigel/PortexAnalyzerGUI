@@ -22,6 +22,7 @@ import com.github.struppigel.gui.pedetails.PEDetailsPanel;
 import com.github.struppigel.gui.utils.PELoadWorker;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
 import com.github.struppigel.gui.utils.WorkerKiller;
+import com.github.struppigel.settings.LookAndFeelSetting;
 import com.github.struppigel.settings.PortexSettings;
 import com.github.struppigel.settings.PortexSettingsKey;
 import org.apache.logging.log4j.LogManager;
@@ -328,11 +329,14 @@ public class MainFrame extends JFrame {
         JMenu settingsMenu = new JMenu("Settings");
         JCheckBoxMenuItem disableYaraWarn = new JCheckBoxMenuItem("Disable Yara warnings");
         JCheckBoxMenuItem disableUpdateCheck = new JCheckBoxMenuItem("Disable update check");
+        JCheckBoxMenuItem systemTheme = new JCheckBoxMenuItem("Use system theme");
         disableUpdateCheck.setState(settings.valueEquals(PortexSettingsKey.DISABLE_UPDATE, "1"));
         disableYaraWarn.setState(settings.valueEquals(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1"));
+        systemTheme.setState(settings.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.SYSTEM.toString()));
 
         settingsMenu.add(disableYaraWarn);
         settingsMenu.add(disableUpdateCheck);
+        settingsMenu.add(systemTheme);
 
         disableYaraWarn.addActionListener(e -> {
             if(disableYaraWarn.getState()) {
@@ -352,6 +356,23 @@ public class MainFrame extends JFrame {
                 settings.put(PortexSettingsKey.DISABLE_UPDATE, "1");
             } else {
                 settings.put(PortexSettingsKey.DISABLE_UPDATE, "0");
+            }
+            try {
+                settings.writeSettings();
+            } catch (IOException ex) {
+                LOGGER.error(e);
+            }
+        });
+
+        systemTheme.addActionListener(e -> {
+            JOptionPane.showMessageDialog(this,
+                    "Please restart PortexAnalyzerGUI for the new theme!",
+                    "Theme changed",
+                    JOptionPane.INFORMATION_MESSAGE);
+            if(systemTheme.getState()) {
+                settings.put(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.SYSTEM.toString());
+            } else {
+                settings.put(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
             }
             try {
                 settings.writeSettings();

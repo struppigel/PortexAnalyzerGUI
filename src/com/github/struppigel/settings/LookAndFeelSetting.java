@@ -1,6 +1,6 @@
 /**
  * *****************************************************************************
- * Copyright 2022 Karsten Hahn
+ * Copyright 2023 Karsten Hahn
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,10 @@
  */
 package com.github.struppigel.settings;
 
-public enum PortexSettingsKey {
-    YARA_PATH,
-    YARA_SIGNATURE_PATH,
-    DISABLE_UPDATE,
-    DISABLE_YARA_WARNINGS,
-    // possible values are in LookAndFeelSetting
-    LOOK_AND_FEEL;
+/**
+ * Available GUI themes
+ */
+public enum LookAndFeelSetting {
+    PORTEX,
+    SYSTEM;
 }

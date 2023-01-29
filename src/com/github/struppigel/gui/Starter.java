@@ -17,7 +17,9 @@
  */
 package com.github.struppigel.gui;
 
+import com.github.struppigel.settings.LookAndFeelSetting;
 import com.github.struppigel.settings.PortexSettings;
+import com.github.struppigel.settings.PortexSettingsKey;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -35,7 +37,11 @@ public class Starter {
 
         LOGGER.debug("starting program");
         PortexSettings s = new PortexSettings();
-        setLookAndFeel2();
+        if(s.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString())) {
+            setPortexLookAndFeel();
+        } else {
+            setSystemLookAndFeel();
+        }
         initMainFrame(s);
     }
 
@@ -43,7 +49,7 @@ public class Starter {
         SwingUtilities.invokeLater(() -> new MainFrame(s));
     }
 
-    private static void setLookAndFeel() {
+    private static void setSystemLookAndFeel() {
         try {
             // Set System L&F
             UIManager.setLookAndFeel(
@@ -56,7 +62,7 @@ public class Starter {
         }
     }
 
-    private static void setLookAndFeel2() {
+    private static void setPortexLookAndFeel() {
         UIManager.put("nimbusBase", new Color(15, 0, 0));
         UIManager.put("nimbusBlueGrey", new Color(170, 0, 0));
         UIManager.put("control", Color.black);

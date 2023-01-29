@@ -22,10 +22,12 @@ import com.github.katjahahn.parser.StandardField;
 import com.github.katjahahn.parser.coffheader.COFFFileHeader;
 import com.github.katjahahn.parser.msdos.MSDOSHeader;
 import com.github.katjahahn.parser.optheader.DataDirEntry;
+import com.github.katjahahn.parser.optheader.DataDirectoryKey;
 import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.katjahahn.parser.sections.rsrc.Resource;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.MainFrame;
 import com.github.struppigel.gui.PEFieldsTable;
@@ -48,6 +50,8 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -58,6 +62,7 @@ import static com.github.katjahahn.parser.optheader.StandardFieldEntryKey.ADDR_O
  */
 public class PEDetailsPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
+    private static final String DEFAULT_SAVE_FILENAME = "portex_visualization.png";
     private final String NL = System.getProperty("line.separator");
     private final JPanel rightPanel;
     private final MainFrame parent;
@@ -204,8 +209,10 @@ public class PEDetailsPanel extends JPanel {
         JPanel buttonPanel = new JPanel();
         JButton saveImgButton = new JButton("Save to file");
         saveImgButton.addActionListener(e -> {
-            String path = PortexSwingUtils.getSaveFileNameFromUser(this);
-            new SaveImageFileWorker(path).execute();
+            String path = PortexSwingUtils.getSaveFileNameFromUser(this, DEFAULT_SAVE_FILENAME);
+            if(path != null) {
+                new SaveImageFileWorker(path).execute();
+            }
         });
 
         buttonPanel.add(saveImgButton);
@@ -271,6 +278,7 @@ public class PEDetailsPanel extends JPanel {
 
     public void setHexEnabled(boolean hexEnabled) {
         this.isHexEnabled = hexEnabled;
+        previewPanel.setHexEnabled(hexEnabled);
         tabbedPanel.setHexEnabled(hexEnabled);
         signaturesPanel.setHexEnabled(hexEnabled);
         parent.refreshSelection();
@@ -281,9 +289,10 @@ public class PEDetailsPanel extends JPanel {
             MSDOSHeader header = peData.getPeData().getMSDOSHeader();
             List<StandardField> entries = header.getHeaderEntries();
             String[] tableHeader = {"Description", "Value", "Value offset"};
-            showFieldEntries(entries, tableHeader);
+            showFieldEntries(entries, tableHeader, 2);
             LOGGER.debug("MS DOS Stub shown");
             showTablePanel();
+            previewPanel.showContentAtOffset(0);
         } else {
             LOGGER.warn("PE Data is null!");
         }
@@ -305,10 +314,12 @@ public class PEDetailsPanel extends JPanel {
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
         LOGGER.debug("COFF File header shown");
         showTablePanel();
+        previewPanel.showContentAtOffset(header.getOffset());
     }
 
     public void showOptionalHeader() {
         showEmpty();
+        previewPanel.showContentAtOffset(peData.getPeData().getOptionalHeader().getOffset());
     }
 
     private void showEmpty() {
@@ -331,17 +342,20 @@ public class PEDetailsPanel extends JPanel {
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
         LOGGER.debug("Standard Fields shown");
         showTablePanel();
-
+        previewPanel.showContentAtOffset(header.getOffset());
     }
 
     public void showRTStrings() {
         if (peData == null) return;
         List<Object[]> entries = peData.getRTStringTableEntries();
         String[] tableHeader = {"ID", "String"};
-        showTextEntries(entries, tableHeader, -1);
+        showTextEntries(entries, tableHeader, -1); //TODO add offsets for RT_TABLE entries
         LOGGER.debug("RT_STRINGS shown");
 
         showTablePanel();
+        // find offset for first RT_STRING table
+        Long offset = getMinOffsetForResourceTypeOrZero("RT_STRING");
+        previewPanel.showContentAtOffset(offset);
     }
 
     public void showWindowsFieldsTable() {
@@ -366,6 +380,7 @@ public class PEDetailsPanel extends JPanel {
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
         LOGGER.debug("Windows Fields shown");
         showTablePanel();
+        previewPanel.showContentAtOffset(header.getOffset());
     }
 
     public void showDataDirectoryTable() {
@@ -373,8 +388,12 @@ public class PEDetailsPanel extends JPanel {
         OptionalHeader header = peData.getPeData().getOptionalHeader();
         SectionTable secTable = peData.getPeData().getSectionTable();
         List<Object[]> dirEntries = new ArrayList<>();
+        long startOffset = 0L;
         for (DataDirEntry de : header.getDataDirectory().values()) {
             Long offset = de.getFileOffset(secTable);
+            if(startOffset == 0 || offset < startOffset) {
+                startOffset = offset;
+            }
             Long size = de.getDirectorySize();
             Long va = de.getVirtualAddress();
             Optional<SectionHeader> hOpt = de.maybeGetSectionTableEntry(secTable);
@@ -387,6 +406,7 @@ public class PEDetailsPanel extends JPanel {
         showTextEntries(dirEntries, tableHeader, 2);
         LOGGER.debug("Windows Fields shown");
         showTablePanel();
+        previewPanel.showContentAtOffset(startOffset);
     }
 
     @Override
@@ -436,6 +456,8 @@ public class PEDetailsPanel extends JPanel {
 
     public void showSectionTable() {
         showTabbedPanel();
+        Long offset = peData.getPeData().getSectionTable().getOffset();
+        previewPanel.showContentAtOffset(offset);
     }
 
     private void addTable(JTable table) {
@@ -458,14 +480,17 @@ public class PEDetailsPanel extends JPanel {
         tablePanel.repaint();
     }
 
-    private void showFieldEntries(List<StandardField> entries, String[] tableHeader) {
+    private void showFieldEntries(List<StandardField> entries, String[] tableHeader, int offsetColumn) {
         cleanUpTablePanel();
-        JTable table = new PEFieldsTable(isHexEnabled);
+        PEFieldsTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
         for (StandardField field : entries) {
             Object[] row = {field.getDescription(), field.getValue(), field.getOffset()};
             model.addRow(row);
+        }
+        if(offsetColumn >= 0) {
+            table.setPreviewOffsetColumn(offsetColumn, previewPanel);
         }
         table.setModel(model);
         addTable(table);
@@ -490,7 +515,7 @@ public class PEDetailsPanel extends JPanel {
         showUpdatesInTablePanel();
     }
 
-    private void showTextEntries(List<Object[]> entries, String[] tableHeader, int offsetColumn) {
+    private PEFieldsTable showTextEntries(List<Object[]> entries, String[] tableHeader, int offsetColumn) {
         cleanUpTablePanel();
         PEFieldsTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
@@ -505,9 +530,10 @@ public class PEDetailsPanel extends JPanel {
         table.setModel(model);
         addTable(table);
         showUpdatesInTablePanel();
+        return table;
     }
 
-    private void showTextEntriesAndDescription(List<Object[]> entries, String[] tableHeader, String text, int offsetColumn) {
+    private PEFieldsTable showTextEntriesAndDescription(List<Object[]> entries, String[] tableHeader, String text, int offsetColumn) {
         cleanUpTablePanel();
         JTextArea t = new JTextArea(text); // if you end up using this again, create a class instead
         t.setEditable(false);
@@ -527,11 +553,13 @@ public class PEDetailsPanel extends JPanel {
         table.setModel(model);
         addTable(table);
         showUpdatesInTablePanel();
+        return table;
     }
 
     public void showPEHeaders() {
         descriptionField.setText("");
         showDescriptionPanel();
+        previewPanel.showContentAtOffset(peData.getPeData().getPESignature().getOffset());
     }
 
     private String toHexIfEnabled(Long num) {
@@ -562,6 +590,7 @@ public class PEDetailsPanel extends JPanel {
 
             descriptionField.setText(text);
             showDescriptionPanel();
+            previewPanel.showContentAtOffset(offset);
         } catch (IOException e) {
             String message = "Could not read Overlay! Reason: " + e.getMessage();
             LOGGER.error(message);
@@ -590,6 +619,7 @@ public class PEDetailsPanel extends JPanel {
             String[] tableHeader = {"Product id", "Build id", "File count"};
             showTextEntriesAndDescription(entries, tableHeader, text, -1);
             showTablePanel();
+            previewPanel.showContentAtOffset(rich.getRichOffset());
         }
     }
 
@@ -607,6 +637,18 @@ public class PEDetailsPanel extends JPanel {
         String MANIFEST_DELIMITER = "\n\n------------------------------------------------------------------------------------------------------------\n\n";
         descriptionField.setText(String.join(MANIFEST_DELIMITER, manifests));
         showDescriptionPanel();
+
+        // find offset for first RT_MANIFEST table
+        Long offset = getMinOffsetForResourceTypeOrZero("RT_MANIFEST");
+        previewPanel.showContentAtOffset(offset);
+    }
+
+    private Long getMinOffsetForResourceTypeOrZero(String resourceType){
+        Long offset = peData.getResources().stream()
+                .filter(r -> r.getType().equals(resourceType))
+                .mapToLong(r -> r.rawBytesLocation().from())
+                .min().orElse(0L);
+        return offset;
     }
 
     public void showVersionInfo() {
@@ -614,6 +656,8 @@ public class PEDetailsPanel extends JPanel {
         String[] vsHeader = {"VsInfo key", "Description"};
         showTextEntries(peData.getVersionInfoTable(), vsHeader, -1);
         showTablePanel();
+        Long offset = getMinOffsetForResourceTypeOrZero("RT_VERSION");
+        previewPanel.showContentAtOffset(offset);
     }
 
     public void showResources() {
@@ -621,20 +665,42 @@ public class PEDetailsPanel extends JPanel {
         String[] tableHeader = {"Type", "Name", "Language", "Offset", "Size", "Signatures"};
         showTextEntries(peData.getResourceTableEntries(), tableHeader, 3);
         showTablePanel();
+        Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.RESOURCE_TABLE);
+        previewPanel.showContentAtOffset(offset);
 
     }
 
     public void showIcons() {
         if (peData == null) return;
         showIconPanel();
+        Long offset = getMinOffsetForResourceTypeOrZero("RT_ICON");
+        previewPanel.showContentAtOffset(offset);
     }
 
     public void showImports() {
         if (peData == null) return;
         // Make beautiful with tabs
         String[] tableHeader = {"DLL", "Category", "Name", "Description", "RVA", "Hint"};
-        showTextEntries(peData.getImportTableEntries(), tableHeader, -1);
+        PEFieldsTable table = showTextEntries(peData.getImportTableEntries(), tableHeader, -1);
+        table.getColumnModel().getColumn(4).setPreferredWidth(100);
+        table.getColumnModel().getColumn(5).setPreferredWidth(100);
+        table.getColumnModel().getColumn(4).setMaxWidth(200);
+        table.getColumnModel().getColumn(5).setMaxWidth(200);
         showTablePanel();
+        Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.IMPORT_TABLE);
+        previewPanel.showContentAtOffset(offset);
+    }
+
+    private Long getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey dataDirKey) {
+        Map<DataDirectoryKey, DataDirEntry> dataDirectory = peData.getPeData()
+                .getOptionalHeader()
+                .getDataDirectory();
+        if(dataDirectory.containsKey(dataDirKey)) {
+            SectionTable sectionTable = peData.getPeData().getSectionTable();
+            return dataDirectory.get(dataDirKey)
+                    .getFileOffset( sectionTable );
+        }
+        return 0L;
     }
 
     public void showExports() {
@@ -643,6 +709,9 @@ public class PEDetailsPanel extends JPanel {
         String[] tableHeader = {"Name", "Ordinal", "Symbol RVA", "Forwarder"};
         showTextEntries(peData.getExportTableEntries(), tableHeader, -1);
         showTablePanel();
+        //Long offset = peData.getPeData().get
+        Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.EXPORT_TABLE);
+        previewPanel.showContentAtOffset(offset);
     }
 
     public void showDebugInfo() {
@@ -652,6 +721,8 @@ public class PEDetailsPanel extends JPanel {
         String text = peData.getDebugInfo();
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
         showTablePanel();
+        Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.DEBUG);
+        previewPanel.showContentAtOffset(offset);
     }
 
     public void showAnomalies() {
@@ -659,7 +730,8 @@ public class PEDetailsPanel extends JPanel {
         String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure "};
         List<Object[]> entries = peData.getAnomaliesTable();
 
-        showTextEntries(entries, tableHeader, -1);
+        PEFieldsTable table = showTextEntries(entries, tableHeader, -1);
+        table.getColumnModel().getColumn(0).setPreferredWidth(500);
         showTablePanel();
     }
 
@@ -669,8 +741,11 @@ public class PEDetailsPanel extends JPanel {
         String[] tableHeader = {"Section", "Type", "Hash value"};
         List<Object[]> entries = peData.getSectionHashTableEntries();
         String text = peData.getHashesReport();
-        showTextEntriesAndDescription(entries, tableHeader, text, -1);
+        PEFieldsTable table = showTextEntriesAndDescription(entries, tableHeader, text, -1);
+        table.getColumnModel().getColumn(2).setPreferredWidth(450);
         showTablePanel();
+        Long offset = peData.getPeData().getSectionTable().getOffset();
+        previewPanel.showContentAtOffset(offset);
     }
 
     public void showSignatures() {
@@ -679,5 +754,6 @@ public class PEDetailsPanel extends JPanel {
 
     public void showPEFormat() {
         showEmpty();
+        previewPanel.showContentAtOffset(0L);
     }
 }

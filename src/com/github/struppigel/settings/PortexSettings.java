@@ -29,8 +29,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.github.struppigel.settings.PortexSettingsKey.DISABLE_UPDATE;
-import static com.github.struppigel.settings.PortexSettingsKey.DISABLE_YARA_WARNINGS;
+import static com.github.struppigel.settings.PortexSettingsKey.*;
 
 public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
@@ -82,6 +81,9 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
                 }
                 if(!this.containsKey(DISABLE_UPDATE)) {
                     this.put(DISABLE_UPDATE, "0");
+                }
+                if(!this.containsKey(LOOK_AND_FEEL)) {
+                    this.put(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
                 }
                 LOGGER.info("Settings read successfully from " + settingsFile.getAbsolutePath());
             }
