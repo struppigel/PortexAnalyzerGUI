@@ -75,21 +75,22 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
                         }
                     }
                 }
-                // apply defaults
-                if(!this.containsKey(DISABLE_YARA_WARNINGS)) {
-                    this.put(DISABLE_YARA_WARNINGS, "0");
-                }
-                if(!this.containsKey(DISABLE_UPDATE)) {
-                    this.put(DISABLE_UPDATE, "0");
-                }
-                if(!this.containsKey(LOOK_AND_FEEL)) {
-                    this.put(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
-                }
                 LOGGER.info("Settings read successfully from " + settingsFile.getAbsolutePath());
             }
         } catch (IOException e) {
             e.printStackTrace();
             LOGGER.error(e);
+        }
+
+        // apply defaults
+        if(!this.containsKey(DISABLE_YARA_WARNINGS)) {
+            this.put(DISABLE_YARA_WARNINGS, "0");
+        }
+        if(!this.containsKey(DISABLE_UPDATE)) {
+            this.put(DISABLE_UPDATE, "0");
+        }
+        if(!this.containsKey(LOOK_AND_FEEL)) {
+            this.put(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
         }
     }
 
