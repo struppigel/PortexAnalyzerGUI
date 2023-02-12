@@ -150,13 +150,11 @@ public class SectionsTabbedPanel extends JPanel {
         for(JPanel tab : tabs) {
             tab.revalidate();
             tab.repaint();
-            tab.setVisible(true);
         }
         revalidate();
         repaint();
         tabbedPane.revalidate();
         tabbedPane.repaint();
-        tabbedPane.setVisible(true);
     }
 
     private void addSingleTableForSections(List<SectionHeader> sections, JPanel tab) {
