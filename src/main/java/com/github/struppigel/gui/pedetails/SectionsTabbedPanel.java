@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.github.katjahahn.parser.sections.SectionHeaderKey.*;
-import static java.lang.Math.max;
 import static java.lang.Math.min;
 
 /**
@@ -58,7 +57,7 @@ public class SectionsTabbedPanel extends JPanel {
     private void cleanUpTabsAndTables() {
         tabbedPane.removeAll();
         tables.clear();
-        //tabs.clear(); // TODO this will make everything non-working, but why?
+        //tabs.clear(); // this will make everything non-working, but why?
         LOGGER.debug("Tabs and tables cleared");
     }
 
@@ -142,7 +141,7 @@ public class SectionsTabbedPanel extends JPanel {
         return tabs;
     }
 
-    private void refreshPanel(List<JPanel>  tabs) {
+    private void refreshPanel(List<JPanel> tabs) {
         LOGGER.debug("Refreshing tabs");
         for(JTable tbl : tables) {
             tbl.revalidate();

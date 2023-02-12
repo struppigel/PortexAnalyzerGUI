@@ -114,7 +114,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Loading Debug Info...");
         String debugInfo = getDebugInfo(data);
-        List<StandardField> debugTableEntries = getDebugTableEntries(data);
+        List<TableContent> debugTableEntries = getDebugTableEntries(data);
         setProgress(80);
 
         publish("Scanning for Anomalies...");
@@ -248,25 +248,26 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return "";
     }
 
-    private List<StandardField> getDebugTableEntries(PEData pedata) {
-        List<StandardField> entries = new ArrayList<>();
+    private List<TableContent> getDebugTableEntries(PEData pedata) {
+        List<TableContent> tables = new ArrayList<TableContent>();
         try {
             Optional<DebugSection> sec = new SectionLoader(pedata).maybeLoadDebugSection();
             if (sec.isPresent()) {
-                // TODO extract all entries, this is only codeview
                 DebugSection debugSec = sec.get();
-                Stream<DebugDirectoryEntry> debugStream = debugSec.getEntries().stream().filter(e -> e.getDebugType() == DebugType.CODEVIEW);
-                List<DebugDirectoryEntry> debugList = debugStream.collect(Collectors.toList());
-                if (debugList.isEmpty()) return entries;
-                DebugDirectoryEntry d = debugList.get(0);
-                Map<DebugDirectoryKey, StandardField> dirTable = d.getDirectoryTable();
-                return dirTable.values().stream().collect(Collectors.toList());
+                List<DebugDirectoryEntry> debugList = debugSec.getEntries();
+
+                for(DebugDirectoryEntry d : debugList) {
+                    Map<DebugDirectoryKey, StandardField> dirTable = d.getDirectoryTable();
+                    List<StandardField> vals = dirTable.values().stream().collect(Collectors.toList());
+                    String title = d.getDebugType().toString();
+                    tables.add(new TableContent(vals, title));
+                }
             }
         } catch (IOException e) {
             LOGGER.error(e);
             e.printStackTrace();
         }
-        return entries;
+        return tables;
     }
 
     private List<Object[]> createExportTableEntries(PEData pedata) {

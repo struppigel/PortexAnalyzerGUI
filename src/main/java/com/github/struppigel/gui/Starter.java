@@ -83,6 +83,7 @@ public class Starter {
         UIManager.put("nimbusSelection", new Color(170, 0, 0));
         UIManager.put("textBackground", Color.darkGray);
         UIManager.put("nimbusLightBackground", Color.black);
+        UIManager.put("Table.alternateRowColor", new Color(30,30,30));
 /*
         UIManager.put("ToolBar.background", Color.blue);
         UIManager.put("ToolBar.foreground", Color.blue);

@@ -24,6 +24,7 @@ import com.github.katjahahn.parser.sections.idata.ImportDLL;
 import com.github.katjahahn.parser.sections.rsrc.Resource;
 import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
 import com.github.katjahahn.tools.Overlay;
+import com.github.struppigel.gui.utils.TableContent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -50,7 +51,7 @@ public class FullPEData {
     private final List<ExportEntry> exports;
     private final String hashes;
     private final List<Object[]> anomaliesTable;
-    private final List<StandardField> debugTableEntries;
+    private final List<TableContent> debugTableEntries;
     private final List<Object[]> vsInfoTable;
     private final List<String> manifests;
     private List<Object[]> exportTableEntries;
@@ -64,7 +65,7 @@ public class FullPEData {
                       List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
                       List<Object[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
                       String hashes, List<Object[]> sectionHashTableEntries,
-                      List<Object[]> anomaliesTable, List<StandardField> debugTableEntries, List<Object[]> vsInfoTable,
+                      List<Object[]> anomaliesTable, List<TableContent> debugTableEntries, List<Object[]> vsInfoTable,
                       String signatureReport, List<Object[]> stringTableEntries) {
         this.pedata = data;
         this.overlay = overlay;
@@ -197,7 +198,7 @@ public class FullPEData {
         return anomaliesTable;
     }
 
-    public List<StandardField> getDebugTableEntries() {
+    public List<TableContent> getDebugTableEntries() {
         return debugTableEntries;
     }
 

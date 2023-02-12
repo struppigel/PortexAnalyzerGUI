@@ -52,7 +52,6 @@ public class PEFieldsTable extends JTable {
         setDefaultRenderer(Long.class, new HexValueRenderer(enableHex));
         setDefaultRenderer(Integer.class, new HexValueRenderer(enableHex));
 
-        setCellSelectionEnabled(true);
         setPreferredScrollableViewportSize(new Dimension(500, 70));
         setFillsViewportHeight(true);
         setAutoCreateRowSorter(true);

@@ -129,8 +129,8 @@ public class SignaturesPanel extends JPanel {
 
     private void fillTableModelsWithData(DefaultTableModel sumModel, DefaultTableModel patModel) {
         List<RuleMatch> allResults = new ArrayList<>();
-        allResults.addAll(yaraResults);
-        allResults.addAll(peidResults);
+        if(yaraResults != null) allResults.addAll(yaraResults);
+        if(peidResults != null) allResults.addAll(peidResults);
         if(allResults.isEmpty()) {
             allResults.add(new EmptyRuleMatch());
         }

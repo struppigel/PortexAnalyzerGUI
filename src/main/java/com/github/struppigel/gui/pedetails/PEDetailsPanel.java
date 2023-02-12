@@ -27,13 +27,13 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.katjahahn.parser.sections.rsrc.Resource;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.MainFrame;
 import com.github.struppigel.gui.PEFieldsTable;
 import com.github.struppigel.gui.VisualizerPanel;
 import com.github.struppigel.gui.pedetails.signatures.SignaturesPanel;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
+import com.github.struppigel.gui.utils.TableContent;
 import com.github.struppigel.settings.PortexSettings;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
@@ -48,10 +48,8 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.OptionalLong;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -84,13 +82,14 @@ public class PEDetailsPanel extends JPanel {
      * Contains the tables
      */
     private final JPanel tablePanel = new JPanel();
-    private SectionsTabbedPanel tabbedPanel;
+    private SectionsTabbedPanel sectionsPanel;
     private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
     ;
     private IconPanel iconPanel = new IconPanel();
     private final SignaturesPanel signaturesPanel;
     private boolean isHexEnabled = true;
     private FileContentPreviewPanel previewPanel;
+    private TabbedPanel tabbedPanel;
 
     public PEDetailsPanel(JPanel rightPanel, MainFrame mainFrame, PortexSettings settings, FileContentPreviewPanel previewPanel) {
         super(new GridLayout(1, 0));
@@ -124,12 +123,14 @@ public class PEDetailsPanel extends JPanel {
         iconWrapperPanel.add(new JScrollPane(iconPanel), BorderLayout.CENTER);
         iconWrapperPanel.add(icoButtonPanel, BorderLayout.PAGE_END);
 
-        tabbedPanel = new SectionsTabbedPanel();
+        sectionsPanel = new SectionsTabbedPanel();
+        tabbedPanel = new TabbedPanel(previewPanel);
         tablePanel.setLayout(new GridLayout(0, 1));
 
         cardPanel.add(tablePanel, "TABLE");
         cardPanel.add(scrollPaneDescription, "DESCRIPTION");
         cardPanel.add(tabbedPanel, "TABBED");
+        cardPanel.add(sectionsPanel, "SECTIONS");
         cardPanel.add(bigVisuals, "VISUALIZATION");
         cardPanel.add(iconWrapperPanel, "ICONS");
         cardPanel.add(signaturesPanel, "SIGNATURES");
@@ -265,7 +266,7 @@ public class PEDetailsPanel extends JPanel {
 
     public void setPeData(FullPEData peData) {
         this.peData = peData;
-        tabbedPanel.setPeData(peData);
+        sectionsPanel.setPeData(peData);
         iconPanel.setPeData(peData);
         signaturesPanel.setPeData(peData);
         try {
@@ -279,8 +280,9 @@ public class PEDetailsPanel extends JPanel {
     public void setHexEnabled(boolean hexEnabled) {
         this.isHexEnabled = hexEnabled;
         previewPanel.setHexEnabled(hexEnabled);
-        tabbedPanel.setHexEnabled(hexEnabled);
+        sectionsPanel.setHexEnabled(hexEnabled);
         signaturesPanel.setHexEnabled(hexEnabled);
+        tabbedPanel.setHexEnabled(hexEnabled);
         parent.refreshSelection();
     }
 
@@ -413,7 +415,7 @@ public class PEDetailsPanel extends JPanel {
     public synchronized void setDropTarget(DropTarget dt) {
         descriptionField.setDropTarget(dt);
         tablePanel.setDropTarget(dt);
-        tabbedPanel.setDropTarget(dt);
+        sectionsPanel.setDropTarget(dt);
         iconPanel.setDropTarget(dt);
         signaturesPanel.setDropTarget(dt);
     }
@@ -428,6 +430,12 @@ public class PEDetailsPanel extends JPanel {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABLE");
         rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to TABLE");
+    }
+
+    private void showSectionPanel() {
+        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "SECTIONS");
+        rightPanel.setVisible(true);
+        LOGGER.debug("Card panel set to SECTION");
     }
 
     private void showIconPanel() {
@@ -455,7 +463,7 @@ public class PEDetailsPanel extends JPanel {
     }
 
     public void showSectionTable() {
-        showTabbedPanel();
+        showSectionPanel();
         Long offset = peData.getPeData().getSectionTable().getOffset();
         previewPanel.showContentAtOffset(offset);
     }
@@ -647,7 +655,8 @@ public class PEDetailsPanel extends JPanel {
         Long offset = peData.getResources().stream()
                 .filter(r -> r.getType().equals(resourceType))
                 .mapToLong(r -> r.rawBytesLocation().from())
-                .min().orElse(0L);
+                .min()
+                .orElse(0L);
         return offset;
     }
 
@@ -717,10 +726,14 @@ public class PEDetailsPanel extends JPanel {
     public void showDebugInfo() {
         if (peData == null) return;
         String[] tableHeader = {"Description", "Value", "Value offset"};
-        List<StandardField> entries = peData.getDebugTableEntries();
-        String text = peData.getDebugInfo();
-        showFieldEntriesAndDescription(entries, tableHeader, text, 2);
-        showTablePanel();
+        List<TableContent> entries = peData.getDebugTableEntries();
+        String text = peData.getDebugInfo(); // TODO include to TabbedPanel
+
+        tabbedPanel.setContent(entries, tableHeader);
+        tabbedPanel.repaint();
+        showTabbedPanel();
+
+        // leave this inside
         Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.DEBUG);
         previewPanel.showContentAtOffset(offset);
     }
