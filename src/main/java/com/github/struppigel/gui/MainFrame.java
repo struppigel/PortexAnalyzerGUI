@@ -22,6 +22,7 @@ import com.github.struppigel.gui.pedetails.PEDetailsPanel;
 import com.github.struppigel.gui.utils.PELoadWorker;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
 import com.github.struppigel.gui.utils.WorkerKiller;
+import com.github.struppigel.gui.utils.WriteSettingsWorker;
 import com.github.struppigel.settings.LookAndFeelSetting;
 import com.github.struppigel.settings.PortexSettings;
 import com.github.struppigel.settings.PortexSettingsKey;
@@ -35,8 +36,6 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.io.BufferedReader;
 import java.io.File;
@@ -82,6 +81,7 @@ public class MainFrame extends JFrame {
         initGUI();
         initDropTargets();
         checkForUpdate();
+        setToHex(settings.valueEquals(PortexSettingsKey.VALUES_AS_HEX, "1"));
     }
 
     private void checkForUpdate() {
@@ -232,7 +232,11 @@ public class MainFrame extends JFrame {
         // init Card Panel on the right
         this.cardPanel.add(visualizerPanel, "VISUALIZER");
         this.cardPanel.add(fileContent, "FILE_CONTENT");
-
+        if(settings.valueEquals(PortexSettingsKey.CONTENT_PREVIEW, "1")) {
+            ((CardLayout) cardPanel.getLayout()).show(cardPanel, "FILE_CONTENT");
+        } else {
+            ((CardLayout) cardPanel.getLayout()).show(cardPanel, "VISUALIZER");
+        }
         // Add all other components
         panel.add(peDetailsPanel, BorderLayout.CENTER);
         panel.add(peComponentTree, BorderLayout.LINE_START);
@@ -249,27 +253,33 @@ public class MainFrame extends JFrame {
 
         ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-24.png"));
         JToggleButton hexButton = new JToggleButton(ico);
-        hexButton.setSelected(true);
+        hexButton.setSelected(settings.valueEquals(PortexSettingsKey.VALUES_AS_HEX, "1"));
         hexButton.addItemListener(e -> {
             int state = e.getStateChange();
             if (state == ItemEvent.SELECTED) {
                 setToHex(true);
+                settings.put(PortexSettingsKey.VALUES_AS_HEX, "1");
             } else if (state == ItemEvent.DESELECTED) {
                 setToHex(false);
+                settings.put(PortexSettingsKey.VALUES_AS_HEX, "0");
             }
+            new WriteSettingsWorker(settings).execute();
         });
         ImageIcon imgIco = new ImageIcon(getClass().getResource("/icons8-image-24.png"));
         JToggleButton imgButton = new JToggleButton(imgIco);
-        imgButton.setSelected(true);
+        imgButton.setSelected(settings.valueEquals(PortexSettingsKey.CONTENT_PREVIEW, "0"));
         imgButton.addItemListener(e -> {
             int state = e.getStateChange();
             if(state == ItemEvent.SELECTED){
                 ((CardLayout) cardPanel.getLayout()).show(cardPanel, "VISUALIZER");
+                settings.put(PortexSettingsKey.CONTENT_PREVIEW, "0");
             } else {
                 ((CardLayout) cardPanel.getLayout()).show(cardPanel, "FILE_CONTENT");
+                settings.put(PortexSettingsKey.CONTENT_PREVIEW, "1");
             }
             cardPanel.repaint();
             fileContent.repaint();
+            new WriteSettingsWorker(settings).execute();
         });
 
         toolBar.add(hexButton);

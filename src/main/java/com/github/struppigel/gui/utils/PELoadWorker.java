@@ -113,7 +113,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(70);
 
         publish("Loading Debug Info...");
-        String debugInfo = getDebugInfo(data);
         List<TableContent> debugTableEntries = getDebugTableEntries(data);
         setProgress(80);
 
@@ -130,7 +129,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
-                debugInfo, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
+                hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
                 signatureReport, stringTableEntries);
     }
 
@@ -222,30 +221,21 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return ByteArrayUtil.byteToHex(array, "");
     }
 
-    private String getDebugInfo(PEData pedata) {
-        try {
-            Optional<DebugSection> sec = new SectionLoader(pedata).maybeLoadDebugSection();
-            if (sec.isPresent()) {
-                DebugSection debugSec = sec.get();
-                Stream<DebugDirectoryEntry> debugStream = debugSec.getEntries().stream().filter(e -> e.getDebugType() == DebugType.CODEVIEW);
-                List<DebugDirectoryEntry> debugList = debugStream.collect(Collectors.toList());
-                if (debugList.isEmpty()) return "";
-                DebugDirectoryEntry d = debugList.get(0);
-                String report = "Time date stamp: " + d.getTimeDateStamp() + NL;
-                report += "Type: " + d.getTypeDescription() + NL + NL;
-                CodeviewInfo c = d.getCodeView();
-                report += "Codeview" + NL + NL;
-                report += "Path: " + c.filePath() + NL;
-                report += "Age: " + c.age() + NL;
-                report += "GUID: " + CodeviewInfo.guidToString(c.guid()) + NL;
+    private String getCodeViewInfo(DebugDirectoryEntry d) {
+        String report = "";
+        CodeviewInfo c = d.getCodeView();
+        report += "Codeview" + NL + NL;
+        report += "Path: " + c.filePath() + NL;
+        report += "Age: " + c.age() + NL;
+        report += "GUID: " + CodeviewInfo.guidToString(c.guid()) + NL;
 
-                return report;
-            }
-        } catch (IOException e) {
-            LOGGER.error(e);
-            e.printStackTrace();
-        }
-        return "";
+        return report;
+    }
+
+    private String getDebugInfo(DebugDirectoryEntry d) {
+        String report = "Time date stamp: " + d.getTimeDateStamp() + NL;
+        report += "Type: " + d.getTypeDescription() + NL + NL;
+        return report;
     }
 
     private List<TableContent> getDebugTableEntries(PEData pedata) {
@@ -260,7 +250,11 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     Map<DebugDirectoryKey, StandardField> dirTable = d.getDirectoryTable();
                     List<StandardField> vals = dirTable.values().stream().collect(Collectors.toList());
                     String title = d.getDebugType().toString();
-                    tables.add(new TableContent(vals, title));
+                    String debugInfo = getDebugInfo(d);
+                    if(d.getDebugType() == DebugType.CODEVIEW) {
+                        debugInfo += getCodeViewInfo(d);
+                    }
+                    tables.add(new TableContent(vals, title, debugInfo));
                 }
             }
         } catch (IOException e) {

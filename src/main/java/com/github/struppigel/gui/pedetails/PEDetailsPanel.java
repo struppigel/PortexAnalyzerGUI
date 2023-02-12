@@ -727,13 +727,11 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         String[] tableHeader = {"Description", "Value", "Value offset"};
         List<TableContent> entries = peData.getDebugTableEntries();
-        String text = peData.getDebugInfo(); // TODO include to TabbedPanel
 
         tabbedPanel.setContent(entries, tableHeader);
         tabbedPanel.repaint();
         showTabbedPanel();
 
-        // leave this inside
         Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.DEBUG);
         previewPanel.showContentAtOffset(offset);
     }

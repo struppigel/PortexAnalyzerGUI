@@ -26,12 +26,22 @@ import java.util.List;
 public class TableContent extends ArrayList<StandardField> {
     private String title;
 
+    private String description;
+
     public TableContent(List<StandardField> list, String title) {
+        this(list, title, "");
+    }
+    public TableContent(List<StandardField> list, String title, String description) {
         super(list);
         this.title = title;
+        this.description = description;
     }
 
     public String getTitle() {
         return title;
+    }
+
+    public String getDescription() {
+        return description;
     }
 }

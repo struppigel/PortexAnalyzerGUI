@@ -18,7 +18,6 @@
 package com.github.struppigel.gui;
 
 import com.github.katjahahn.parser.PEData;
-import com.github.katjahahn.parser.StandardField;
 import com.github.katjahahn.parser.sections.edata.ExportEntry;
 import com.github.katjahahn.parser.sections.idata.ImportDLL;
 import com.github.katjahahn.parser.sections.rsrc.Resource;
@@ -55,7 +54,6 @@ public class FullPEData {
     private final List<Object[]> vsInfoTable;
     private final List<String> manifests;
     private List<Object[]> exportTableEntries;
-    private String debugInfo;
     private List<Object[]> sectionHashTableEntries;
     private String signatureReport;
     private List<Object[]> stringTableEntries;
@@ -63,7 +61,7 @@ public class FullPEData {
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries,
                       List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
-                      List<Object[]> exportTableEntries, List<ExportEntry> exports, String debugInfo,
+                      List<Object[]> exportTableEntries, List<ExportEntry> exports,
                       String hashes, List<Object[]> sectionHashTableEntries,
                       List<Object[]> anomaliesTable, List<TableContent> debugTableEntries, List<Object[]> vsInfoTable,
                       String signatureReport, List<Object[]> stringTableEntries) {
@@ -79,7 +77,6 @@ public class FullPEData {
         this.manifests = manifests;
         this.exportTableEntries = exportTableEntries;
         this.exports = exports;
-        this.debugInfo = debugInfo;
         this.hashes = hashes;
         this.sectionHashTableEntries = sectionHashTableEntries;
         this.anomaliesTable = anomaliesTable;
@@ -179,11 +176,7 @@ public class FullPEData {
     }
 
     public boolean hasDebugInfo() {
-        return !debugInfo.equals("");
-    }
-
-    public String getDebugInfo() {
-        return this.debugInfo;
+        return debugTableEntries.size() > 0;
     }
 
     public String getHashesReport() {

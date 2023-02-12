@@ -19,7 +19,6 @@ package com.github.struppigel.settings;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import scala.math.Ordering;
 
 import javax.swing.*;
 import java.io.*;
@@ -82,15 +81,21 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
             LOGGER.error(e);
         }
 
+        applyDefaults();
+    }
+
+    private void applyDefaults() {
         // apply defaults
-        if(!this.containsKey(DISABLE_YARA_WARNINGS)) {
-            this.put(DISABLE_YARA_WARNINGS, "0");
-        }
-        if(!this.containsKey(DISABLE_UPDATE)) {
-            this.put(DISABLE_UPDATE, "0");
-        }
-        if(!this.containsKey(LOOK_AND_FEEL)) {
-            this.put(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
+        applySettingIfNotSet(DISABLE_YARA_WARNINGS, "0");
+        applySettingIfNotSet(DISABLE_UPDATE, "0");
+        applySettingIfNotSet(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
+        applySettingIfNotSet(VALUES_AS_HEX, "1");
+        applySettingIfNotSet(CONTENT_PREVIEW, "1");
+    }
+
+    private void applySettingIfNotSet(PortexSettingsKey key, String value) {
+        if(!this.containsKey(key)) {
+            this.put(key, value);
         }
     }
 

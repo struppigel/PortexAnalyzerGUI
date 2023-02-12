@@ -23,5 +23,8 @@ public enum PortexSettingsKey {
     DISABLE_UPDATE,
     DISABLE_YARA_WARNINGS,
     // possible values are in LookAndFeelSetting
-    LOOK_AND_FEEL;
+    LOOK_AND_FEEL,
+    VALUES_AS_HEX,
+    CONTENT_PREVIEW;
+
 }

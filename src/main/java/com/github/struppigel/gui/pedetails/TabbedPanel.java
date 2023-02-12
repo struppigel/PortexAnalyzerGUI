@@ -62,7 +62,6 @@ public class TabbedPanel extends JPanel {
     public void initializeContent() {
         LOGGER.debug("Init tabs for tables");
         cleanUpTabsAndTables();
-
         List<JPanel> tabs = initTabsAndTables();
         refreshPanel(tabs);
     }
@@ -126,7 +125,7 @@ public class TabbedPanel extends JPanel {
         createRows(content, model);
 
         table.setModel(model);
-        addTable(table, tab);
+        addTableAndDescription(table, tab, content.getDescription());
     }
     private void createRows(TableContent content, DefaultTableModel model) {
         for(StandardField field : content) {
@@ -135,8 +134,11 @@ public class TabbedPanel extends JPanel {
         }
     }
 
-    private void addTable(JTable table, JPanel tab) {
+    private void addTableAndDescription(JTable table, JPanel tab, String description) {
         tables.add(table);
+        if(description.length() > 0) {
+            tab.add(new JScrollPane(new JTextArea(description)));
+        }
         JScrollPane sPane = new JScrollPane(table);
         tab.add(sPane);
     }
