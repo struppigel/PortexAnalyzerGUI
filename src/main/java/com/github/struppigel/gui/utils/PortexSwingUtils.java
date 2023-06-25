@@ -46,11 +46,9 @@ public class PortexSwingUtils {
         if (state == JFileChooser.APPROVE_OPTION) {
             File dir = fc.getCurrentDirectory();
             File file = fc.getSelectedFile();
-            if (file != null && file.isDirectory()) {
+            if (file != null && !file.isDirectory()) {
                 return file.getAbsolutePath();
             }
-            return dir.getAbsolutePath();
-
         }
         return null;
     }

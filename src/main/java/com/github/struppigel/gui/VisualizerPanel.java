@@ -17,6 +17,7 @@
  */
 package com.github.struppigel.gui;
 
+import com.github.katjahahn.tools.visualizer.ColorableItem;
 import com.github.katjahahn.tools.visualizer.ImageUtil;
 import com.github.katjahahn.tools.visualizer.Visualizer;
 import com.github.katjahahn.tools.visualizer.VisualizerBuilder;
@@ -107,15 +108,17 @@ public class VisualizerPanel extends JPanel {
 
     private class VisualizerWorker extends SwingWorker<BufferedImage, Void> {
 
-        private final int height;
+        private final int maxHeight;
         private final File file;
         private final boolean showEntropy;
         private final boolean showByteplot;
         private final boolean showLegend;
         private final int width;
 
+        private int pixelSize = 4;
+
         public VisualizerWorker(int height, int width, File file, boolean showEntropy, boolean showByteplot, boolean showLegend) {
-            this.height = height;
+            this.maxHeight = height;
             this.width = width;
             this.file = file;
             this.showEntropy = showEntropy;
@@ -123,13 +126,28 @@ public class VisualizerPanel extends JPanel {
             this.showLegend = showLegend;
         }
 
+        private int height(int nrBytes) {
+            double nrOfPixels = file.length() / (double) nrBytes;
+            double pixelsPerRow = width / (double) pixelSize;
+            double pixelsPerCol = nrOfPixels / pixelsPerRow;
+            return (int) Math.ceil(pixelsPerCol * pixelSize);
+        }
+
         @Override
         protected BufferedImage doInBackground() throws Exception {
             if(pefile == null) return null;
+            // bps
+            int res = 1;
+            while(height(res) > maxHeight) res *= 2;
+            int bytesPerPixel = res;
+
             Visualizer visualizer = new VisualizerBuilder()
-                    .setHeight(height)
                     .setFileWidth(width)
+                    .setPixelSize(pixelSize)
+                    .setBytesPerPixel(bytesPerPixel, file.length())
+                    .setColor(ColorableItem.ENTROPY, Color.cyan)
                     .build();
+
             BufferedImage peImage = visualizer.createImage(file);
 
             if(showEntropy){
@@ -137,7 +155,13 @@ public class VisualizerPanel extends JPanel {
                 peImage = ImageUtil.appendImages(entropyImg, peImage);
             }
             if(showByteplot) {
-                BufferedImage bytePlot = visualizer.createBytePlot(file);
+                int bytePlotPixelSize = (width * height(bytesPerPixel) > file.length()) ? pixelSize : 1;
+                Visualizer vi2 = new VisualizerBuilder() // more fine grained bytePlot, hence new visualizer
+                        .setPixelSize(bytePlotPixelSize)
+                        .setFileWidth(width)
+                        .setHeight(height(bytesPerPixel))
+                        .build();
+                BufferedImage bytePlot = vi2.createBytePlot(file);
                 peImage = ImageUtil.appendImages(bytePlot, peImage);
             }
             if(showLegend) {

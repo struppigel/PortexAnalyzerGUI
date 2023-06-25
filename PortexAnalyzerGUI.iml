@@ -18,7 +18,7 @@
     <orderEntry type="library" name="apache.logging.log4j.core" level="project" />
     <orderEntry type="library" name="PortexAnalyzer" level="project" />
     <orderEntry type="library" name="net.ifok.image.image4j" level="project" />
-    <orderEntry type="library" name="Maven: com.github.katjahahn:portex_2.12:4.0.0" level="project" />
+    <orderEntry type="library" name="Maven: com.github.katjahahn:portex_2.12:4.0.3" level="project" />
     <orderEntry type="library" name="Maven: org.scala-lang:scala-library:2.12.13" level="project" />
     <orderEntry type="library" name="Maven: com.google.guava:guava:31.1-jre" level="project" />
     <orderEntry type="library" name="Maven: com.google.guava:failureaccess:1.0.1" level="project" />
@@ -30,26 +30,5 @@
     <orderEntry type="library" name="Maven: org.apache.logging.log4j:log4j-api:2.19.0" level="project" />
     <orderEntry type="library" name="Maven: net.ifok.image:image4j:0.7.2" level="project" />
     <orderEntry type="library" name="Maven: org.apache.logging.log4j:log4j-core:2.19.0" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-util:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-gui-util:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-ext:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: xml-apis:xmlParserAPIs:2.0.2" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-transcoder:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: fop:fop:0.20.5" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-1.5-fop:0.20-5" level="project" />
-    <orderEntry type="library" name="Maven: xml-apis:xml-apis:1.0.b2" level="project" />
-    <orderEntry type="library" name="Maven: xalan:xalan:2.4.1" level="project" />
-    <orderEntry type="library" name="Maven: xerces:xercesImpl:2.2.1" level="project" />
-    <orderEntry type="library" name="Maven: avalon-framework:avalon-framework:4.0" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-bridge:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-gvt:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-awt-util:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-script:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: rhino:js:1.5R4.1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-svg-dom:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-dom:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-css:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-xml:1.6-1" level="project" />
-    <orderEntry type="library" name="Maven: batik:batik-parser:1.6-1" level="project" />
   </component>
 </module>

@@ -212,7 +212,29 @@ public class PEDetailsPanel extends JPanel {
         saveImgButton.addActionListener(e -> {
             String path = PortexSwingUtils.getSaveFileNameFromUser(this, DEFAULT_SAVE_FILENAME);
             if(path != null) {
-                new SaveImageFileWorker(path).execute();
+
+                if (!path.toLowerCase().endsWith(".png")) {
+                    path += ".png";
+                }
+
+                if(new File(path).exists()) {
+                    int choice = JOptionPane.showConfirmDialog(null,
+                            "File already exists, do you want to overwrite?",
+                            "File already exists",
+                            JOptionPane.YES_NO_OPTION);
+                    System.out.println(choice);
+                    if(choice == 0) {
+                        new SaveImageFileWorker(path).execute();
+                    } else {
+                        JOptionPane.showMessageDialog(null,
+                                "Unable to save file",
+                                "File not saved",
+                                JOptionPane.WARNING_MESSAGE);
+                    }
+                } else {
+                    new SaveImageFileWorker(path).execute();
+
+                }
             }
         });
 
@@ -230,9 +252,6 @@ public class PEDetailsPanel extends JPanel {
         @Override
         protected Boolean doInBackground() {
             try {
-                if (!path.toLowerCase().endsWith(".png")) {
-                    path += ".png";
-                }
                 ImageIO.write(visPanel.getImage(), "png", new File(path));
             } catch (IOException ex) {
                 LOGGER.error(ex);
@@ -248,13 +267,13 @@ public class PEDetailsPanel extends JPanel {
                 Boolean success = get();
                 if (success) {
                     JOptionPane.showMessageDialog(PEDetailsPanel.this,
-                            "File successfully saved",
+                            "File successfully saved under " + path,
                             "Success",
                             JOptionPane.INFORMATION_MESSAGE);
                 } else {
                     JOptionPane.showMessageDialog(null,
-                            "Unable to save file :(",
-                            "Something went wrong",
+                            "Unable to save file " + path,
+                            "Something went wrong :(",
                             JOptionPane.ERROR_MESSAGE);
                 }
             } catch (ExecutionException | InterruptedException e) {

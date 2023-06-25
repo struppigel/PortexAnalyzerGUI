@@ -6,7 +6,7 @@
 
     <groupId>com.github.struppigel</groupId>
     <artifactId>PortexAnalyzerGUI</artifactId>
-    <version>0.12.9</version>
+    <version>0.12.10</version>
 
     <build>
         <resources>
@@ -52,7 +52,7 @@
     <dependency>
         <groupId>com.github.katjahahn</groupId>
         <artifactId>portex_2.12</artifactId>
-        <version>4.0.1</version>
+        <version>4.0.3</version>
     </dependency>
         <dependency>
             <groupId>net.ifok.image</groupId>

@@ -254,6 +254,9 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     if(d.getDebugType() == DebugType.CODEVIEW) {
                         debugInfo += getCodeViewInfo(d);
                     }
+                    if(d.getDebugType() == DebugType.REPRO) {
+                        debugInfo += d.getRepro().getInfo();
+                    }
                     tables.add(new TableContent(vals, title, debugInfo));
                 }
             }
