@@ -18,7 +18,7 @@
     <orderEntry type="library" name="apache.logging.log4j.core" level="project" />
     <orderEntry type="library" name="PortexAnalyzer" level="project" />
     <orderEntry type="library" name="net.ifok.image.image4j" level="project" />
-    <orderEntry type="library" name="Maven: com.github.katjahahn:portex_2.12:4.0.3" level="project" />
+    <orderEntry type="library" name="Maven: com.github.katjahahn:portex_2.12:4.0.5" level="project" />
     <orderEntry type="library" name="Maven: org.scala-lang:scala-library:2.12.13" level="project" />
     <orderEntry type="library" name="Maven: com.google.guava:guava:31.1-jre" level="project" />
     <orderEntry type="library" name="Maven: com.google.guava:failureaccess:1.0.1" level="project" />
