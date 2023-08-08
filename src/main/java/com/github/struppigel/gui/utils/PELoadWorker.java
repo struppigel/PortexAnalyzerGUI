@@ -252,7 +252,12 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     String title = d.getDebugType().toString();
                     String debugInfo = getDebugInfo(d);
                     if(d.getDebugType() == DebugType.CODEVIEW) {
-                        debugInfo += getCodeViewInfo(d);
+                        try{
+                            debugInfo += getCodeViewInfo(d);
+                        } catch (IllegalStateException ise) {
+                            debugInfo += "Invalid codeview structure!";
+                            LOGGER.warn(ise.getMessage());
+                        }
                     }
                     if(d.getDebugType() == DebugType.REPRO) {
                         debugInfo += d.getRepro().getInfo();
