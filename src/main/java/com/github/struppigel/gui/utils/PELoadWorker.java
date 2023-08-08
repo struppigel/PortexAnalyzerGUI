@@ -290,19 +290,24 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         List<Object[]> entries = new ArrayList<>();
         for (Resource r : resources) {
             Map<Level, IDOrName> lvlIds = r.getLevelIDs();
-            String nameId = lvlIds.get(Level.nameLevel()).toString();
-            String langId = lvlIds.get(Level.languageLevel()).toString();
-            String signatures;
-            long offset = r.rawBytesLocation().from();
-            long size = r.rawBytesLocation().size();
+            if(lvlIds == null) return entries;
+            IDOrName nameLvl = lvlIds.get(Level.nameLevel());
+            IDOrName langLvl =  lvlIds.get(Level.languageLevel());
+            if(nameLvl != null && langLvl != null) {
+                String nameId = nameLvl.toString();
+                String langId = langLvl.toString();
+                String signatures;
+                long offset = r.rawBytesLocation().from();
+                long size = r.rawBytesLocation().size();
 
-            Stream<String> scanresults = FileTypeScanner.apply(pedata.getFile())
-                    .scanAtReport(offset).stream()
-                    // TODO this is a hack because lack of support from PortEx for scanAt function
-                    .map(s -> s.contains("bytes matched:") ? s.split("bytes matched:")[0] : s);
-            signatures = scanresults.collect(Collectors.joining(", "));
-            Object[] entry = {r.getType(), nameId, langId, offset, size, signatures};
-            entries.add(entry);
+                Stream<String> scanresults = FileTypeScanner.apply(pedata.getFile())
+                        .scanAtReport(offset).stream()
+                        // TODO this is a hack because lack of support from PortEx for scanAt function
+                        .map(s -> s.contains("bytes matched:") ? s.split("bytes matched:")[0] : s);
+                signatures = scanresults.collect(Collectors.joining(", "));
+                Object[] entry = {r.getType(), nameId, langId, offset, size, signatures};
+                entries.add(entry);
+            }
         }
         return entries;
     }
