@@ -869,7 +869,7 @@ public class PEDetailsPanel extends JPanel {
         summary += "Resources found: " + peData.getResources().size() + NL;
         summary += "Debug entries loaded: " + peData.getDebugTableEntries().size() + NL;
         summary += "Has overlay: " + (peData.overlayExists() ? "Yes" : "No") + NL;
-        summary += peData.getSignatureReport() + NL;
+        summary += NL + peData.getSignatureReport() + NL;
         descriptionField.setText(summary);
         showDescriptionPanel();
         previewPanel.showContentAtOffset(0L);
