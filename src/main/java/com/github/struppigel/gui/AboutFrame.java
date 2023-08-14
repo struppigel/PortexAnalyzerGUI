@@ -26,7 +26,7 @@ public class AboutFrame extends JFrame {
 
     private static final long serialVersionUID = 1L;
 
-    public static String version = "0.12.11";
+    public static String version = "0.12.12";
     private static final String text = "Portex Analyzer GUI" + "\n\n" + "Version: " + version
             + "\nAuthor: Karsten Hahn"
             + "\nLast update: 14. August 2023"
