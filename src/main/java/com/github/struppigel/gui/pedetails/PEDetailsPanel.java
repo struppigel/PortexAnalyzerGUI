@@ -27,6 +27,7 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.katjahahn.tools.PEFileDumper;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.MainFrame;
 import com.github.struppigel.gui.PEFieldsTable;
@@ -71,6 +72,7 @@ public class PEDetailsPanel extends JPanel {
      * Part of table panel
      */
     private final List<JTable> tables = new ArrayList<>();
+    private final JTextArea descriptionWithButtonArea = new JTextArea();
     private final JTextArea descriptionField = new JTextArea();
 
     /**
@@ -84,7 +86,7 @@ public class PEDetailsPanel extends JPanel {
     private final JPanel tablePanel = new JPanel();
     private SectionsTabbedPanel sectionsPanel;
     private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
-    ;
+
     private IconPanel iconPanel = new IconPanel();
     private final SignaturesPanel signaturesPanel;
     private boolean isHexEnabled = true;
@@ -102,11 +104,13 @@ public class PEDetailsPanel extends JPanel {
     }
 
     private void initDetails() {
-        JScrollPane scrollPaneDescription = new JScrollPane(descriptionField);
+        // only description
         descriptionField.setText("Drop file here");
         descriptionField.setEditable(false);
+        descriptionField.setDropTarget(this.getDropTarget());
         descriptionField.setDragEnabled(true);
         descriptionField.setLineWrap(true);
+        JScrollPane scrollPaneDescription = new JScrollPane(descriptionField);
 
         // visualizer page + button
         JPanel bigVisuals = new JPanel();
@@ -123,12 +127,25 @@ public class PEDetailsPanel extends JPanel {
         iconWrapperPanel.add(new JScrollPane(iconPanel), BorderLayout.CENTER);
         iconWrapperPanel.add(icoButtonPanel, BorderLayout.PAGE_END);
 
+        // description + dump button
+        descriptionWithButtonArea.setText("");
+        descriptionWithButtonArea.setEditable(false);
+        descriptionWithButtonArea.setDragEnabled(true);
+        descriptionWithButtonArea.setDropTarget(this.getDropTarget());
+        descriptionWithButtonArea.setLineWrap(true);
+        JPanel descriptionAndButtonWrapperPanel = new JPanel();
+        JPanel dumpButtonPanel = initDumpButtonPanel();
+        descriptionAndButtonWrapperPanel.setLayout(new BorderLayout());
+        descriptionAndButtonWrapperPanel.add(new JScrollPane(descriptionWithButtonArea), BorderLayout.CENTER);
+        descriptionAndButtonWrapperPanel.add(dumpButtonPanel, BorderLayout.PAGE_END);
+
         sectionsPanel = new SectionsTabbedPanel();
         tabbedPanel = new TabbedPanel(previewPanel);
         tablePanel.setLayout(new GridLayout(0, 1));
 
         cardPanel.add(tablePanel, "TABLE");
         cardPanel.add(scrollPaneDescription, "DESCRIPTION");
+        cardPanel.add(descriptionAndButtonWrapperPanel, "DESCBUTTON");
         cardPanel.add(tabbedPanel, "TABBED");
         cardPanel.add(sectionsPanel, "SECTIONS");
         cardPanel.add(bigVisuals, "VISUALIZATION");
@@ -151,6 +168,17 @@ public class PEDetailsPanel extends JPanel {
         });
 
         buttonPanel.add(saveImgButton);
+        return buttonPanel;
+    }
+
+    private JPanel initDumpButtonPanel() {
+        JPanel buttonPanel = new JPanel();
+        JButton saveButton = new JButton("Save overlay dump to");
+        saveButton.addActionListener(e -> {
+            String path = PortexSwingUtils.getSaveFolderNameFromUser(this);
+            new DumpOverlayWorker(path).execute();
+        });
+        buttonPanel.add(saveButton);
         return buttonPanel;
     }
 
@@ -196,6 +224,49 @@ public class PEDetailsPanel extends JPanel {
                 } else {
                     JOptionPane.showMessageDialog(null,
                             "Unable to save some icons :(",
+                            "Something went wrong",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (ExecutionException | InterruptedException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+        }
+    }
+    private class DumpOverlayWorker extends SwingWorker<Boolean, Void> {
+
+        private final String outFile;
+
+        public DumpOverlayWorker(String outFile) {
+            this.outFile = outFile;
+        }
+
+        @Override
+        protected Boolean doInBackground() {
+            boolean successFlag = false;
+            File folder = new File(outFile);
+            // TODO what exceptions are thrown here? PortEx does not seem to throw them
+            // TODO make sure you don't overwrite files or warn before that happens
+            if(folder.isDirectory()) {
+                PEFileDumper dumper = new PEFileDumper(peData.getPeData(), folder);
+                dumper.dumpOverlay();
+                successFlag = true;
+            }
+            return successFlag;
+        }
+
+        @Override
+        protected void done() {
+            try {
+                Boolean success = get();
+                if (success) {
+                    JOptionPane.showMessageDialog(null,
+                            "File(s) successfully saved",
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(null,
+                            "Unable to save file(s) :(",
                             "Something went wrong",
                             JOptionPane.ERROR_MESSAGE);
                 }
@@ -432,7 +503,7 @@ public class PEDetailsPanel extends JPanel {
 
     @Override
     public synchronized void setDropTarget(DropTarget dt) {
-        descriptionField.setDropTarget(dt);
+        descriptionWithButtonArea.setDropTarget(dt);
         tablePanel.setDropTarget(dt);
         sectionsPanel.setDropTarget(dt);
         iconPanel.setDropTarget(dt);
@@ -443,6 +514,12 @@ public class PEDetailsPanel extends JPanel {
         ((CardLayout) cardPanel.getLayout()).show(cardPanel, "DESCRIPTION");
         rightPanel.setVisible(true);
         LOGGER.debug("Card panel set to DESCRIPTION");
+    }
+
+    private void showDescriptionButtonPanel() {
+        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "DESCBUTTON");
+        rightPanel.setVisible(true);
+        LOGGER.debug("Card panel set to DESCBUTTON");
     }
 
     private void showTablePanel() {
@@ -615,8 +692,8 @@ public class PEDetailsPanel extends JPanel {
                 text += "no matches";
             }
 
-            descriptionField.setText(text);
-            showDescriptionPanel();
+            descriptionWithButtonArea.setText(text);
+            showDescriptionButtonPanel();
             previewPanel.showContentAtOffset(offset);
         } catch (IOException e) {
             String message = "Could not read Overlay! Reason: " + e.getMessage();
@@ -783,7 +860,18 @@ public class PEDetailsPanel extends JPanel {
     }
 
     public void showPEFormat() {
-        showEmpty();
+        if (peData == null) return;
+        String summary = "";
+        summary += "Anomalies found: " + peData.getAnomaliesTable().size() + NL;
+        summary += "Sections: " + peData.getPeData().getSectionTable().getNumberOfSections() + NL;
+        summary += "Exported symbols: " + peData.getExportTableEntries().size() + NL;
+        summary += "Import entries: " + peData.getImportTableEntries().size() + NL;
+        summary += "Resources found: " + peData.getResources().size() + NL;
+        summary += "Debug entries loaded: " + peData.getDebugTableEntries().size() + NL;
+        summary += "Has overlay: " + (peData.overlayExists() ? "Yes" : "No") + NL;
+        summary += peData.getSignatureReport() + NL;
+        descriptionField.setText(summary);
+        showDescriptionPanel();
         previewPanel.showContentAtOffset(0L);
     }
 }
