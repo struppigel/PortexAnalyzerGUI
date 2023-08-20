@@ -232,8 +232,9 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return report;
     }
 
-    private String getDebugInfo(DebugDirectoryEntry d) {
-        String report = "Time date stamp: " + d.getTimeDateStamp() + NL;
+    private String getDebugInfo(DebugDirectoryEntry d, Boolean isRepro) {
+        String time = isRepro ? "invalid - reproducibility build" : String.valueOf(d.getTimeDateStamp());
+        String report = "Time date stamp: " + time + NL;
         report += "Type: " + d.getTypeDescription() + NL + NL;
         return report;
     }
@@ -250,7 +251,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     Map<DebugDirectoryKey, StandardField> dirTable = d.getDirectoryTable();
                     List<StandardField> vals = dirTable.values().stream().collect(Collectors.toList());
                     String title = d.getDebugType().toString();
-                    String debugInfo = getDebugInfo(d);
+                    String debugInfo = getDebugInfo(d, pedata.hasReproInvalidTimeStamps());
                     if(d.getDebugType() == DebugType.CODEVIEW) {
                         try{
                             debugInfo += getCodeViewInfo(d);

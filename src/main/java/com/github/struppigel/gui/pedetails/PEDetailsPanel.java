@@ -394,7 +394,7 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         COFFFileHeader header = peData.getPeData().getCOFFFileHeader();
         List<StandardField> entries = header.getHeaderEntries();
-        String date = header.getTimeDate().toString();
+        String date = peData.getPeData().hasReproInvalidTimeStamps() ? "invalid - reproducibility build" : header.getTimeDate().toString();
         String text = "Time date stamp : " + date + NL;
         text += "Machine type: " + header.getMachineType().getDescription() + NL;
         text += "Characteristics: " + NL;

@@ -52,7 +52,7 @@
     <dependency>
         <groupId>com.github.katjahahn</groupId>
         <artifactId>portex_2.12</artifactId>
-        <version>4.0.5</version>
+        <version>4.0.7</version>
     </dependency>
         <dependency>
             <groupId>net.ifok.image</groupId>
