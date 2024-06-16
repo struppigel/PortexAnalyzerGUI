@@ -39,6 +39,35 @@ public class PortexSwingUtils {
         return null;
     }
 
+    /**
+     * Determines if a file can be safely written by checking if it already exists and asking for consent if it does.
+     * Will return whether file can be written.
+     * @param parent GUI component where messages should be shown
+     * @param file to check
+     * @return true if file can be written to specified location in path
+     */
+    public static Boolean checkIfFileExistsAndAskIfOverwrite(Component parent, File file) {
+        // file does not exist, so we can immediately return true
+        if(!file.exists()) return true;
+
+        // file exists, we need to ask
+        int choice = JOptionPane.showConfirmDialog(parent,
+                    "File already exists, do you want to overwrite?",
+                    "File already exists",
+                    JOptionPane.YES_NO_OPTION);
+        int YES_OPTION = 0;
+        // user wants to overwrite
+        if(choice == YES_OPTION) return true;
+
+        // user does not want to overwrite, we tell them the consequences
+        JOptionPane.showMessageDialog(parent,
+                    "Unable to save file",
+                    "File not saved",
+                     JOptionPane.WARNING_MESSAGE);
+
+        return false;
+    }
+
     public static String getSaveFileNameFromUser(Component parent, String defaultFileName) {
         JFileChooser fc = new JFileChooser(userdir);
         fc.setSelectedFile(new File(defaultFileName));

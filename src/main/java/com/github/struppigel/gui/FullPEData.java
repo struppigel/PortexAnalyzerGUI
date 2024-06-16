@@ -34,7 +34,8 @@ import java.util.List;
 /**
  * Wrapper for the PEData.
  * This class makes sure to save things that we do not want to compute several times and
- * definitely do not want to compute in the event dispatch threat.
+ * definitely do not want to compute in the event dispatch thread.
+ * It stores that data in a form that is easily digestible by the GUI and does not need more transformations.
  */
 public class FullPEData {
     private static final Logger LOGGER = LogManager.getLogger();

@@ -53,6 +53,7 @@ public class SignaturesPanel extends JPanel {
     //e.g. XORedPE, "This program", "0xcafebabe", "Resource"
     private final String[] patternHeaders = {"Match name", "Pattern name", "Pattern content", "Offset"}; //, "Location"};
     private boolean hexEnabled = true;
+    private boolean ignoreYaraScan = true;
     private JTextField yaraPathTextField = new JTextField(30);
     private JTextField rulePathTextField = new JTextField(30);
 
@@ -262,26 +263,31 @@ public class SignaturesPanel extends JPanel {
     private void scan(boolean warnUser) {
         if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
             initProgressBar();
+            this.ignoreYaraScan = false;
             YaraScanner yaraScanner = new YaraScanner(this, pedata, yaraPath, rulePath, settings);
             PEidScanner peidScanner = new PEidScanner(this, pedata);
             yaraScanner.execute();
             peidScanner.execute();
             WorkerKiller.getInstance().addWorker(yaraScanner);
             WorkerKiller.getInstance().addWorker(peidScanner);
-        } else if(warnUser) {
-            String message = "Cannot scan";
-            if(yaraPath == null) { message += ", because no yara path set"; }
-            else if(rulePath == null) { message += ", because no rule path set"; }
-            else if(!new File(yaraPath).exists()) { message += ", because yara path is not an existing file: " + yaraPath; }
-            else if(!new File(rulePath).exists()) { message += ", because rule path is not an existing file: " + rulePath; }
-            else { message += ". The reason is unknown :("; }
-            JOptionPane.showMessageDialog(this,
-                    message,
-                    "Cannot scan",
-                    JOptionPane.WARNING_MESSAGE);
-            requestPaths();
         } else {
-            requestPaths();
+            if(warnUser) {
+                String message = "Cannot scan";
+                if(yaraPath == null) { message += ", because no yara path set"; }
+                else if(rulePath == null) { message += ", because no rule path set"; }
+                else if(!new File(yaraPath).exists()) { message += ", because yara path is not an existing file: " + yaraPath; }
+                else if(!new File(rulePath).exists()) { message += ", because rule path is not an existing file: " + rulePath; }
+                else { message += ". The reason is unknown :("; }
+                JOptionPane.showMessageDialog(this,
+                        message,
+                        "Cannot scan with yara",
+                        JOptionPane.WARNING_MESSAGE);
+            }
+            initProgressBar();
+            this.ignoreYaraScan = true;
+            PEidScanner peidScanner = new PEidScanner(this, pedata);
+            peidScanner.execute();
+            WorkerKiller.getInstance().addWorker(peidScanner);
         }
     }
 
@@ -298,13 +304,13 @@ public class SignaturesPanel extends JPanel {
 
     public void buildPEiDTables(List<PEidRuleMatch> signatureMatches) {
         this.peidResults = signatureMatches;
-        if(yaraResults != null) {
+        if(yaraResults != null || ignoreYaraScan) {
             buildTables();
         }
     }
 
 
-    void buildYaraTables(List<YaraRuleMatch> scanResults) {
+    public void buildYaraTables(List<YaraRuleMatch> scanResults) {
         this.yaraResults = scanResults;
         if(peidResults != null) {
             buildTables();

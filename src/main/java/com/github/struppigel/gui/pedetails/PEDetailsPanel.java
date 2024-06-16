@@ -27,7 +27,6 @@ import com.github.katjahahn.parser.optheader.OptionalHeader;
 import com.github.katjahahn.parser.sections.SectionHeader;
 import com.github.katjahahn.parser.sections.SectionLoader;
 import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.katjahahn.tools.PEFileDumper;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.MainFrame;
 import com.github.struppigel.gui.PEFieldsTable;
@@ -46,8 +45,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
@@ -173,12 +171,24 @@ public class PEDetailsPanel extends JPanel {
 
     private JPanel initDumpButtonPanel() {
         JPanel buttonPanel = new JPanel();
-        JButton saveButton = new JButton("Save overlay dump to");
+        JButton saveButton = new JButton("Dump overlay");
         saveButton.addActionListener(e -> {
-            String path = PortexSwingUtils.getSaveFolderNameFromUser(this);
-            new DumpOverlayWorker(path).execute();
+            String defaultFileName = peData.getFile().getAbsolutePath() + ".overlay";
+            String path = PortexSwingUtils.getSaveFileNameFromUser(this, defaultFileName);
+            if(PortexSwingUtils.checkIfFileExistsAndAskIfOverwrite(this, new File(path))) {
+                new DumpOverlayWorker(path).execute();
+            }
+        });
+        JButton removeButton = new JButton("Remove overlay");
+        removeButton.addActionListener(e -> {
+            String defaultFileName = peData.getFile().getAbsolutePath() + ".truncated";
+            String path = PortexSwingUtils.getSaveFileNameFromUser(this, defaultFileName);
+            if(PortexSwingUtils.checkIfFileExistsAndAskIfOverwrite(this, new File(path))) {
+                new RemoveOverlayWorker(path).execute();
+            }
         });
         buttonPanel.add(saveButton);
+        buttonPanel.add(removeButton);
         return buttonPanel;
     }
 
@@ -233,7 +243,70 @@ public class PEDetailsPanel extends JPanel {
             }
         }
     }
-    private class DumpOverlayWorker extends SwingWorker<Boolean, Void> {
+
+    private class RemoveOverlayWorker extends SwingWorker<String, Void> {
+
+        private final String outFile;
+
+        public RemoveOverlayWorker(String outFile) {
+            this.outFile = outFile;
+        }
+
+        @Override
+        protected String doInBackground() {
+            String resultMessage = "something unknown went wrong";
+            File file = new File(outFile);
+            if(!file.isDirectory()) {
+                try (RandomAccessFile raf = new RandomAccessFile(peData.getFile(), "r");
+                     FileOutputStream out = new FileOutputStream(outFile)) {
+                    long endOffset = peData.getOverlay().getOffset();
+                    raf.seek(0);
+                    byte[] buffer = new byte[2048];
+                    int bytesRead;
+                    long totalBytesRead = 0;
+                    while ((bytesRead = raf.read(buffer)) != -1) {
+                        // end was reached, we calculate the rest of the buffer
+                        if (totalBytesRead + bytesRead > endOffset) {
+                            int bytesToWrite = (int) (endOffset - totalBytesRead);
+                            out.write(buffer, 0, bytesToWrite);
+                            break;
+                        }
+                        out.write(buffer, 0, bytesRead);
+                    }
+                    resultMessage = "success";
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    resultMessage = e.getMessage();
+                }
+            } else {
+                resultMessage = "given output file is a directory";
+            }
+            return resultMessage;
+        }
+
+        @Override
+        protected void done() {
+            try {
+                String msg = get();
+                if (msg.equals("success")) {
+                    JOptionPane.showMessageDialog(null,
+                            "File successfully saved to " + outFile,
+                            "Success",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(null,
+                            "Unable to save file :(. " + msg,
+                            "Something went wrong",
+                            JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (ExecutionException | InterruptedException e) {
+                LOGGER.error(e);
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private class DumpOverlayWorker extends SwingWorker<String, Void> {
 
         private final String outFile;
 
@@ -242,31 +315,43 @@ public class PEDetailsPanel extends JPanel {
         }
 
         @Override
-        protected Boolean doInBackground() {
-            boolean successFlag = false;
-            File folder = new File(outFile);
-            // TODO what exceptions are thrown here? PortEx does not seem to throw them
-            // TODO make sure you don't overwrite files or warn before that happens
-            if(folder.isDirectory()) {
-                PEFileDumper dumper = new PEFileDumper(peData.getPeData(), folder);
-                dumper.dumpOverlay();
-                successFlag = true;
+        protected String doInBackground() {
+            String resultMessage = "something unknown went wrong";
+            File file = new File(outFile);
+            if(!file.isDirectory()) {
+                try (RandomAccessFile raf = new RandomAccessFile(peData.getFile(), "r");
+                     FileOutputStream out = new FileOutputStream(outFile)) {
+                    long offset = peData.getOverlay().getOffset();
+                    raf.seek(offset);
+                    byte[] buffer = new byte[2048];
+                    int bytesRead;
+                    while ((bytesRead = raf.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                    }
+                    resultMessage = "success";
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    resultMessage = e.getMessage();
+                }
+
+            } else {
+                resultMessage = "given output file is a directory";
             }
-            return successFlag;
+            return resultMessage;
         }
 
         @Override
         protected void done() {
             try {
-                Boolean success = get();
-                if (success) {
+                String msg = get();
+                if (msg.equals("success")) {
                     JOptionPane.showMessageDialog(null,
-                            "File(s) successfully saved",
+                            "File successfully saved to " + outFile,
                             "Success",
                             JOptionPane.INFORMATION_MESSAGE);
                 } else {
                     JOptionPane.showMessageDialog(null,
-                            "Unable to save file(s) :(",
+                            "Unable to save file :(. " + msg,
                             "Something went wrong",
                             JOptionPane.ERROR_MESSAGE);
                 }
@@ -287,24 +372,9 @@ public class PEDetailsPanel extends JPanel {
                 if (!path.toLowerCase().endsWith(".png")) {
                     path += ".png";
                 }
-
-                if(new File(path).exists()) {
-                    int choice = JOptionPane.showConfirmDialog(null,
-                            "File already exists, do you want to overwrite?",
-                            "File already exists",
-                            JOptionPane.YES_NO_OPTION);
-                    System.out.println(choice);
-                    if(choice == 0) {
-                        new SaveImageFileWorker(path).execute();
-                    } else {
-                        JOptionPane.showMessageDialog(null,
-                                "Unable to save file",
-                                "File not saved",
-                                JOptionPane.WARNING_MESSAGE);
-                    }
-                } else {
+                Boolean canWrite = PortexSwingUtils.checkIfFileExistsAndAskIfOverwrite(this, new File(path));
+                if(canWrite){
                     new SaveImageFileWorker(path).execute();
-
                 }
             }
         });
