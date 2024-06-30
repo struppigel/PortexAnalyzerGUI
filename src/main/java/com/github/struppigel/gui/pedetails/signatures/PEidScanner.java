@@ -1,9 +1,9 @@
 package com.github.struppigel.gui.pedetails.signatures;
 
-import com.github.katjahahn.parser.sections.rsrc.Resource;
-import com.github.katjahahn.tools.Overlay;
-import com.github.katjahahn.tools.sigscanner.FileTypeScanner;
-import com.github.katjahahn.tools.sigscanner.SignatureScanner;
+import com.github.struppigel.parser.sections.rsrc.Resource;
+import com.github.struppigel.tools.Overlay;
+import com.github.struppigel.tools.sigscanner.FileTypeScanner;
+import com.github.struppigel.tools.sigscanner.SignatureScanner;
 import com.github.struppigel.gui.FullPEData;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

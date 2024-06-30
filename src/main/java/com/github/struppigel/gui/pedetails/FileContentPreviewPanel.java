@@ -17,7 +17,7 @@
  */
 package com.github.struppigel.gui.pedetails;
 
-import com.github.katjahahn.parser.IOUtil;
+import com.github.struppigel.parser.IOUtil;
 import com.github.struppigel.gui.FullPEData;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

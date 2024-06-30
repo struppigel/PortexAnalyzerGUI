@@ -58,6 +58,9 @@ public class PEComponentTree extends JPanel {
     private static final String PE_FORMAT_TEXT = "PE Format";
     private static final String ICONS_TEXT = "Icons";
     private static final String SIGNATURES_TEXT = "Signatures";
+    private static final String DOT_NET_TEXT = ".NET Headers";
+    private static final String DOT_NET_METADATA_ROOT_TEXT = ".NET Metadata Root";
+
     private final PEDetailsPanel peDetailsPanel;
     private FullPEData peData = null;
     private JTree peTree;
@@ -76,7 +79,9 @@ public class PEComponentTree extends JPanel {
         LOGGER.debug("Updating tree");
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) peTree.getModel().getRoot();
         root.removeAllChildren();
-        //create the child nodes
+        // create the child nodes
+        // PE related
+        // DOS/PE Headers
         DefaultMutableTreeNode pe = new DefaultMutableTreeNode(PE_FORMAT_TEXT);
         DefaultMutableTreeNode dosStub = new DefaultMutableTreeNode(DOS_STUB_TEXT);
         DefaultMutableTreeNode rich = new DefaultMutableTreeNode(RICH_TEXT);
@@ -84,31 +89,37 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode optional = new DefaultMutableTreeNode(OPTIONAL_HEADER_TEXT);
         DefaultMutableTreeNode sections = new DefaultMutableTreeNode(SECTION_TABLE_TEXT);
         DefaultMutableTreeNode overlay = new DefaultMutableTreeNode(OVERLAY_TEXT);
-
+        // OptionalHeader
         DefaultMutableTreeNode standard = new DefaultMutableTreeNode(STANDARD_FIELDS_TEXT);
         DefaultMutableTreeNode windows = new DefaultMutableTreeNode(WINDOWS_FIELDS_TEXT);
         DefaultMutableTreeNode datadir = new DefaultMutableTreeNode(DATA_DIRECTORY_TEXT);
-
+        // Resources
         DefaultMutableTreeNode resources = new DefaultMutableTreeNode(RESOURCES_TEXT);
         DefaultMutableTreeNode manifest = new DefaultMutableTreeNode(MANIFEST_TEXT);
         DefaultMutableTreeNode version = new DefaultMutableTreeNode(VERSIONINFO_TEXT);
         DefaultMutableTreeNode icons = new DefaultMutableTreeNode(ICONS_TEXT);
         DefaultMutableTreeNode rtstrings = new DefaultMutableTreeNode(RT_STRING_TEXT);
-
+        // Data directories
         DefaultMutableTreeNode imports = new DefaultMutableTreeNode(IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
         DefaultMutableTreeNode debug = new DefaultMutableTreeNode(DEBUG_TEXT);
 
+        // .NET related
+        DefaultMutableTreeNode dotNet = new DefaultMutableTreeNode(DOT_NET_TEXT);
+        DefaultMutableTreeNode dotNetRoot = new DefaultMutableTreeNode(DOT_NET_METADATA_ROOT_TEXT);
+
+        // Non-PE
         DefaultMutableTreeNode anomaly = new DefaultMutableTreeNode(ANOMALY_TEXT);
         DefaultMutableTreeNode hashes = new DefaultMutableTreeNode(HASHES_TEXT);
         DefaultMutableTreeNode vis = new DefaultMutableTreeNode(VISUALIZATION_TEXT);
         DefaultMutableTreeNode signatures = new DefaultMutableTreeNode(SIGNATURES_TEXT);
 
+        // adding the sub nodes for optional header
         optional.add(standard);
         optional.add(windows);
         optional.add(datadir);
 
-        //add the child nodes to the root node
+        // add the child nodes to the root node
         root.add(pe);
         pe.add(dosStub);
         if (peData.getPeData().maybeGetRichHeader().isPresent()) {
@@ -148,6 +159,11 @@ public class PEComponentTree extends JPanel {
         if (peData.overlayExists()) {
             pe.add(overlay);
             LOGGER.debug("Overlay added to root node of tree");
+        }
+
+        if(peData.isDotNet()) {
+            pe.add(dotNet);
+            dotNet.add(dotNetRoot);
         }
 
         root.add(anomaly);
@@ -287,6 +303,10 @@ public class PEComponentTree extends JPanel {
             case RT_STRING_TEXT:
                 peDetailsPanel.showRTStrings();
                 break;
+            case DOT_NET_METADATA_ROOT_TEXT:
+                peDetailsPanel.showDotNetMetadataRoot();
+                break;
+
         }
     }
 

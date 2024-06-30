@@ -17,26 +17,29 @@
  */
 package com.github.struppigel.gui.utils;
 
-import com.github.katjahahn.parser.*;
-import com.github.katjahahn.parser.sections.SectionHeader;
-import com.github.katjahahn.parser.sections.SectionLoader;
-import com.github.katjahahn.parser.sections.SectionTable;
-import com.github.katjahahn.parser.sections.debug.*;
-import com.github.katjahahn.parser.sections.edata.ExportEntry;
-import com.github.katjahahn.parser.sections.edata.ExportNameEntry;
-import com.github.katjahahn.parser.sections.idata.ImportDLL;
-import com.github.katjahahn.parser.sections.idata.NameImport;
-import com.github.katjahahn.parser.sections.idata.OrdinalImport;
-import com.github.katjahahn.parser.sections.idata.SymbolDescription;
-import com.github.katjahahn.parser.sections.rsrc.IDOrName;
-import com.github.katjahahn.parser.sections.rsrc.Level;
-import com.github.katjahahn.parser.sections.rsrc.Resource;
-import com.github.katjahahn.parser.sections.rsrc.version.VersionInfo;
-import com.github.katjahahn.tools.*;
-import com.github.katjahahn.tools.anomalies.Anomaly;
-import com.github.katjahahn.tools.anomalies.PEAnomalyScanner;
-import com.github.katjahahn.tools.sigscanner.FileTypeScanner;
-import com.github.katjahahn.tools.sigscanner.SignatureScanner;
+import com.github.struppigel.parser.*;
+import com.github.struppigel.parser.sections.SectionHeader;
+import com.github.struppigel.parser.sections.SectionLoader;
+import com.github.struppigel.parser.sections.SectionTable;
+import com.github.struppigel.parser.sections.clr.CLRSection;
+import com.github.struppigel.parser.sections.clr.MetadataRoot;
+import com.github.struppigel.parser.sections.clr.MetadataRootKey;
+import com.github.struppigel.parser.sections.debug.*;
+import com.github.struppigel.parser.sections.edata.ExportEntry;
+import com.github.struppigel.parser.sections.edata.ExportNameEntry;
+import com.github.struppigel.parser.sections.idata.ImportDLL;
+import com.github.struppigel.parser.sections.idata.NameImport;
+import com.github.struppigel.parser.sections.idata.OrdinalImport;
+import com.github.struppigel.parser.sections.idata.SymbolDescription;
+import com.github.struppigel.parser.sections.rsrc.IDOrName;
+import com.github.struppigel.parser.sections.rsrc.Level;
+import com.github.struppigel.parser.sections.rsrc.Resource;
+import com.github.struppigel.parser.sections.rsrc.version.VersionInfo;
+import com.github.struppigel.tools.*;
+import com.github.struppigel.tools.anomalies.Anomaly;
+import com.github.struppigel.tools.anomalies.PEAnomalyScanner;
+import com.github.struppigel.tools.sigscanner.FileTypeScanner;
+import com.github.struppigel.tools.sigscanner.SignatureScanner;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.MainFrame;
 import com.google.common.base.Optional;
@@ -52,6 +55,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -64,8 +68,6 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
     private final String NL = System.getProperty("line.separator");
     private final File file;
     private final MainFrame frame;
-
-    public static final int MAX_MANIFEST_SIZE = 0x2000;
     private final JLabel progressText;
 
     public PELoadWorker(File file, MainFrame frame, JLabel progressText) {
@@ -79,6 +81,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(0);
         publish("Loading Headers...");
         PEData data = PELoader.loadPE(file);
+        java.util.Optional<CLRSection> maybeCLR = loadCLRSection(data).transform(java.util.Optional::of).or(java.util.Optional.empty());
+        List<StandardField> dotnetMetaDataRootEntries = createDotNetMetadataRootEntries(maybeCLR);
         setProgress(10);
 
         publish("Calculating Hashes...");
@@ -97,7 +101,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(40);
 
         publish("Scanning for signatures...");
-        String signatureReport = r.peidReport();
+        String rehintsReport = r.reversingHintsReport();
         setProgress(50);
 
         publish("Loading Resources...");
@@ -130,43 +134,53 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
                 hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
-                signatureReport, stringTableEntries);
+                rehintsReport, stringTableEntries, dotnetMetaDataRootEntries, maybeCLR);
+    }
+
+    private Optional<CLRSection> loadCLRSection(PEData data) {
+        SectionLoader loader = new SectionLoader(data);
+        try {
+            Optional<CLRSection> maybeClr = loader.maybeLoadCLRSection();
+            return maybeClr;
+        } catch(IOException e){
+            LOGGER.error(e);
+            e.printStackTrace();
+        }
+        return Optional.absent();
+    }
+
+    private List<StandardField> createDotNetMetadataRootEntries(java.util.Optional<CLRSection> clr) {
+        if(clr.isPresent() && !clr.get().isEmpty()) {
+            MetadataRoot root = clr.get().metadataRoot();
+            Map<MetadataRootKey, StandardField> entriesMap = root.getMetaDataEntries();
+            return entriesMap.values().stream().collect(Collectors.toList());
+        }
+        return new ArrayList<>();
     }
 
     private List<Object[]> createStringTableEntries(PEData data) {
-        List<Object[]> entries = new ArrayList<>();
         Map<Long, String> strTable = data.loadStringTable();
-        for(Map.Entry<Long, String> entry : strTable.entrySet()){
-            Object[] row = {entry.getKey(), entry.getValue()};
-            entries.add(row);
-        }
-        return entries;
+        return strTable.entrySet().stream()
+                .map(e -> new Object[]{e.getKey(), e.getValue()})
+                .collect(Collectors.toList());
     }
 
     private List<Object[]> createVersionInfoEntries(PEData data) {
-        List<Resource> res = data.loadResources();
-        List<Object[]> entries = new ArrayList<>();
-        for (Resource r : res) {
-            if (r.getType().equals("RT_VERSION")) {
-                VersionInfo versionInfo = VersionInfo.apply(r, data.getFile());
-                Map<String, String> map = versionInfo.getVersionStrings();
-                for (Map.Entry<String, String> e : map.entrySet()) {
-                    Object[] entry = {e.getKey(), e.getValue()};
-                    entries.add(entry);
-                }
-            }
-        }
-        return entries;
+        return data.loadResources().stream()
+                .filter(r -> r.getType().equals("RT_VERSION"))
+                .flatMap(
+                    r -> VersionInfo.apply(r, data.getFile()).getVersionStrings().entrySet()
+                            .stream()
+                            .map(e -> new Object[]{e.getKey(), e.getValue()})
+                )
+                .collect(Collectors.toList());
     }
 
     private List<Object[]> createAnomalyTableEntries(PEData data) {
-        List<Object[]> entries = new ArrayList<>();
         List<Anomaly> anomalies = PEAnomalyScanner.newInstance(data).getAnomalies();
-        for (Anomaly a : anomalies) {
-            Object[] entry = {a.description(), a.getType(), a.subtype(), a.key()};
-            entries.add(entry);
-        }
-        return entries;
+        return anomalies.stream()
+                .map(a -> new Object[]{a.description(), a.getType(), a.subtype(), a.key()})
+                .collect(Collectors.toList());
     }
 
     private String createHashesReport(PEData data) {
@@ -251,7 +265,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     Map<DebugDirectoryKey, StandardField> dirTable = d.getDirectoryTable();
                     List<StandardField> vals = dirTable.values().stream().collect(Collectors.toList());
                     String title = d.getDebugType().toString();
-                    String debugInfo = getDebugInfo(d, pedata.hasReproInvalidTimeStamps());
+                    String debugInfo = getDebugInfo(d, pedata.isReproBuild());
                     if(d.getDebugType() == DebugType.CODEVIEW) {
                         try{
                             debugInfo += getCodeViewInfo(d);

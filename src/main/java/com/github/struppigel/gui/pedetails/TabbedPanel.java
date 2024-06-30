@@ -17,7 +17,7 @@
  */
 package com.github.struppigel.gui.pedetails;
 
-import com.github.katjahahn.parser.StandardField;
+import com.github.struppigel.parser.StandardField;
 import com.github.struppigel.gui.PEFieldsTable;
 import com.github.struppigel.gui.utils.TableContent;
 import org.apache.logging.log4j.LogManager;

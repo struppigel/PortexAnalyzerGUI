@@ -17,9 +17,9 @@
  */
 package com.github.struppigel.gui.pedetails;
 
-import com.github.katjahahn.parser.PEData;
-import com.github.katjahahn.parser.sections.rsrc.icon.IcoFile;
-import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
+import com.github.struppigel.parser.PEData;
+import com.github.struppigel.parser.sections.rsrc.icon.IcoFile;
+import com.github.struppigel.parser.sections.rsrc.icon.IconParser;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.utils.WorkerKiller;
 import net.ifok.image.image4j.codec.ico.ICODecoder;

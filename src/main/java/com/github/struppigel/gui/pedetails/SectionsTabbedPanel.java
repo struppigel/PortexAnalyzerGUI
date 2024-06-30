@@ -17,7 +17,7 @@
  */
 package com.github.struppigel.gui.pedetails;
 
-import com.github.katjahahn.parser.sections.*;
+import com.github.struppigel.parser.sections.*;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.PEFieldsTable;
 import org.apache.logging.log4j.LogManager;
@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.github.katjahahn.parser.sections.SectionHeaderKey.*;
+import static com.github.struppigel.parser.sections.SectionHeaderKey.*;
 import static java.lang.Math.min;
 
 /**

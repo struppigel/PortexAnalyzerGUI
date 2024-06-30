@@ -17,16 +17,16 @@
  */
 package com.github.struppigel.gui.pedetails;
 
-import com.github.katjahahn.parser.RichHeader;
-import com.github.katjahahn.parser.StandardField;
-import com.github.katjahahn.parser.coffheader.COFFFileHeader;
-import com.github.katjahahn.parser.msdos.MSDOSHeader;
-import com.github.katjahahn.parser.optheader.DataDirEntry;
-import com.github.katjahahn.parser.optheader.DataDirectoryKey;
-import com.github.katjahahn.parser.optheader.OptionalHeader;
-import com.github.katjahahn.parser.sections.SectionHeader;
-import com.github.katjahahn.parser.sections.SectionLoader;
-import com.github.katjahahn.parser.sections.SectionTable;
+import com.github.struppigel.parser.RichHeader;
+import com.github.struppigel.parser.StandardField;
+import com.github.struppigel.parser.coffheader.COFFFileHeader;
+import com.github.struppigel.parser.msdos.MSDOSHeader;
+import com.github.struppigel.parser.optheader.DataDirEntry;
+import com.github.struppigel.parser.optheader.DataDirectoryKey;
+import com.github.struppigel.parser.optheader.OptionalHeader;
+import com.github.struppigel.parser.sections.SectionHeader;
+import com.github.struppigel.parser.sections.SectionLoader;
+import com.github.struppigel.parser.sections.SectionTable;
 import com.github.struppigel.gui.FullPEData;
 import com.github.struppigel.gui.MainFrame;
 import com.github.struppigel.gui.PEFieldsTable;
@@ -52,7 +52,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
-import static com.github.katjahahn.parser.optheader.StandardFieldEntryKey.ADDR_OF_ENTRY_POINT;
+import static com.github.struppigel.parser.optheader.StandardFieldEntryKey.ADDR_OF_ENTRY_POINT;
 
 /**
  * Displays the data in the middle.
@@ -464,7 +464,7 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         COFFFileHeader header = peData.getPeData().getCOFFFileHeader();
         List<StandardField> entries = header.getHeaderEntries();
-        String date = peData.getPeData().hasReproInvalidTimeStamps() ? "invalid - reproducibility build" : header.getTimeDate().toString();
+        String date = peData.getPeData().isReproBuild() ? "invalid - reproducibility build" : header.getTimeDate().toString();
         String text = "Time date stamp : " + date + NL;
         text += "Machine type: " + header.getMachineType().getDescription() + NL;
         text += "Characteristics: " + NL;
@@ -518,6 +518,19 @@ public class PEDetailsPanel extends JPanel {
         // find offset for first RT_STRING table
         Long offset = getMinOffsetForResourceTypeOrZero("RT_STRING");
         previewPanel.showContentAtOffset(offset);
+    }
+
+    public void showDotNetMetadataRoot() {
+        if (peData == null) return;
+        List<StandardField> entries = peData.getDotNetMetadataRootEntries();
+        String[] tableHeader = {"Key", "Value", "Offset"};
+        int offsetColumn = 2;
+        long startOffset = peData.getDotNetMetadataRootOffset();
+        String description = "MetadataRoot version string: " + peData.getDotNetMetadataVersionString();
+        showFieldEntriesAndDescription(entries, tableHeader, description, offsetColumn);
+        LOGGER.debug(".NET MetadataRoot shown");
+        showTablePanel();
+        previewPanel.showContentAtOffset(startOffset);
     }
 
     public void showWindowsFieldsTable() {
@@ -914,7 +927,6 @@ public class PEDetailsPanel extends JPanel {
 
     public void showHashes() {
         if (peData == null) return;
-
         String[] tableHeader = {"Section", "Type", "Hash value"};
         List<Object[]> entries = peData.getSectionHashTableEntries();
         String text = peData.getHashesReport();
@@ -939,7 +951,7 @@ public class PEDetailsPanel extends JPanel {
         summary += "Resources found: " + peData.getResources().size() + NL;
         summary += "Debug entries loaded: " + peData.getDebugTableEntries().size() + NL;
         summary += "Has overlay: " + (peData.overlayExists() ? "Yes" : "No") + NL;
-        summary += NL + peData.getSignatureReport() + NL;
+        summary += NL + peData.getReHintsReport() + NL;
         descriptionField.setText(summary);
         showDescriptionPanel();
         previewPanel.showContentAtOffset(0L);

@@ -17,12 +17,14 @@
  */
 package com.github.struppigel.gui;
 
-import com.github.katjahahn.parser.PEData;
-import com.github.katjahahn.parser.sections.edata.ExportEntry;
-import com.github.katjahahn.parser.sections.idata.ImportDLL;
-import com.github.katjahahn.parser.sections.rsrc.Resource;
-import com.github.katjahahn.parser.sections.rsrc.icon.IconParser;
-import com.github.katjahahn.tools.Overlay;
+import com.github.struppigel.parser.PEData;
+import com.github.struppigel.parser.StandardField;
+import com.github.struppigel.parser.sections.clr.CLRSection;
+import com.github.struppigel.parser.sections.edata.ExportEntry;
+import com.github.struppigel.parser.sections.idata.ImportDLL;
+import com.github.struppigel.parser.sections.rsrc.Resource;
+import com.github.struppigel.parser.sections.rsrc.icon.IconParser;
+import com.github.struppigel.tools.Overlay;
 import com.github.struppigel.gui.utils.TableContent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -54,18 +56,24 @@ public class FullPEData {
     private final List<TableContent> debugTableEntries;
     private final List<Object[]> vsInfoTable;
     private final List<String> manifests;
-    private List<Object[]> exportTableEntries;
-    private List<Object[]> sectionHashTableEntries;
-    private String signatureReport;
-    private List<Object[]> stringTableEntries;
 
+    private final List<Object[]> exportTableEntries;
+    private final List<Object[]> sectionHashTableEntries;
+    private final String rehintsReport;
+    private final List<Object[]> stringTableEntries;
+
+    private final List<StandardField> dotNetMetadataRootTableEntries;
+    private final java.util.Optional<CLRSection> maybeCLR;
+
+    private final long OFFSET_DEFAULT = 0L;
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries,
                       List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
                       List<Object[]> exportTableEntries, List<ExportEntry> exports,
                       String hashes, List<Object[]> sectionHashTableEntries,
                       List<Object[]> anomaliesTable, List<TableContent> debugTableEntries, List<Object[]> vsInfoTable,
-                      String signatureReport, List<Object[]> stringTableEntries) {
+                      String rehintsReport, List<Object[]> stringTableEntries, List<StandardField> dotNetMetadataRootTableEntries,
+                      java.util.Optional<CLRSection> maybeCLR) {
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -83,8 +91,10 @@ public class FullPEData {
         this.anomaliesTable = anomaliesTable;
         this.debugTableEntries = debugTableEntries;
         this.vsInfoTable = vsInfoTable;
-        this.signatureReport = signatureReport;
+        this.rehintsReport = rehintsReport;
         this.stringTableEntries = stringTableEntries;
+        this.dotNetMetadataRootTableEntries = dotNetMetadataRootTableEntries;
+        this.maybeCLR = maybeCLR;
     }
 
     public PEData getPeData() {
@@ -205,8 +215,8 @@ public class FullPEData {
         return resources.stream().anyMatch(r -> IconParser.isGroupIcon(r));
     }
 
-    public String getSignatureReport() {
-        return this.signatureReport;
+    public String getReHintsReport() {
+        return this.rehintsReport;
     }
 
     public boolean hasRTStrings() {
@@ -217,4 +227,25 @@ public class FullPEData {
         return this.stringTableEntries;
     }
 
+    public boolean isDotNet() { return !dotNetMetadataRootTableEntries.isEmpty(); }
+
+    public List<StandardField> getDotNetMetadataRootEntries() {
+        return dotNetMetadataRootTableEntries;
+    }
+
+    public long getDotNetMetadataRootOffset(){
+        if(maybeCLR.isPresent() && !maybeCLR.get().isEmpty()) {
+            return maybeCLR.get().getMetadataRoot().getOffset();
+        } else {
+            return OFFSET_DEFAULT;
+        }
+    }
+
+    public String getDotNetMetadataVersionString(){
+        if(maybeCLR.isPresent() && !maybeCLR.get().isEmpty()) {
+            return maybeCLR.get().getMetadataRoot().getVersionString();
+        } else {
+            return "<no metadata root version string>";
+        }
+    }
 }

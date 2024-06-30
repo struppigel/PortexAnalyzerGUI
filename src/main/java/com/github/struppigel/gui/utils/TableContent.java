@@ -18,7 +18,7 @@
 
 package com.github.struppigel.gui.utils;
 
-import com.github.katjahahn.parser.StandardField;
+import com.github.struppigel.parser.StandardField;
 
 import java.util.ArrayList;
 import java.util.List;

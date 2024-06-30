@@ -17,10 +17,10 @@
  */
 package com.github.struppigel.gui;
 
-import com.github.katjahahn.tools.visualizer.ColorableItem;
-import com.github.katjahahn.tools.visualizer.ImageUtil;
-import com.github.katjahahn.tools.visualizer.Visualizer;
-import com.github.katjahahn.tools.visualizer.VisualizerBuilder;
+import com.github.struppigel.tools.visualizer.ColorableItem;
+import com.github.struppigel.tools.visualizer.ImageUtil;
+import com.github.struppigel.tools.visualizer.Visualizer;
+import com.github.struppigel.tools.visualizer.VisualizerBuilder;
 import com.github.struppigel.gui.utils.WorkerKiller;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
