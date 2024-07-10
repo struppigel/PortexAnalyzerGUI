@@ -21,9 +21,7 @@ import com.github.struppigel.parser.*;
 import com.github.struppigel.parser.sections.SectionHeader;
 import com.github.struppigel.parser.sections.SectionLoader;
 import com.github.struppigel.parser.sections.SectionTable;
-import com.github.struppigel.parser.sections.clr.CLRSection;
-import com.github.struppigel.parser.sections.clr.MetadataRoot;
-import com.github.struppigel.parser.sections.clr.MetadataRootKey;
+import com.github.struppigel.parser.sections.clr.*;
 import com.github.struppigel.parser.sections.debug.*;
 import com.github.struppigel.parser.sections.edata.ExportEntry;
 import com.github.struppigel.parser.sections.edata.ExportNameEntry;
@@ -55,7 +53,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -83,6 +80,10 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         PEData data = PELoader.loadPE(file);
         java.util.Optional<CLRSection> maybeCLR = loadCLRSection(data).transform(java.util.Optional::of).or(java.util.Optional.empty());
         List<StandardField> dotnetMetaDataRootEntries = createDotNetMetadataRootEntries(maybeCLR);
+        List<Object[]> dotNetStreamHeaders = createDotNetStreamHeaders(maybeCLR);
+        List<StandardField> optimizedStreamEntries = createOptimizedStreamEntries(maybeCLR);
+        Map<String, List<List<Object>>> clrTables = data.loadCLRTables();
+        Map<String, List<String>> clrTableHeaders = data.loadCLRTableHeaders();
         setProgress(10);
 
         publish("Calculating Hashes...");
@@ -134,7 +135,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
                 hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
-                rehintsReport, stringTableEntries, dotnetMetaDataRootEntries, maybeCLR);
+                rehintsReport, stringTableEntries, dotnetMetaDataRootEntries, maybeCLR, dotNetStreamHeaders,
+                optimizedStreamEntries, clrTables, clrTableHeaders);
     }
 
     private Optional<CLRSection> loadCLRSection(PEData data) {
@@ -147,6 +149,28 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             e.printStackTrace();
         }
         return Optional.absent();
+    }
+
+    private List<StandardField> createOptimizedStreamEntries(java.util.Optional<CLRSection> clr) {
+        if(clr.isPresent() && !clr.get().isEmpty()) {
+            MetadataRoot root = clr.get().metadataRoot();
+            if(root.maybeGetOptimizedStream().isPresent()){
+               OptimizedStream optStream = root.maybeGetOptimizedStream().get();
+               return optStream.getEntriesList();
+            }
+        }
+        return new ArrayList<>();
+    }
+
+    private List<Object[]> createDotNetStreamHeaders(java.util.Optional<CLRSection> clr) {
+        if(clr.isPresent() && !clr.get().isEmpty()) {
+            MetadataRoot root = clr.get().metadataRoot();
+            List<StreamHeader> headers = root.getStreamHeaders();
+            return headers.stream()
+                    .map(h -> new Object[]{ h.name(), h.size(), h.offset(), root.getBSJBOffset() + h.offset() })
+                    .collect(Collectors.toList());
+        }
+        return new ArrayList<>();
     }
 
     private List<StandardField> createDotNetMetadataRootEntries(java.util.Optional<CLRSection> clr) {

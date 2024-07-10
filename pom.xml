@@ -6,7 +6,7 @@
 
     <groupId>com.github.struppigel</groupId>
     <artifactId>PortexAnalyzerGUI</artifactId>
-    <version>0.12.13</version>
+    <version>0.13.0</version>
 
     <build>
         <resources>
@@ -54,7 +54,7 @@
             <artifactId>12</artifactId>
             <version>1.0</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/src/main/resources/portex_2.12-5.0.1-SNAPSHOT.jar</systemPath>
+            <systemPath>${project.basedir}/src/main/resources/portex_2.12-5.0.2-SNAPSHOT.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>net.ifok.image</groupId>

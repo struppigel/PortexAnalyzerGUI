@@ -26,8 +26,10 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
-import java.util.Collections;
+import java.awt.*;
+import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * The tree on the left side
@@ -59,7 +61,13 @@ public class PEComponentTree extends JPanel {
     private static final String ICONS_TEXT = "Icons";
     private static final String SIGNATURES_TEXT = "Signatures";
     private static final String DOT_NET_TEXT = ".NET Headers";
-    private static final String DOT_NET_METADATA_ROOT_TEXT = ".NET Metadata Root";
+    private static final String DOT_NET_METADATA_ROOT_TEXT = "Metadata Root";
+
+    private static final String DOT_NET_STREAM_HEADERS_TEXT = "Stream Headers";
+
+    private static final String DOT_NET_OPTIMIZED_STREAM_TEXT = "#~";
+
+    private List<String> clrTableNames = new ArrayList<>();
 
     private final PEDetailsPanel peDetailsPanel;
     private FullPEData peData = null;
@@ -107,6 +115,8 @@ public class PEComponentTree extends JPanel {
         // .NET related
         DefaultMutableTreeNode dotNet = new DefaultMutableTreeNode(DOT_NET_TEXT);
         DefaultMutableTreeNode dotNetRoot = new DefaultMutableTreeNode(DOT_NET_METADATA_ROOT_TEXT);
+        DefaultMutableTreeNode dotNetStreams = new DefaultMutableTreeNode(DOT_NET_STREAM_HEADERS_TEXT);
+        DefaultMutableTreeNode dotNetOptStream = new DefaultMutableTreeNode(DOT_NET_OPTIMIZED_STREAM_TEXT);
 
         // Non-PE
         DefaultMutableTreeNode anomaly = new DefaultMutableTreeNode(ANOMALY_TEXT);
@@ -162,8 +172,17 @@ public class PEComponentTree extends JPanel {
         }
 
         if(peData.isDotNet()) {
-            pe.add(dotNet);
+            root.add(dotNet);
             dotNet.add(dotNetRoot);
+            dotNet.add(dotNetStreams);
+            if(peData.hasOptimizedStream()) {
+                dotNetStreams.add(dotNetOptStream);
+                this.clrTableNames = peData.getClrTables().keySet().stream().sorted().collect(Collectors.toList());
+                for (String name : clrTableNames) {
+                    DefaultMutableTreeNode node = new DefaultMutableTreeNode(name);
+                    dotNetOptStream.add(node);
+                }
+            }
         }
 
         root.add(anomaly);
@@ -176,8 +195,9 @@ public class PEComponentTree extends JPanel {
         // reload the tree model to actually show the update
         DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
         model.reload();
-        // expand the tree per default
+        // expand the tree per default except for .NET CLR tables
         setTreeExpandedState(peTree, true);
+        setNodeExpandedState(peTree, dotNetOptStream, false);
     }
 
     // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
@@ -222,7 +242,11 @@ public class PEComponentTree extends JPanel {
         renderer.setOpenIcon(openIcon);
         renderer.setOpenIcon(closeIcon);
 
-        add(peTree);
+        // set scrollbar
+        JScrollPane scrollPane = new JScrollPane(peTree);
+        this.setLayout(new BorderLayout());
+        this.add(scrollPane, BorderLayout.CENTER);
+
         peTree.setRootVisible(false);
         peTree.addTreeSelectionListener(e -> selectionChanged(e.getNewLeadSelectionPath()));
         this.setVisible(true);
@@ -236,77 +260,88 @@ public class PEComponentTree extends JPanel {
         switch (node) {
             case DOS_STUB_TEXT:
                 peDetailsPanel.showDosStub();
-                break;
+                return;
             case RICH_TEXT:
                 peDetailsPanel.showRichHeader();
-                break;
+                return;
             case COFF_FILE_HEADER_TEXT:
                 peDetailsPanel.showCoffFileHeader();
-                break;
+                return;
             case OPTIONAL_HEADER_TEXT:
                 peDetailsPanel.showOptionalHeader();
-                break;
+                return;
             case STANDARD_FIELDS_TEXT:
                 peDetailsPanel.showStandardFieldsTable();
-                break;
+                return;
             case WINDOWS_FIELDS_TEXT:
                 peDetailsPanel.showWindowsFieldsTable();
-                break;
+                return;
             case DATA_DIRECTORY_TEXT:
                 peDetailsPanel.showDataDirectoryTable();
-                break;
+                return;
             case SECTION_TABLE_TEXT:
                 peDetailsPanel.showSectionTable();
-                break;
+                return;
             case PE_HEADERS_TEXT:
                 peDetailsPanel.showPEHeaders();
-                break;
+                return;
             case OVERLAY_TEXT:
                 peDetailsPanel.showOverlay();
-                break;
+                return;
             case MANIFEST_TEXT:
                 peDetailsPanel.showManifests();
-                break;
+                return;
             case RESOURCES_TEXT:
                 peDetailsPanel.showResources();
-                break;
+                return;
             case VERSIONINFO_TEXT:
                 peDetailsPanel.showVersionInfo();
-                break;
+                return;
             case IMPORTS_TEXT:
                 peDetailsPanel.showImports();
-                break;
+                return;
             case EXPORTS_TEXT:
                 peDetailsPanel.showExports();
-                break;
+                return;
             case DEBUG_TEXT:
                 peDetailsPanel.showDebugInfo();
-                break;
+                return;
             case ANOMALY_TEXT:
                 peDetailsPanel.showAnomalies();
-                break;
+                return;
             case HASHES_TEXT:
                 peDetailsPanel.showHashes();
-                break;
+                return;
             case VISUALIZATION_TEXT:
                 peDetailsPanel.showVisualization();
-                break;
+                return;
             case PE_FORMAT_TEXT:
                 peDetailsPanel.showPEFormat();
-                break;
+                return;
             case ICONS_TEXT:
                 peDetailsPanel.showIcons();
-                break;
+                return;
             case SIGNATURES_TEXT:
                 peDetailsPanel.showSignatures();
-                break;
+                return;
             case RT_STRING_TEXT:
                 peDetailsPanel.showRTStrings();
-                break;
+                return;
             case DOT_NET_METADATA_ROOT_TEXT:
                 peDetailsPanel.showDotNetMetadataRoot();
-                break;
-
+                return;
+            case DOT_NET_STREAM_HEADERS_TEXT:
+                peDetailsPanel.showDotNetStreamHeaders();
+                return;
+            case DOT_NET_OPTIMIZED_STREAM_TEXT:
+                peDetailsPanel.showOptimizedStream();
+                return;
+        }
+        for(String name : clrTableNames){
+            if(node.equals(name)) {
+                peDetailsPanel.showClrTable(name);
+                return;
+            }
         }
     }
 

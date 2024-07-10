@@ -450,8 +450,7 @@ public class PEDetailsPanel extends JPanel {
         if (peData != null) {
             MSDOSHeader header = peData.getPeData().getMSDOSHeader();
             List<StandardField> entries = header.getHeaderEntries();
-            String[] tableHeader = {"Description", "Value", "Value offset"};
-            showFieldEntries(entries, tableHeader, 2);
+            showFieldEntries(entries);
             LOGGER.debug("MS DOS Stub shown");
             showTablePanel();
             previewPanel.showContentAtOffset(0);
@@ -472,7 +471,7 @@ public class PEDetailsPanel extends JPanel {
         if (header.getCharacteristics().size() == 0) {
             text += "no characteristics set";
         }
-        String[] tableHeader = {"Description", "Value", "Value offset"};
+        String[] tableHeader = {"Description", "Value", "File offset"};
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
         LOGGER.debug("COFF File header shown");
         showTablePanel();
@@ -498,7 +497,7 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         OptionalHeader header = peData.getPeData().getOptionalHeader();
         List<StandardField> entries = new ArrayList<>(header.getStandardFields().values());
-        String[] tableHeader = {"Description", "Value", "Value offset"};
+        String[] tableHeader = {"Description", "Value", "File offset"};
         String text = "Linker version: " + header.getLinkerVersionDescription() + NL;
         text += "Magic Number: " + header.getMagicNumber().getDescription() + NL;
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
@@ -533,11 +532,35 @@ public class PEDetailsPanel extends JPanel {
         previewPanel.showContentAtOffset(startOffset);
     }
 
+    public void showDotNetStreamHeaders() {
+        if (peData == null) return;
+        List<Object[]> entries = peData.getDotNetStreamHeaderEntries();
+        String[] tableHeader = {"Stream name", "Size", "BSJB offset", "File offset"};
+        showTextEntries(entries, tableHeader, 3);
+        LOGGER.debug(".NET Stream Headers shown");
+        showTablePanel();
+        previewPanel.showContentAtOffset(peData.getDotNetMetadataRootOffset());
+    }
+
+    public void showOptimizedStream() {
+        if (peData == null) return;
+        List<StandardField> entries = peData.getOptimizedStreamEntries();
+        showFieldEntries(entries);
+        LOGGER.debug("#~ shown");
+        showTablePanel();
+        Long offset = Collections.min(
+                peData.getOptimizedStreamEntries()
+                        .stream()
+                        .map(e -> e.getOffset())
+                        .collect(Collectors.toList()));
+        previewPanel.showContentAtOffset(offset);
+    }
+
     public void showWindowsFieldsTable() {
         if (peData == null) return;
         OptionalHeader header = peData.getPeData().getOptionalHeader();
         List<StandardField> entries = new ArrayList<>(header.getWindowsSpecificFields().values());
-        String[] tableHeader = {"Description", "Value", "Value offset"};
+        String[] tableHeader = {"Description", "Value", "File offset"};
 
         String text = "Subsystem: " + header.getSubsystem().getDescription() + NL;
 
@@ -667,7 +690,8 @@ public class PEDetailsPanel extends JPanel {
         tablePanel.repaint();
     }
 
-    private void showFieldEntries(List<StandardField> entries, String[] tableHeader, int offsetColumn) {
+    private void showFieldEntries(List<StandardField> entries) {
+        String[] tableHeader = {"Description", "Value", "File offset"};
         cleanUpTablePanel();
         PEFieldsTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
@@ -676,9 +700,8 @@ public class PEDetailsPanel extends JPanel {
             Object[] row = {field.getDescription(), field.getValue(), field.getOffset()};
             model.addRow(row);
         }
-        if(offsetColumn >= 0) {
-            table.setPreviewOffsetColumn(offsetColumn, previewPanel);
-        }
+
+        table.setPreviewOffsetColumn(2, previewPanel);
         table.setModel(model);
         addTable(table);
         showUpdatesInTablePanel();
@@ -785,6 +808,21 @@ public class PEDetailsPanel extends JPanel {
         }
     }
 
+
+    public void showClrTable(String name) {
+        if (peData == null || !peData.isDotNet()) return;
+        if(!peData.getClrTables().containsKey(name) || !peData.getClrTableHeaders().containsKey(name)) return;
+        List<Object[]> entries = peData.getClrTables().get(name).stream().map(t -> t.toArray()).collect(Collectors.toList());
+        List<String> headers = peData.getClrTableHeaders().get(name);
+        String[] headersArray = headers.toArray(new String[headers.size()]);
+        int offsetColumn = headersArray.length - 1;
+        showTextEntries(entries, headersArray, offsetColumn);
+        showTablePanel();
+        long tableOffset = peData.getClrTableOffset(name);
+        previewPanel.showContentAtOffset(tableOffset);
+    }
+
+
     public void showRichHeader() {
         if (peData == null) return;
         if (peData.getPeData().maybeGetRichHeader().isPresent()) {
@@ -850,7 +888,7 @@ public class PEDetailsPanel extends JPanel {
 
     public void showResources() {
         if (peData == null) return;
-        String[] tableHeader = {"Type", "Name", "Language", "Offset", "Size", "Signatures"};
+        String[] tableHeader = {"Type", "Name", "Language", "Res. Offset", "Size", "Signatures"};
         showTextEntries(peData.getResourceTableEntries(), tableHeader, 3);
         showTablePanel();
         Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.RESOURCE_TABLE);
@@ -904,7 +942,7 @@ public class PEDetailsPanel extends JPanel {
 
     public void showDebugInfo() {
         if (peData == null) return;
-        String[] tableHeader = {"Description", "Value", "Value offset"};
+        String[] tableHeader = {"Description", "Value", "File offset"};
         List<TableContent> entries = peData.getDebugTableEntries();
 
         tabbedPanel.setContent(entries, tableHeader);

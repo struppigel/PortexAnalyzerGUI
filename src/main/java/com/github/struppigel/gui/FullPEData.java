@@ -20,6 +20,8 @@ package com.github.struppigel.gui;
 import com.github.struppigel.parser.PEData;
 import com.github.struppigel.parser.StandardField;
 import com.github.struppigel.parser.sections.clr.CLRSection;
+import com.github.struppigel.parser.sections.clr.CLRTable;
+import com.github.struppigel.parser.sections.clr.OptimizedStream;
 import com.github.struppigel.parser.sections.edata.ExportEntry;
 import com.github.struppigel.parser.sections.idata.ImportDLL;
 import com.github.struppigel.parser.sections.rsrc.Resource;
@@ -32,12 +34,14 @@ import org.apache.logging.log4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
- * Wrapper for the PEData.
- * This class makes sure to save things that we do not want to compute several times and
+ * Wrapper for the PE data. Contains all data that must be parsed from file and converted by a worker.
+ * This class makes sure to save all the data that we do not want to compute several times and
  * definitely do not want to compute in the event dispatch thread.
- * It stores that data in a form that is easily digestible by the GUI and does not need more transformations.
+ * It stores that data in a form that is easily digestible by the GUI and does not need intensive transformations.
  */
 public class FullPEData {
     private static final Logger LOGGER = LogManager.getLogger();
@@ -64,6 +68,11 @@ public class FullPEData {
 
     private final List<StandardField> dotNetMetadataRootTableEntries;
     private final java.util.Optional<CLRSection> maybeCLR;
+    private final List<Object[]> dotNetStreamHeaders;
+
+    private final List<StandardField> optimizedStreamEntries;
+    private final Map<String, List<List<Object>>> clrTables;
+    private final Map<String, List<String>> clrTableHeaders;
 
     private final long OFFSET_DEFAULT = 0L;
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
@@ -73,7 +82,8 @@ public class FullPEData {
                       String hashes, List<Object[]> sectionHashTableEntries,
                       List<Object[]> anomaliesTable, List<TableContent> debugTableEntries, List<Object[]> vsInfoTable,
                       String rehintsReport, List<Object[]> stringTableEntries, List<StandardField> dotNetMetadataRootTableEntries,
-                      java.util.Optional<CLRSection> maybeCLR) {
+                      java.util.Optional<CLRSection> maybeCLR, List<Object[]> dotNetStreamHeaders, List<StandardField> optimizedStreamEntries,
+                      Map<String, List<List<Object>>> clrTables, Map<String, List<String>> clrTableHeaders) {
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -95,7 +105,15 @@ public class FullPEData {
         this.stringTableEntries = stringTableEntries;
         this.dotNetMetadataRootTableEntries = dotNetMetadataRootTableEntries;
         this.maybeCLR = maybeCLR;
+        this.dotNetStreamHeaders = dotNetStreamHeaders;
+        this.optimizedStreamEntries = optimizedStreamEntries;
+        this.clrTables = clrTables;
+        this.clrTableHeaders = clrTableHeaders;
     }
+
+    public Map<String, List<String>> getClrTableHeaders() { return clrTableHeaders; }
+
+    public Map<String, List<List<Object>>> getClrTables() { return clrTables; }
 
     public PEData getPeData() {
         return pedata;
@@ -229,6 +247,8 @@ public class FullPEData {
 
     public boolean isDotNet() { return !dotNetMetadataRootTableEntries.isEmpty(); }
 
+    public boolean hasOptimizedStream() { return !optimizedStreamEntries.isEmpty(); }
+
     public List<StandardField> getDotNetMetadataRootEntries() {
         return dotNetMetadataRootTableEntries;
     }
@@ -247,5 +267,33 @@ public class FullPEData {
         } else {
             return "<no metadata root version string>";
         }
+    }
+
+    public java.util.Optional<CLRTable> getClrTableForName(String name) {
+        Optional<CLRSection> clr = getPeData().loadClrSection();
+        if(clr.isPresent()) {
+            Optional<OptimizedStream> optStream = clr.get().getMetadataRoot().maybeGetOptimizedStream();
+            if (optStream.isPresent()) {
+                java.util.Optional<CLRTable> clrTable = optStream.get().getCLRTables().stream().filter(t -> name.contains(t.getTableName())).findFirst();
+                return clrTable;
+            }
+        }
+        return Optional.empty();
+    }
+
+    public long getClrTableOffset(String tableName) {
+        java.util.Optional<CLRTable> clrTable = getClrTableForName(tableName);
+        if(clrTable.isPresent()) {
+            return clrTable.get().getRawOffset();
+        }
+        return OFFSET_DEFAULT;
+    }
+
+    public List<Object[]> getDotNetStreamHeaderEntries() {
+        return this.dotNetStreamHeaders;
+    }
+
+    public List<StandardField> getOptimizedStreamEntries() {
+        return this.optimizedStreamEntries;
     }
 }

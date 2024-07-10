@@ -12,12 +12,12 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 
 ## Features
 
-* Header information from: MSDOS Header, Rich Header, COFF File Header, Optional Header, Section Table
+* Header information from: MSDOS Header, Rich Header, COFF File Header, Optional Header, Section Table, .NET Metadata
 * PE Structures: Import Section, Resource Section, Export Section, Debug Section
-* Scanning for file format anomalies
+* Scanning for file format anomalies and reversing hints for certain combinations
 * Visualize file structure, local entropies and byteplot, and save it as PNG
 * Calculate Shannon Entropy, Imphash, MD5, SHA256, Rich and RichPV hash
-* Overlay and overlay signature scanning
+* Overlay and overlay signature scanning, dump or remove overlay
 * Version information and manifest
 * Icon extraction and saving as PNG
 * Customized signature scanning via Yara. Internal signature scans using PEiD signatures and an internal filetype scanner.
@@ -34,7 +34,7 @@ These features include among others:
 
 * customized visualization
 * extraction and conversion of icons to .ICO files
-* dumping of sections, overlay, resources
+* dumping of sections, resources
 * export reports to txt, json, csv
 
 Some of these features are already provided by PortexAnalyzer CLI version, which you can find here: [PortexAnalyzer CLI](https://github.com/struppigel/PortEx/tree/master/progs)
