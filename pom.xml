@@ -7,6 +7,12 @@
     <groupId>com.github.struppigel</groupId>
     <artifactId>PortexAnalyzerGUI</artifactId>
     <version>0.13.0</version>
+    <repositories>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/struppigel/PortEx</url>
+        </repository>
+    </repositories>
 
     <build>
         <resources>
@@ -14,33 +20,33 @@
                 <directory>resources</directory>
             </resource>
         </resources>
-    <plugins>
-    <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <executions>
-            <execution>
-                <phase>package</phase>
-                <goals>
-                    <goal>single</goal>
-                </goals>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.github.struppigel.gui.Starter</mainClass>
-                        </manifest>
-                        <manifestEntries>
-                            <Multi-Release>true</Multi-Release>
-                        </manifestEntries>
-                    </archive>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                </configuration>
-            </execution>
-        </executions>
-    </plugin>
-    </plugins>
+        <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <executions>
+                <execution>
+                    <phase>package</phase>
+                    <goals>
+                        <goal>single</goal>
+                    </goals>
+                    <configuration>
+                        <archive>
+                            <manifest>
+                                <mainClass>com.github.struppigel.gui.Starter</mainClass>
+                            </manifest>
+                            <manifestEntries>
+                                <Multi-Release>true</Multi-Release>
+                            </manifestEntries>
+                        </archive>
+                        <descriptorRefs>
+                            <descriptorRef>jar-with-dependencies</descriptorRef>
+                        </descriptorRefs>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+        </plugins>
     </build>
 
     <properties>
@@ -49,13 +55,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencies>
-        <dependency>
-            <groupId>com.github.struppigel.portex_2</groupId>
-            <artifactId>12</artifactId>
-            <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/src/main/resources/portex_2.12-5.0.2-SNAPSHOT.jar</systemPath>
-        </dependency>
         <dependency>
             <groupId>net.ifok.image</groupId>
             <artifactId>image4j</artifactId>
@@ -75,6 +74,11 @@
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
             <version>2.19.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.struppigel</groupId>
+            <artifactId>portex_2.12</artifactId>
+            <version>5.0.2-SNAPSHOT</version>
         </dependency>
     </dependencies>
     
