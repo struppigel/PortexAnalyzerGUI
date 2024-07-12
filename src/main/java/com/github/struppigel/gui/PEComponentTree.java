@@ -50,8 +50,10 @@ public class PEComponentTree extends JPanel {
     private static final String MANIFEST_TEXT = "Manifests";
     private static final String RESOURCES_TEXT = "Resources";
     private static final String RT_STRING_TEXT = "String Table";
-    private static final String VERSIONINFO_TEXT = "Version Info";
+    private static final String VERSION_INFO_TEXT = "Version Info";
     private static final String IMPORTS_TEXT = "Imports";
+
+    private static final String DELAY_LOAD_IMPORTS_TEXT = "Delay Load Imports";
     private static final String EXPORTS_TEXT = "Exports";
     private static final String DEBUG_TEXT = "Debug";
     private static final String ANOMALY_TEXT = "Anomalies";
@@ -104,11 +106,12 @@ public class PEComponentTree extends JPanel {
         // Resources
         DefaultMutableTreeNode resources = new DefaultMutableTreeNode(RESOURCES_TEXT);
         DefaultMutableTreeNode manifest = new DefaultMutableTreeNode(MANIFEST_TEXT);
-        DefaultMutableTreeNode version = new DefaultMutableTreeNode(VERSIONINFO_TEXT);
+        DefaultMutableTreeNode version = new DefaultMutableTreeNode(VERSION_INFO_TEXT);
         DefaultMutableTreeNode icons = new DefaultMutableTreeNode(ICONS_TEXT);
         DefaultMutableTreeNode rtstrings = new DefaultMutableTreeNode(RT_STRING_TEXT);
         // Data directories
         DefaultMutableTreeNode imports = new DefaultMutableTreeNode(IMPORTS_TEXT);
+        DefaultMutableTreeNode delayLoad = new DefaultMutableTreeNode(DELAY_LOAD_IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
         DefaultMutableTreeNode debug = new DefaultMutableTreeNode(DEBUG_TEXT);
 
@@ -156,6 +159,10 @@ public class PEComponentTree extends JPanel {
 
         if(peData.hasImports()){
             pe.add(imports);
+        }
+
+        if(peData.hasDelayLoadImports()){
+            pe.add(delayLoad);
         }
 
         if(peData.hasExports()){
@@ -294,11 +301,14 @@ public class PEComponentTree extends JPanel {
             case RESOURCES_TEXT:
                 peDetailsPanel.showResources();
                 return;
-            case VERSIONINFO_TEXT:
+            case VERSION_INFO_TEXT:
                 peDetailsPanel.showVersionInfo();
                 return;
             case IMPORTS_TEXT:
                 peDetailsPanel.showImports();
+                return;
+            case DELAY_LOAD_IMPORTS_TEXT:
+                peDetailsPanel.showDelayLoadImports();
                 return;
             case EXPORTS_TEXT:
                 peDetailsPanel.showExports();

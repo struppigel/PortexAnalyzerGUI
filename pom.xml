@@ -78,7 +78,7 @@
         <dependency>
             <groupId>com.github.struppigel</groupId>
             <artifactId>portex_2.12</artifactId>
-            <version>5.0.3-SNAPSHOT</version>
+            <version>5.0.4-SNAPSHOT</version>
         </dependency>
     </dependencies>
     

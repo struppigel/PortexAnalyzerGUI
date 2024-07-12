@@ -913,18 +913,26 @@ public class PEDetailsPanel extends JPanel {
         previewPanel.showContentAtOffset(offset);
     }
 
-    public void showImports() {
+    private void showImportsForEntries(List<Object[]> entries, DataDirectoryKey dataDir) {
         if (peData == null) return;
         // Make beautiful with tabs
         String[] tableHeader = {"DLL", "Category", "Name", "Description", "RVA", "Hint"};
-        PEFieldsTable table = showTextEntries(peData.getImportTableEntries(), tableHeader, -1);
+        PEFieldsTable table = showTextEntries(entries, tableHeader, -1);
         table.getColumnModel().getColumn(4).setPreferredWidth(100);
         table.getColumnModel().getColumn(5).setPreferredWidth(100);
         table.getColumnModel().getColumn(4).setMaxWidth(200);
         table.getColumnModel().getColumn(5).setMaxWidth(200);
         showTablePanel();
-        Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.IMPORT_TABLE);
+        Long offset = getFileOffsetForDataDirectoryKeyOrZero(dataDir);
         previewPanel.showContentAtOffset(offset);
+    }
+
+    public void showDelayLoadImports() {
+        showImportsForEntries(peData.getDelayLoadEntries(), DataDirectoryKey.DELAY_IMPORT_DESCRIPTOR);
+    }
+
+    public void showImports() {
+        showImportsForEntries(peData.getImportTableEntries(), DataDirectoryKey.IMPORT_TABLE);
     }
 
     private Long getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey dataDirKey) {

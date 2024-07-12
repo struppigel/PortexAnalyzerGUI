@@ -220,7 +220,7 @@ public class MainFrame extends JFrame {
 
     private void initGUI() {
         // Main frame settings
-        setSize(1024, 800);
+        setSize(1280, 768);
         setLocationRelativeTo(null);
         setVisible(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
