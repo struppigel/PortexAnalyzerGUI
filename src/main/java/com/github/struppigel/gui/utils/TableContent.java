@@ -23,6 +23,9 @@ import com.github.struppigel.parser.StandardField;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Table entries and description. Currently used to hold the data for one tab in the TabbedPanel
+ */
 public class TableContent extends ArrayList<StandardField> {
     private String title;
 

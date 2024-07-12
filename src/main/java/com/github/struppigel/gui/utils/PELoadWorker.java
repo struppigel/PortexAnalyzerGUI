@@ -119,6 +119,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Loading Debug Info...");
         List<TableContent> debugTableEntries = getDebugTableEntries(data);
+        data.loadExtendedDllCharacteristics(); // preload it so it can be accessed next time
         setProgress(80);
 
         publish("Scanning for Anomalies...");
@@ -300,6 +301,9 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                     }
                     if(d.getDebugType() == DebugType.REPRO) {
                         debugInfo += d.getRepro().getInfo();
+                    }
+                    if(d.getDebugType() == DebugType.EX_DLLCHARACTERISTICS) {
+                        debugInfo += d.getExtendedDLLCharacteristics().getInfo();
                     }
                     tables.add(new TableContent(vals, title, debugInfo));
                 }

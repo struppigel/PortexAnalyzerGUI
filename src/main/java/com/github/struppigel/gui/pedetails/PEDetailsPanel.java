@@ -34,6 +34,7 @@ import com.github.struppigel.gui.VisualizerPanel;
 import com.github.struppigel.gui.pedetails.signatures.SignaturesPanel;
 import com.github.struppigel.gui.utils.PortexSwingUtils;
 import com.github.struppigel.gui.utils.TableContent;
+import com.github.struppigel.parser.sections.debug.ExtendedDLLCharacteristics;
 import com.github.struppigel.settings.PortexSettings;
 import com.google.common.base.Optional;
 import org.apache.logging.log4j.LogManager;
@@ -574,7 +575,16 @@ public class PEDetailsPanel extends JPanel {
 
         text += NL + "DLL Characteristics:" + NL;
         text += header.getDllCharacteristics().stream().map(ch -> "\t* " + ch.getDescription()).collect(Collectors.joining(NL)) + NL;
-
+        java.util.Optional<ExtendedDLLCharacteristics> exDll = peData.getPeData().loadExtendedDllCharacteristics();
+        if(exDll.isPresent() && (exDll.get().getCETCompat() || exDll.get().getForwardCFICompat())) {
+            text += NL + "Extended DLL Characteristics:" + NL;
+            if ( exDll.get().getCETCompat() ) {
+                text += "\t*  CET Compat" + NL;
+            }
+            if ( exDll.get().getForwardCFICompat() ) {
+                text += "\t*  Foward CFI Compat" + NL;
+            }
+        }
         showFieldEntriesAndDescription(entries, tableHeader, text, 2);
         LOGGER.debug("Windows Fields shown");
         showTablePanel();
