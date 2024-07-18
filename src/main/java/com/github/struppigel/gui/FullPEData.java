@@ -53,6 +53,8 @@ public class FullPEData {
     private final List<ImportDLL> imports;
     private final List<Object[]> importTableEntries;
     private final List<Object[]> delayLoadEntries;
+
+    private final List<Object[]> boundImportEntries;
     private final List<Object[]> resourceTableEntries;
     private final List<Resource> resources;
     private final List<ExportEntry> exports;
@@ -78,6 +80,7 @@ public class FullPEData {
     private final long OFFSET_DEFAULT = 0L;
     public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries, List<Object[]> delayLoadEntries,
+                      List<Object[]> boundImportEntries,
                       List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
                       List<Object[]> exportTableEntries, List<ExportEntry> exports,
                       String hashes, List<Object[]> sectionHashTableEntries,
@@ -93,6 +96,7 @@ public class FullPEData {
         this.imports = imports;
         this.importTableEntries = importTableEntries;
         this.delayLoadEntries = delayLoadEntries;
+        this.boundImportEntries = boundImportEntries;
         this.resourceTableEntries = resourceTableEntries;
         this.resources = resources;
         this.manifests = manifests;
@@ -141,9 +145,11 @@ public class FullPEData {
         return importTableEntries;
     }
 
-    public List<Object[]> getDelayLoadEntries() {
-        return delayLoadEntries;
-    }
+    public List<Object[]> getDelayLoadEntries() {return delayLoadEntries;}
+
+    public List<Object[]> getBoundImportEntries() {return boundImportEntries;}
+
+    public boolean hasBoundImportEntries() {return !boundImportEntries.isEmpty();}
 
     public boolean hasManifest() {
         return getManifests().size() > 0;

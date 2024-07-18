@@ -54,6 +54,7 @@ public class PEComponentTree extends JPanel {
     private static final String IMPORTS_TEXT = "Imports";
 
     private static final String DELAY_LOAD_IMPORTS_TEXT = "Delay Load Imports";
+    private static final String BOUND_IMPORTS_TEXT = "Bound Imports";
     private static final String EXPORTS_TEXT = "Exports";
     private static final String DEBUG_TEXT = "Debug";
     private static final String ANOMALY_TEXT = "Anomalies";
@@ -112,6 +113,7 @@ public class PEComponentTree extends JPanel {
         // Data directories
         DefaultMutableTreeNode imports = new DefaultMutableTreeNode(IMPORTS_TEXT);
         DefaultMutableTreeNode delayLoad = new DefaultMutableTreeNode(DELAY_LOAD_IMPORTS_TEXT);
+        DefaultMutableTreeNode bound = new DefaultMutableTreeNode(BOUND_IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
         DefaultMutableTreeNode debug = new DefaultMutableTreeNode(DEBUG_TEXT);
 
@@ -163,6 +165,10 @@ public class PEComponentTree extends JPanel {
 
         if(peData.hasDelayLoadImports()){
             pe.add(delayLoad);
+        }
+
+        if(peData.hasBoundImportEntries()) {
+            pe.add(bound);
         }
 
         if(peData.hasExports()){
@@ -309,6 +315,9 @@ public class PEComponentTree extends JPanel {
                 return;
             case DELAY_LOAD_IMPORTS_TEXT:
                 peDetailsPanel.showDelayLoadImports();
+                return;
+            case BOUND_IMPORTS_TEXT:
+                peDetailsPanel.showBoundImports();
                 return;
             case EXPORTS_TEXT:
                 peDetailsPanel.showExports();

@@ -6,7 +6,7 @@
 
     <groupId>com.github.struppigel</groupId>
     <artifactId>PortexAnalyzerGUI</artifactId>
-    <version>0.13.0</version>
+    <version>0.13.2</version>
     <repositories>
         <repository>
             <id>github</id>
@@ -78,7 +78,7 @@
         <dependency>
             <groupId>com.github.struppigel</groupId>
             <artifactId>portex_2.12</artifactId>
-            <version>5.0.4-SNAPSHOT</version>
+            <version>5.0.5-SNAPSHOT</version>
         </dependency>
     </dependencies>
     

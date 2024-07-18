@@ -931,6 +931,20 @@ public class PEDetailsPanel extends JPanel {
         showImportsForEntries(peData.getDelayLoadEntries(), DataDirectoryKey.DELAY_IMPORT_DESCRIPTOR);
     }
 
+    public void showBoundImports() {
+        if (peData == null) return;
+        String[] tableHeader = {"Name", "Offset Module Name", "Time Date Stamp", "Forwarder Refs", "Raw Offset"};
+        showTextEntries(peData.getBoundImportEntries(), tableHeader, 4);
+        showTablePanel();
+        SectionTable sectionTable = peData.getPeData().getSectionTable();
+        Long offset = peData.getPeData()
+                .getOptionalHeader()
+                .getDataDirectory()
+                .get(DataDirectoryKey.BOUND_IMPORT)
+                .getFileOffset(sectionTable);
+        previewPanel.showContentAtOffset(offset);
+    }
+
     public void showImports() {
         showImportsForEntries(peData.getImportTableEntries(), DataDirectoryKey.IMPORT_TABLE);
     }

@@ -25,10 +25,7 @@ import com.github.struppigel.parser.sections.clr.*;
 import com.github.struppigel.parser.sections.debug.*;
 import com.github.struppigel.parser.sections.edata.ExportEntry;
 import com.github.struppigel.parser.sections.edata.ExportNameEntry;
-import com.github.struppigel.parser.sections.idata.ImportDLL;
-import com.github.struppigel.parser.sections.idata.NameImport;
-import com.github.struppigel.parser.sections.idata.OrdinalImport;
-import com.github.struppigel.parser.sections.idata.SymbolDescription;
+import com.github.struppigel.parser.sections.idata.*;
 import com.github.struppigel.parser.sections.rsrc.IDOrName;
 import com.github.struppigel.parser.sections.rsrc.Level;
 import com.github.struppigel.parser.sections.rsrc.Resource;
@@ -101,6 +98,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         List<ImportDLL> delayDLLs = data.loadDelayLoadImports();
         List<Object[]> impEntries = createImportTableEntries(importDLLs);
         List<Object[]> delayLoadEntries = createImportTableEntries(delayDLLs);
+        List<Object[]> boundImportEntries = createBoundImportEntries(data);
         setProgress(40);
 
         publish("Scanning for signatures...");
@@ -136,10 +134,31 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
-                impEntries, delayLoadEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
+                impEntries, delayLoadEntries, boundImportEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
                 hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
                 rehintsReport, stringTableEntries, dotnetMetaDataRootEntries, maybeCLR, dotNetStreamHeaders,
                 optimizedStreamEntries, clrTables, clrTableHeaders);
+    }
+
+    private Object[] createBoundImportEntry(BoundImportDescriptor bi) {
+        List<Object> line = new ArrayList<>();
+        line.add(bi.getName());
+        line.add(bi.get(BoundImportDescriptorKey.OFFSET_MODULE_NAME));
+        line.add(bi.get(BoundImportDescriptorKey.TIME_DATE_STAMP));
+        line.add(bi.get(BoundImportDescriptorKey.NR_OF_MODULE_FORWARDER_REFS));
+        line.add(bi.rawOffset());
+        return line.toArray();
+    }
+
+    private List<Object[]> createBoundImportEntries(PEData data) throws IOException {
+        Optional<BoundImportSection> section = new SectionLoader(data).maybeLoadBoundImportSection();
+        if(section.isPresent()) {
+            BoundImportSection bsec = section.get();
+            return bsec.getEntries().stream()
+                    .map(this::createBoundImportEntry)
+                    .collect(Collectors.toList());
+        }
+        return new ArrayList<>();
     }
 
     private Optional<CLRSection> loadCLRSection(PEData data) {
