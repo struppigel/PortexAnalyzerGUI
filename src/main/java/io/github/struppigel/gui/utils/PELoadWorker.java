@@ -34,7 +34,7 @@ import io.github.struppigel.tools.*;
 import io.github.struppigel.tools.anomalies.Anomaly;
 import io.github.struppigel.tools.anomalies.PEAnomalyScanner;
 import io.github.struppigel.tools.sigscanner.FileTypeScanner;
-import io.github.struppigel.tools.sigscanner.SignatureScanner;
+import io.github.struppigel.tools.sigscanner.MatchedSignature;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.MainFrame;
 import com.google.common.base.Optional;
@@ -129,7 +129,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         publish("Scanning Overlay...");
         Overlay overlay = new Overlay(data);
         double overlayEntropy = ShannonEntropy.entropy(data.getFile(), overlay.getOffset(), overlay.getSize());
-        List<String> overlaySignatures = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAtToString(data.getFile(), overlay.getOffset());
+        List<String> overlaySignatures = data.getOverlaySignatures().stream().map(MatchedSignature::toString).collect(Collectors.toList());
         setProgress(100);
 
         publish("Done!");

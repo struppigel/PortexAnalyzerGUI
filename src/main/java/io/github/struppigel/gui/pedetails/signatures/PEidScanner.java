@@ -1,8 +1,7 @@
 package io.github.struppigel.gui.pedetails.signatures;
 
-import io.github.struppigel.parser.sections.rsrc.Resource;
 import io.github.struppigel.tools.Overlay;
-import io.github.struppigel.tools.sigscanner.FileTypeScanner;
+import io.github.struppigel.tools.sigscanner.MatchedSignature;
 import io.github.struppigel.tools.sigscanner.SignatureScanner;
 import io.github.struppigel.gui.FullPEData;
 import org.apache.logging.log4j.LogManager;
@@ -37,8 +36,11 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
 
     private List<PEidRuleMatch> entryPointScan() {
         List<PEidRuleMatch> result;
-        List<SignatureScanner.SignatureMatch> matches = SignatureScanner.newInstance().scanAll(pedata.getFile(), true);
-        result = toPeidRuleMatches(toPatternMatches(matches), "Entry Point", "PEiD");
+        List<PatternMatch> matches = SignatureScanner.newInstance().scanAll(pedata.getFile(), true)
+                .stream()
+                .map(this::toPatternMatch)
+                .collect(Collectors.toList());
+        result = toPeidRuleMatches(matches, "Entry Point", "PEiD");
         return result;
     }
 
@@ -47,8 +49,11 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
         List<PEidRuleMatch> result = new ArrayList<>();
         try {
             long offset = overlay.getOffset();
-            List<SignatureScanner.SignatureMatch> overlayMatches = new SignatureScanner(SignatureScanner.loadOverlaySigs()).scanAt(pedata.getFile(), offset);
-            List<PEidRuleMatch> oMatch = toPeidRuleMatches(toPatternMatches(overlayMatches), "Overlay", "Filetype");
+            List<PatternMatch> overlayMatches = pedata.getPeData().getOverlaySignatures()
+                    .stream()
+                    .map(this::toPatternMatch)
+                    .collect(Collectors.toList());
+            List<PEidRuleMatch> oMatch = toPeidRuleMatches(overlayMatches, "Overlay", "Filetype");
             result.addAll(oMatch);
         } catch (IOException e) {
             LOGGER.error("something went wrong while scanning the overlay " + e);
@@ -57,18 +62,18 @@ public class PEidScanner extends SwingWorker<List<PEidRuleMatch>, Void> {
     }
 
     private List<PEidRuleMatch> resourceScan() {
-        List<PatternMatch> resMatches = new ArrayList<>();
-        for (Resource r : pedata.getResources()) {
-            long resOffset = r.rawBytesLocation().from();
-            List<SignatureScanner.SignatureMatch> filetypes = FileTypeScanner.apply(pedata.getFile()).scanAt(resOffset);
-            resMatches.addAll(toPatternMatches(filetypes));
-        }
-        return toPeidRuleMatches(resMatches, "Resource", "Filetype");
+        List<PatternMatch> resSigs = pedata.getPeData().getResourceSignatures().stream().map(this::toPatternMatch).collect(Collectors.toList());
+        return toPeidRuleMatches(resSigs, "Resource", "Filetype");
     }
 
-
-    private List<PatternMatch> toPatternMatches(List<SignatureScanner.SignatureMatch> matches){
-        return matches.stream().map(m -> toPatternMatch(m)).collect(Collectors.toList());
+    private PatternMatch toPatternMatch(MatchedSignature m) {
+        String rulename = m.getName();
+        if (rulename.startsWith("[")) {
+            rulename = rulename.substring(1, rulename.length() - 1);
+        }
+        String pattern = m.getPattern();
+        long offset = m.getAddress();
+        return new PatternMatch(offset, rulename, pattern);
     }
 
     private PatternMatch toPatternMatch(SignatureScanner.SignatureMatch m) {
