@@ -95,15 +95,31 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
 
     private void stdInHandling(Process process, List<YaraRuleMatch> matches) throws IOException {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            List<PatternMatch> patterns = new ArrayList<>();
+            List<String> lines = new ArrayList<>();
             String line;
             while ((line = reader.readLine()) != null) {
-                patterns = scanLine(matches, patterns, line);
+                lines.add(line);
             }
+            matches.addAll(parseOutput(lines));
         }
     }
 
-    private List<PatternMatch> scanLine(List<YaraRuleMatch> matches, List<PatternMatch> patterns, String line) {
+    /**
+     * Parses the output of yara -s
+     *
+     * @param lines the lines yara printed to stdout
+     * @return the matched rules with their patterns
+     */
+    static List<YaraRuleMatch> parseOutput(List<String> lines) {
+        List<YaraRuleMatch> matches = new ArrayList<>();
+        List<PatternMatch> patterns = new ArrayList<>();
+        for (String line : lines) {
+            patterns = scanLine(matches, patterns, line);
+        }
+        return matches;
+    }
+
+    private static List<PatternMatch> scanLine(List<YaraRuleMatch> matches, List<PatternMatch> patterns, String line) {
         if (isRuleName(line)) {
             String rulename = parseRulename(line);
             patterns = new ArrayList<>(); // fresh patterns
@@ -115,7 +131,7 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
         return patterns;
     }
 
-    private PatternMatch parsePattern(String line) {
+    private static PatternMatch parsePattern(String line) {
         assert isPattern(line); // make sure the pattern is 0xcafebabe:...:...
         String[] split = line.split(":");
         String longStr = split[0].substring(2);// remove '0x'
@@ -125,12 +141,12 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
         return new PatternMatch(offset, name, content);
     }
 
-    private boolean isPattern(String line) {
+    private static boolean isPattern(String line) {
         return line.startsWith("0x") && line.contains(":$") &&
                 line.split(":").length >= 3 && isLongHex(line.split(":\\$")[0]);
     }
 
-    private boolean isLongHex(String s) {
+    private static boolean isLongHex(String s) {
         if (s.startsWith("0x")) {
             return isLongHex(s.substring(2));
         }
@@ -143,12 +159,12 @@ class YaraScanner extends SwingWorker<List<YaraRuleMatch>, Void> {
         }
     }
 
-    private String parseRulename(String line) {
+    private static String parseRulename(String line) {
         assert isRuleName(line);
         return line.split(" ")[0];
     }
 
-    private boolean isRuleName(String line) {
+    private static boolean isRuleName(String line) {
         return !isPattern(line) && line.split(" ").length >= 2;
     }
 

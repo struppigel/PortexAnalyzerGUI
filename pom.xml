@@ -6,7 +6,7 @@
 
     <groupId>com.github.struppigel</groupId>
     <artifactId>PortexAnalyzerGUI</artifactId>
-    <version>0.13.2</version>
+    <version>0.13.3</version>
 
     <build>
         <resources>
@@ -27,7 +27,7 @@
                     <configuration>
                         <archive>
                             <manifest>
-                                <mainClass>com.github.struppigel.gui.Starter</mainClass>
+                                <mainClass>io.github.struppigel.gui.Starter</mainClass>
                             </manifest>
                             <manifestEntries>
                                 <Multi-Release>true</Multi-Release>
@@ -40,6 +40,18 @@
                 </execution>
             </executions>
         </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.5.4</version>
+            <configuration>
+                <systemPropertyVariables>
+                    <java.awt.headless>true</java.awt.headless>
+                    <portex.testfiles>${portex.testfiles}</portex.testfiles>
+                    <project.version>${project.version}</project.version>
+                </systemPropertyVariables>
+            </configuration>
+        </plugin>
         </plugins>
     </build>
 
@@ -47,7 +59,21 @@
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- PE samples are never committed, tests read them from the local PortEx corpus -->
+        <portex.testfiles>${project.basedir}/../PortEx/portextestfiles</portex.testfiles>
     </properties>
+    <profiles>
+        <!-- compile against the Java 8 API when building with a newer JDK -->
+        <profile>
+            <id>jdk9+</id>
+            <activation>
+                <jdk>[9,)</jdk>
+            </activation>
+            <properties>
+                <maven.compiler.release>8</maven.compiler.release>
+            </properties>
+        </profile>
+    </profiles>
     <dependencies>
         <dependency>
             <groupId>net.ifok.image</groupId>
@@ -72,7 +98,13 @@
         <dependency>
             <groupId>io.github.struppigel</groupId>
             <artifactId>portex_2.12</artifactId>
-            <version>5.0.6</version>
+            <version>5.0.7</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.4</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     

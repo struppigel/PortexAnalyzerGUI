@@ -24,7 +24,7 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 
 ## Supported OS and JRE
 
-I test this program on Linux and Windows. But it should work on any OS with JRE version 9 or higher.
+I test this program on Linux and Windows. But it should work on any OS with JRE version 24 or higher.
 
 ## Future
 

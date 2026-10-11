@@ -245,7 +245,7 @@ public class FullPEData {
     }
 
     public boolean hasIcons() {
-        return resources.stream().anyMatch(r -> IconParser.isGroupIcon(r));
+        return resources.stream().anyMatch(IconParser::isGroupIcon);
     }
 
     public String getReHintsReport() {
@@ -289,19 +289,21 @@ public class FullPEData {
         if(clr.isPresent()) {
             Optional<OptimizedStream> optStream = clr.get().getMetadataRoot().maybeGetOptimizedStream();
             if (optStream.isPresent()) {
-                java.util.Optional<CLRTable> clrTable = optStream.get().getCLRTables().stream().filter(t -> name.contains(t.getTableName())).findFirst();
-                return clrTable;
+                // compare full names, e.g. "0x23 AssemblyRef", because table names may contain other table names
+                return optStream.get().getCLRTables().stream().filter(t -> name.equals(clrTableName(t))).findFirst();
             }
         }
         return Optional.empty();
     }
 
+    // same format as the keys of PEData.loadCLRTables()
+    private static String clrTableName(CLRTable table) {
+        return String.format("%0#4x %s", table.getIndex(), table.getTableName());
+    }
+
     public long getClrTableOffset(String tableName) {
         java.util.Optional<CLRTable> clrTable = getClrTableForName(tableName);
-        if(clrTable.isPresent()) {
-            return clrTable.get().getRawOffset();
-        }
-        return OFFSET_DEFAULT;
+        return clrTable.map(CLRTable::getRawOffset).orElse(OFFSET_DEFAULT);
     }
 
     public List<Object[]> getDotNetStreamHeaderEntries() {

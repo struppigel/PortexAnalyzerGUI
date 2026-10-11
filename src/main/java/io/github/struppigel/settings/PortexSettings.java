@@ -33,20 +33,33 @@ import static io.github.struppigel.settings.PortexSettingsKey.*;
 public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
     private static final Logger LOGGER = LogManager.getLogger();
-    private final URL appPath = this.getClass().getProtectionDomain().getCodeSource().getLocation();
     private static final String SETTINGS_FILE_NAME = "settings.ini";
     private static final String SETTINGS_DELIMITER = ":::";
-    private File settingsFile;
+    private final File settingsFile;
 
     public PortexSettings() {
+        this(defaultSettingsFile());
+    }
+
+    /**
+     * Uses the given settings file instead of the one next to the application.
+     *
+     * @param settingsFile the file to read the settings from and write them to
+     */
+    public PortexSettings(File settingsFile) {
+        this.settingsFile = settingsFile;
+        loadSettings();
+    }
+
+    private static File defaultSettingsFile() {
+        URL appPath = PortexSettings.class.getProtectionDomain().getCodeSource().getLocation();
         try {
             File app = new File(appPath.toURI());
             File folder = app.getAbsoluteFile();
             if(!folder.isDirectory()) { // different behaviour Win vs Linux here
                 folder = folder.getParentFile();
             }
-            settingsFile = Paths.get(folder.getAbsolutePath(), SETTINGS_FILE_NAME).toFile();
-            loadSettings();
+            return Paths.get(folder.getAbsolutePath(), SETTINGS_FILE_NAME).toFile();
         } catch (URISyntaxException e) {
             LOGGER.fatal(e); // must never happen
             throw new RuntimeException(e);
@@ -108,6 +121,29 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
         new SettingsWriter(settingsFile, map).execute();
     }
 
+    /**
+     * Writes the settings synchronously, unlike {@link #writeSettings()}.
+     */
+    void writeSettingsNow() throws IOException {
+        write(settingsFile, new HashMap<>(this));
+    }
+
+    private static void write(File settingsFile, Map<PortexSettingsKey, String> map) throws IOException {
+        try {
+            settingsFile.delete();
+            settingsFile.createNewFile();
+            try (PrintStream out = new PrintStream(new FileOutputStream(settingsFile))) {
+                for (Map.Entry<PortexSettingsKey, String> entry : map.entrySet()) {
+                    out.println(entry.getKey() + SETTINGS_DELIMITER + entry.getValue().trim());
+                }
+                LOGGER.info("Settings written to " + settingsFile.getAbsolutePath());
+            }
+        } catch (IOException e) {
+            LOGGER.error("problem with writing " + settingsFile);
+            throw e;
+        }
+    }
+
     private static class SettingsWriter extends SwingWorker<Void, Void> {
 
         private final File settingsFile;
@@ -120,19 +156,7 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
         @Override
         protected Void doInBackground() throws Exception {
-            try {
-                settingsFile.delete();
-                settingsFile.createNewFile();
-                try (PrintStream out = new PrintStream(new FileOutputStream(settingsFile))) {
-                    for (Map.Entry<PortexSettingsKey, String> entry : map.entrySet()) {
-                        out.println(entry.getKey() + SETTINGS_DELIMITER + entry.getValue().trim());
-                    }
-                    LOGGER.info("Settings written to " + settingsFile.getAbsolutePath());
-                }
-            } catch (IOException e) {
-                LOGGER.error("problem with writing " + settingsFile);
-                throw e;
-            }
+            write(settingsFile, map);
             return null;
         }
     }

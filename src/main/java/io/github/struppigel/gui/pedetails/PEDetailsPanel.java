@@ -43,6 +43,7 @@ import org.apache.logging.log4j.Logger;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.dnd.DropTarget;
 import java.awt.image.BufferedImage;
@@ -78,6 +79,7 @@ public class PEDetailsPanel extends JPanel {
      * Contains the tablePanel, tabbedPanel and descriptionField
      */
     private final JPanel cardPanel = new JPanel(new CardLayout());
+    private String visibleCardName;
 
     /**
      * Contains the tables
@@ -107,7 +109,7 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setText("Drop file here");
         descriptionField.setEditable(false);
         descriptionField.setDropTarget(this.getDropTarget());
-        descriptionField.setDragEnabled(true);
+        enableDrag(descriptionField);
         descriptionField.setLineWrap(true);
         JScrollPane scrollPaneDescription = new JScrollPane(descriptionField);
 
@@ -129,7 +131,7 @@ public class PEDetailsPanel extends JPanel {
         // description + dump button
         descriptionWithButtonArea.setText("");
         descriptionWithButtonArea.setEditable(false);
-        descriptionWithButtonArea.setDragEnabled(true);
+        enableDrag(descriptionWithButtonArea);
         descriptionWithButtonArea.setDropTarget(this.getDropTarget());
         descriptionWithButtonArea.setLineWrap(true);
         JPanel descriptionAndButtonWrapperPanel = new JPanel();
@@ -156,6 +158,13 @@ public class PEDetailsPanel extends JPanel {
         add(cardPanel, BorderLayout.CENTER);
 
         showDescriptionPanel();
+    }
+
+    // drag support needs a display, which is not available in headless mode, e.g., in tests
+    private static void enableDrag(JTextComponent textComponent) {
+        if (!GraphicsEnvironment.isHeadless()) {
+            textComponent.setDragEnabled(true);
+        }
     }
 
     private JPanel initSaveIconsButtonPanel() {
@@ -245,6 +254,44 @@ public class PEDetailsPanel extends JPanel {
         }
     }
 
+    /**
+     * Writes the bytes of the input file from offset 0 until the end offset (exclusive) to the output file.
+     */
+    static void writeUntil(File in, long endOffset, File outFile) throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(in, "r");
+             FileOutputStream out = new FileOutputStream(outFile)) {
+            raf.seek(0);
+            byte[] buffer = new byte[2048];
+            int bytesRead;
+            long totalBytesRead = 0;
+            while ((bytesRead = raf.read(buffer)) != -1) {
+                // end was reached, we calculate the rest of the buffer
+                if (totalBytesRead + bytesRead > endOffset) {
+                    int bytesToWrite = (int) (endOffset - totalBytesRead);
+                    out.write(buffer, 0, bytesToWrite);
+                    break;
+                }
+                out.write(buffer, 0, bytesRead);
+                totalBytesRead += bytesRead;
+            }
+        }
+    }
+
+    /**
+     * Writes the bytes of the input file from the start offset until the end of the file to the output file.
+     */
+    static void writeFrom(File in, long startOffset, File outFile) throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(in, "r");
+             FileOutputStream out = new FileOutputStream(outFile)) {
+            raf.seek(startOffset);
+            byte[] buffer = new byte[2048];
+            int bytesRead;
+            while ((bytesRead = raf.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+    }
+
     private class RemoveOverlayWorker extends SwingWorker<String, Void> {
 
         private final String outFile;
@@ -258,22 +305,8 @@ public class PEDetailsPanel extends JPanel {
             String resultMessage = "something unknown went wrong";
             File file = new File(outFile);
             if(!file.isDirectory()) {
-                try (RandomAccessFile raf = new RandomAccessFile(peData.getFile(), "r");
-                     FileOutputStream out = new FileOutputStream(outFile)) {
-                    long endOffset = peData.getOverlay().getOffset();
-                    raf.seek(0);
-                    byte[] buffer = new byte[2048];
-                    int bytesRead;
-                    long totalBytesRead = 0;
-                    while ((bytesRead = raf.read(buffer)) != -1) {
-                        // end was reached, we calculate the rest of the buffer
-                        if (totalBytesRead + bytesRead > endOffset) {
-                            int bytesToWrite = (int) (endOffset - totalBytesRead);
-                            out.write(buffer, 0, bytesToWrite);
-                            break;
-                        }
-                        out.write(buffer, 0, bytesRead);
-                    }
+                try {
+                    writeUntil(peData.getFile(), peData.getOverlay().getOffset(), file);
                     resultMessage = "success";
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -320,15 +353,8 @@ public class PEDetailsPanel extends JPanel {
             String resultMessage = "something unknown went wrong";
             File file = new File(outFile);
             if(!file.isDirectory()) {
-                try (RandomAccessFile raf = new RandomAccessFile(peData.getFile(), "r");
-                     FileOutputStream out = new FileOutputStream(outFile)) {
-                    long offset = peData.getOverlay().getOffset();
-                    raf.seek(offset);
-                    byte[] buffer = new byte[2048];
-                    int bytesRead;
-                    while ((bytesRead = raf.read(buffer)) != -1) {
-                        out.write(buffer, 0, bytesRead);
-                    }
+                try {
+                    writeFrom(peData.getFile(), peData.getOverlay().getOffset(), file);
                     resultMessage = "success";
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -626,52 +652,50 @@ public class PEDetailsPanel extends JPanel {
         signaturesPanel.setDropTarget(dt);
     }
 
+    private void showCard(String name, boolean rightPanelVisible) {
+        ((CardLayout) cardPanel.getLayout()).show(cardPanel, name);
+        rightPanel.setVisible(rightPanelVisible);
+        visibleCardName = name;
+        LOGGER.debug("Card panel set to " + name);
+    }
+
+    /**
+     * @return the name of the card that is currently shown, e.g., TABLE or DESCRIPTION
+     */
+    String getVisibleCardName() {
+        return visibleCardName;
+    }
+
     private void showDescriptionPanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "DESCRIPTION");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to DESCRIPTION");
+        showCard("DESCRIPTION", true);
     }
 
     private void showDescriptionButtonPanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "DESCBUTTON");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to DESCBUTTON");
+        showCard("DESCBUTTON", true);
     }
 
     private void showTablePanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABLE");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to TABLE");
+        showCard("TABLE", true);
     }
 
     private void showSectionPanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "SECTIONS");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to SECTION");
+        showCard("SECTIONS", true);
     }
 
     private void showIconPanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "ICONS");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to ICONS");
+        showCard("ICONS", true);
     }
 
     private void showTabbedPanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "TABBED");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to TABBED");
+        showCard("TABBED", true);
     }
 
     private void showSignaturesPanel() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "SIGNATURES");
-        rightPanel.setVisible(true);
-        LOGGER.debug("Card panel set to SIGNATURES");
+        showCard("SIGNATURES", true);
     }
 
     public void showVisualization() {
-        ((CardLayout) cardPanel.getLayout()).show(cardPanel, "VISUALIZATION");
-        rightPanel.setVisible(false);
-        LOGGER.debug("Card panel set to VISUALIZATION");
+        showCard("VISUALIZATION", false);
     }
 
     public void showSectionTable() {
@@ -757,7 +781,7 @@ public class PEDetailsPanel extends JPanel {
         cleanUpTablePanel();
         JTextArea t = new JTextArea(text); // if you end up using this again, create a class instead
         t.setEditable(false);
-        t.setDragEnabled(true);
+        enableDrag(t);
         t.setLineWrap(true);
         tablePanel.add(new JScrollPane(t));
         PEFieldsTable table = new PEFieldsTable(isHexEnabled);

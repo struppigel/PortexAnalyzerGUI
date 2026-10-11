@@ -23,6 +23,7 @@ import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.event.TableModelEvent;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.Vector;
@@ -74,6 +75,8 @@ public class PEFieldsTable extends JTable {
         if (row == -1) return null;
         Vector vRow = (Vector) model.getDataVector().elementAt(row);
         Object offset = vRow.elementAt(previewOffsetColumn);
+        // rows without offset, e.g., "no matches found"
+        if (!(offset instanceof Long)) return null;
         return (Long) offset;
     }
 
@@ -94,13 +97,48 @@ public class PEFieldsTable extends JTable {
 
     public static class PETableModel extends DefaultTableModel {
 
+        // cached because the column class is requested for every rendered cell
+        private Class<?>[] columnClasses;
+
+        @Override
+        public void fireTableChanged(TableModelEvent e) {
+            columnClasses = null;
+            super.fireTableChanged(e);
+        }
+
+        /**
+         * Returns the class that all values of the column have, so that sorting compares values of the same type.
+         * Returns Object.class if the column has no values or values of different types, e.g., Integer hints and
+         * empty strings in the imports table.
+         */
         @Override
         public Class<?> getColumnClass(int columnIndex) {
-            if (this.getColumnCount() < columnIndex || this.getRowCount() == 0) {
+            if (columnIndex < 0 || columnIndex >= getColumnCount()) {
                 return Object.class;
             }
-            Class clazz = getValueAt(0, columnIndex).getClass();
-            return clazz;
+            if (columnClasses == null || columnClasses.length != getColumnCount()) {
+                columnClasses = determineColumnClasses();
+            }
+            return columnClasses[columnIndex];
+        }
+
+        private Class<?>[] determineColumnClasses() {
+            Class<?>[] classes = new Class<?>[getColumnCount()];
+            for (int column = 0; column < classes.length; column++) {
+                Class<?> common = null;
+                for (int row = 0; row < getRowCount(); row++) {
+                    Object value = getValueAt(row, column);
+                    if (value == null) continue;
+                    if (common == null) {
+                        common = value.getClass();
+                    } else if (common != value.getClass()) {
+                        common = Object.class;
+                        break;
+                    }
+                }
+                classes[column] = common == null ? Object.class : common;
+            }
+            return classes;
         }
     }
 
@@ -113,7 +151,9 @@ public class PEFieldsTable extends JTable {
         }
         @Override
         public void setValue(Object value){
-            if(value == null) {
+            if(value == null || (value.getClass() != Long.class && value.getClass() != Integer.class)) {
+                // the renderer is reused for all cells, so the text must always be set
+                super.setValue(value);
                 return;
             }
             if(value.getClass() == Long.class) {
