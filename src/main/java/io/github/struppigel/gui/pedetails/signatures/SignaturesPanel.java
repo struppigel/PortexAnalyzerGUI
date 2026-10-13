@@ -20,11 +20,7 @@ package io.github.struppigel.gui.pedetails.signatures;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.PEFieldsTable;
 import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
-import io.github.struppigel.gui.utils.PortexSwingUtils;
 import io.github.struppigel.gui.utils.WorkerKiller;
-import io.github.struppigel.gui.utils.WriteSettingsWorker;
-import io.github.struppigel.settings.PortexSettings;
-import io.github.struppigel.settings.PortexSettingsKey;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -32,7 +28,6 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
@@ -40,41 +35,20 @@ import java.util.Vector;
 public class SignaturesPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JProgressBar scanRunningBar = new JProgressBar();
-    private final PortexSettings settings;
     private final FileContentPreviewPanel previewPanel;
     private FullPEData pedata;
 
-    private String rulePath; // TODO set a default path
-    private String yaraPath;
-
-    // e.g. Yara|PEiD, XORedPE, Full file|EP
+    // e.g. PEiD, Filetype
     private final String[] summaryHeaders = {"Source", "Match name", "Scan mode"};
 
-    //e.g. XORedPE, "This program", "0xcafebabe", "Resource"
+    //e.g. "This program", "0xcafebabe", "Resource"
     private final String[] patternHeaders = {"Match name", "Pattern name", "Pattern content", "Offset", "Location"};
     private boolean hexEnabled = true;
-    private boolean ignoreYaraScan = true;
-    private JTextField yaraPathTextField = new JTextField(30);
-    private JTextField rulePathTextField = new JTextField(30);
 
-    private List<YaraRuleMatch> yaraResults = null;
-    // TODO put this here in result table!
     private List<PEidRuleMatch> peidResults = null;
-    public SignaturesPanel(PortexSettings settings, FileContentPreviewPanel previewPanel) {
-        this.settings = settings;
-        this.previewPanel = previewPanel;
-        applyLoadedSettings();
-    }
 
-    private void applyLoadedSettings() {
-        if(settings.containsKey(PortexSettingsKey.YARA_PATH)) {
-            yaraPath = settings.get(PortexSettingsKey.YARA_PATH);
-            yaraPathTextField.setText(yaraPath);
-        }
-        if(settings.containsKey(PortexSettingsKey.YARA_SIGNATURE_PATH)) {
-            rulePath = settings.get(PortexSettingsKey.YARA_SIGNATURE_PATH);
-            rulePathTextField.setText(rulePath);
-        }
+    public SignaturesPanel(FileContentPreviewPanel previewPanel) {
+        this.previewPanel = previewPanel;
     }
 
     private void initProgressBar() {
@@ -116,11 +90,8 @@ public class SignaturesPanel extends JPanel {
         // set up buttons
         JPanel buttonPanel = new JPanel();
         JButton rescan = new JButton("Rescan");
-        JButton pathSettings = new JButton("Settings");
         buttonPanel.add(rescan);
-        buttonPanel.add(pathSettings);
-        pathSettings.addActionListener(e -> requestPaths());
-        rescan.addActionListener(e -> scan(false));
+        rescan.addActionListener(e -> scan());
 
         this.add(buttonPanel, BorderLayout.SOUTH);
 
@@ -130,7 +101,6 @@ public class SignaturesPanel extends JPanel {
 
     private void fillTableModelsWithData(DefaultTableModel sumModel, DefaultTableModel patModel) {
         List<RuleMatch> allResults = new ArrayList<>();
-        if(yaraResults != null) allResults.addAll(yaraResults);
         if(peidResults != null) allResults.addAll(peidResults);
         if(allResults.isEmpty()) {
             allResults.add(new EmptyRuleMatch());
@@ -140,79 +110,6 @@ public class SignaturesPanel extends JPanel {
             for (Object[] row : match.toPatternRows()) {
                 patModel.addRow(row);
             }
-        }
-    }
-
-    void requestPaths() {
-        this.removeAll();
-
-        JPanel tablePanel = new JPanel();
-        tablePanel.setLayout(new GridLayout(0, 1));
-
-        JButton yaraPathButton = new JButton("...");
-        JButton rulePathButton = new JButton("...");
-
-        JPanel demand = new JPanel();
-        demand.add(new JLabel("Add your yara and signature paths for signature scanning"));
-        tablePanel.add(demand);
-        JPanel firstRow = new JPanel();
-        firstRow.setLayout(new FlowLayout());
-        firstRow.add(new JLabel("Yara path:"));
-        firstRow.add(yaraPathTextField);
-        firstRow.add(yaraPathButton);
-        tablePanel.add(firstRow);
-        JPanel secondRow = new JPanel();
-        secondRow.setLayout(new FlowLayout());
-        secondRow.add(new JLabel("Signature path:"));
-        secondRow.add(rulePathTextField);
-        secondRow.add(rulePathButton);
-        tablePanel.add(secondRow);
-        JButton scanButton = new JButton("Scan");
-        JPanel thirdRow = new JPanel();
-        thirdRow.add(scanButton);
-        tablePanel.add(thirdRow);
-        setButtonListenersForRequestPath(scanButton, yaraPathButton, rulePathButton);
-
-        this.setLayout(new BorderLayout());
-        this.add(tablePanel, BorderLayout.NORTH);
-        this.add(Box.createVerticalGlue(), BorderLayout.CENTER);
-        revalidate();
-        repaint();
-    }
-
-    private void setButtonListenersForRequestPath(JButton scanButton, JButton yaraPathButton, JButton rulePathButton) {
-
-        scanButton.addActionListener(e -> {
-            // this button is used in settings dialog and acts also as save button
-            yaraPath = yaraPathTextField.getText();
-            rulePath = rulePathTextField.getText();
-            writeSettings();
-            scan(true);
-        });
-
-        yaraPathButton.addActionListener(e -> {
-            String result = PortexSwingUtils.getOpenFileNameFromUser(this);
-            if(result != null) {
-                yaraPath = result;
-                yaraPathTextField.setText(yaraPath);
-            }
-
-
-        });
-        rulePathButton.addActionListener(e -> {
-            String result = PortexSwingUtils.getOpenFileNameFromUser(this);
-            if(result != null) {
-                rulePath = result;
-                rulePathTextField.setText(rulePath);
-            }
-        });
-    }
-
-    private void writeSettings() {
-        if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
-            settings.put(PortexSettingsKey.YARA_PATH, yaraPath);
-            settings.put(PortexSettingsKey.YARA_SIGNATURE_PATH, rulePath);
-            new WriteSettingsWorker(settings).execute();
         }
     }
 
@@ -260,40 +157,16 @@ public class SignaturesPanel extends JPanel {
         return -1;
     }
 
-    private void scan(boolean warnUser) {
-        if (yaraPath != null && rulePath != null && new File(yaraPath).exists() && new File(rulePath).exists()) {
-            initProgressBar();
-            this.ignoreYaraScan = false;
-            YaraScanner yaraScanner = new YaraScanner(this, pedata, yaraPath, rulePath, settings);
-            PEidScanner peidScanner = new PEidScanner(this, pedata);
-            yaraScanner.execute();
-            peidScanner.execute();
-            WorkerKiller.getInstance().addWorker(yaraScanner);
-            WorkerKiller.getInstance().addWorker(peidScanner);
-        } else {
-            if(warnUser) {
-                String message = "Cannot scan";
-                if(yaraPath == null) { message += ", because no yara path set"; }
-                else if(rulePath == null) { message += ", because no rule path set"; }
-                else if(!new File(yaraPath).exists()) { message += ", because yara path is not an existing file: " + yaraPath; }
-                else if(!new File(rulePath).exists()) { message += ", because rule path is not an existing file: " + rulePath; }
-                else { message += ". The reason is unknown :("; }
-                JOptionPane.showMessageDialog(this,
-                        message,
-                        "Cannot scan with yara",
-                        JOptionPane.WARNING_MESSAGE);
-            }
-            initProgressBar();
-            this.ignoreYaraScan = true;
-            PEidScanner peidScanner = new PEidScanner(this, pedata);
-            peidScanner.execute();
-            WorkerKiller.getInstance().addWorker(peidScanner);
-        }
+    private void scan() {
+        initProgressBar();
+        PEidScanner peidScanner = new PEidScanner(this, pedata);
+        peidScanner.execute();
+        WorkerKiller.getInstance().addWorker(peidScanner);
     }
 
     public void setPeData(FullPEData data) {
         this.pedata = data;
-        scan(false);
+        scan();
     }
 
     public void setHexEnabled(boolean hexEnabled) {
@@ -304,16 +177,6 @@ public class SignaturesPanel extends JPanel {
 
     public void buildPEiDTables(List<PEidRuleMatch> signatureMatches) {
         this.peidResults = signatureMatches;
-        if(yaraResults != null || ignoreYaraScan) {
-            buildTables();
-        }
-    }
-
-
-    public void buildYaraTables(List<YaraRuleMatch> scanResults) {
-        this.yaraResults = scanResults;
-        if(peidResults != null) {
-            buildTables();
-        }
+        buildTables();
     }
 }

@@ -19,6 +19,7 @@ package io.github.struppigel.gui;
 
 import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
 import io.github.struppigel.gui.pedetails.PEDetailsPanel;
+import io.github.struppigel.gui.utils.AppIcon;
 import io.github.struppigel.gui.utils.PELoadWorker;
 import io.github.struppigel.gui.utils.PortexSwingUtils;
 import io.github.struppigel.gui.utils.ThemeIcon;
@@ -39,6 +40,7 @@ import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetDragEvent;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ItemEvent;
 import java.io.BufferedReader;
@@ -94,6 +96,7 @@ public class MainFrame extends JFrame {
 
     public MainFrame(PortexSettings settings) {
         super("Portex Analyzer v. " + AboutFrame.version);
+        AppIcon.applyTo(this);
 
         this.settings = settings;
         this.darkTheme = ThemeIcon.isDarkTheme(settings);
@@ -344,6 +347,7 @@ public class MainFrame extends JFrame {
 
     private void initProgressBar() {
         this.progressBarFrame = new JFrame("Loading PE file");
+        AppIcon.applyTo(progressBarFrame);
         JPanel panel = new JPanel();
         this.progressBar = new JProgressBar();
         progressBar.setPreferredSize(new Dimension(250, 25));
@@ -381,7 +385,6 @@ public class MainFrame extends JFrame {
 
     private JMenu createSettingsMenu() {
         JMenu settingsMenu = new JMenu("Settings");
-        JCheckBoxMenuItem disableYaraWarn = new JCheckBoxMenuItem("Disable Yara warnings");
         JCheckBoxMenuItem disableUpdateCheck = new JCheckBoxMenuItem("Disable update check");
         JMenu themeMenu = new JMenu("Theme");
         JRadioButtonMenuItem darkTheme = new JRadioButtonMenuItem("Dark");
@@ -392,26 +395,11 @@ public class MainFrame extends JFrame {
         themeMenu.add(darkTheme);
         themeMenu.add(brightTheme);
         disableUpdateCheck.setState(settings.valueEquals(PortexSettingsKey.DISABLE_UPDATE, "1"));
-        disableYaraWarn.setState(settings.valueEquals(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1"));
         darkTheme.setSelected(this.darkTheme);
         brightTheme.setSelected(!this.darkTheme);
 
-        settingsMenu.add(disableYaraWarn);
         settingsMenu.add(disableUpdateCheck);
         settingsMenu.add(themeMenu);
-
-        disableYaraWarn.addActionListener(e -> {
-            if(disableYaraWarn.getState()) {
-                settings.put(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1");
-            } else {
-                settings.put(PortexSettingsKey.DISABLE_YARA_WARNINGS, "0");
-            }
-            try {
-                settings.writeSettings();
-            } catch (IOException ex) {
-                LOGGER.error(e);
-            }
-        });
 
         disableUpdateCheck.addActionListener(e -> {
             if(disableUpdateCheck.getState()) {
@@ -479,7 +467,30 @@ public class MainFrame extends JFrame {
     }
 
     private class FileDropper extends DropTarget {
+        @Override
+        public synchronized void dragEnter(DropTargetDragEvent evt) {
+            if (!evt.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                evt.rejectDrag(); // e.g., text that was dragged from a text component
+            } else {
+                super.dragEnter(evt);
+            }
+        }
+
+        @Override
+        public synchronized void dragOver(DropTargetDragEvent evt) {
+            if (!evt.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                evt.rejectDrag();
+            } else {
+                super.dragOver(evt);
+            }
+        }
+
+        @Override
         public synchronized void drop(DropTargetDropEvent evt) {
+            if (!evt.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+                evt.rejectDrop();
+                return;
+            }
             try {
                 evt.acceptDrop(DnDConstants.ACTION_COPY);
                 List<File> droppedFiles = (List<File>)

@@ -6,7 +6,7 @@
 
     <groupId>com.github.struppigel</groupId>
     <artifactId>PortexAnalyzerGUI</artifactId>
-    <version>0.13.3</version>
+    <version>1.0.0</version>
 
     <build>
         <resources>

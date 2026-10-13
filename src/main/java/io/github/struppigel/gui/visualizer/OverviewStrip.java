@@ -46,6 +46,8 @@ public class OverviewStrip extends JComponent {
     static final List<Track> TRACKS = Arrays.asList(Track.BYTEPLOT, Track.ENTROPY, Track.STRUCTURE);
     private static final int CELL_SIZE = 2;
     private static final int GAP = 2;
+    private static final int MIN_MARK_HEIGHT = 8;
+    private static final int ARROW = 5;
 
     private final VisualizationModel model;
     private final int trackWidth;
@@ -54,6 +56,7 @@ public class OverviewStrip extends JComponent {
 
     private Rendered rendered;
     private RenderRequest pending;
+    private String tooltipHint;
 
     /**
      * @param model the visualization to show
@@ -169,7 +172,15 @@ public class OverviewStrip extends JComponent {
         }
         FileRegion region = model.innermostAt(offset);
         String text = "0x" + Long.toHexString(offset);
-        return region == null ? text : text + " " + region.getPath();
+        text = region == null ? text : text + " " + region.getPath();
+        return tooltipHint == null ? text : text + " (" + tooltipHint + ")";
+    }
+
+    /**
+     * @param hint what the user can do here, added to the tool tip, e.g., "double-click to open the visualization"
+     */
+    void setTooltipHint(String hint) {
+        this.tooltipHint = hint;
     }
 
     @Override
@@ -191,6 +202,62 @@ public class OverviewStrip extends JComponent {
         if (showVisibleRange) {
             paintVisibleRange(g, mapping);
         }
+        paintCurrentLocation(g, mapping);
+    }
+
+    /**
+     * Marks where in the file the user is: the selected structure, range or offset. Even a single byte gets a visible
+     * mark.
+     */
+    private void paintCurrentLocation(Graphics g, ViewMapping mapping) {
+        long start;
+        long end;
+        if (model.hasRangeSelection()) {
+            start = model.getRangeStart();
+            end = model.getRangeEnd();
+        } else if (model.getSelectedRegion() != null) {
+            start = model.getSelectedRegion().getStart();
+            end = model.getSelectedRegion().getEnd();
+        } else if (model.getSelectedOffset() >= 0) {
+            start = model.getSelectedOffset();
+            end = start + 1;
+        } else {
+            return;
+        }
+        long length = mapping.getFileLength();
+        if (start >= length) {
+            return;
+        }
+        end = Math.max(start + 1, Math.min(end, length));
+        long firstRow = mapping.rowOf(start);
+        long lastRow = mapping.rowOf(end - 1);
+        int h = (int) Math.max(MIN_MARK_HEIGHT, (lastRow - firstRow + 1) * CELL_SIZE);
+        int y = (int) Math.max(0, Math.min(getHeight() - h, firstRow * CELL_SIZE - (h - (lastRow - firstRow + 1) * CELL_SIZE) / 2));
+        int w = TRACKS.size() * trackWidth + (TRACKS.size() - 1) * GAP;
+        Color accent = UIManager.getColor("Component.accentColor");
+        Color mark = accent == null ? Color.white : lighten(accent);
+        Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            g2.setColor(new Color(mark.getRed(), mark.getGreen(), mark.getBlue(), 60));
+            g2.fillRect(0, y, w, h);
+            // a faint dark line next to a thin line in the tint of the theme
+            g2.setColor(new Color(0, 0, 0, 80));
+            g2.setStroke(new BasicStroke(3));
+            g2.drawRect(1, y + 1, w - 3, h - 3);
+            g2.setColor(new Color(mark.getRed(), mark.getGreen(), mark.getBlue(), 230));
+            g2.setStroke(new BasicStroke(1));
+            g2.drawRect(1, y + 1, w - 3, h - 3);
+            // arrows at both sides point at the place, also when the area is small
+            int middle = y + h / 2;
+            g2.fillPolygon(new int[]{0, ARROW, 0}, new int[]{middle - ARROW, middle, middle + ARROW}, 3);
+            g2.fillPolygon(new int[]{w, w - ARROW, w}, new int[]{middle - ARROW, middle, middle + ARROW}, 3);
+        } finally {
+            g2.dispose();
+        }
+    }
+
+    private static Color lighten(Color color) {
+        return new Color((color.getRed() + 255) / 2, (color.getGreen() + 255) / 2, (color.getBlue() + 255) / 2);
     }
 
     private void paintVisibleRange(Graphics g, ViewMapping mapping) {

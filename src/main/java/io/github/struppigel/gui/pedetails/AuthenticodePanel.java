@@ -19,6 +19,7 @@ package io.github.struppigel.gui.pedetails;
 
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.PEFieldsTable;
+import io.github.struppigel.gui.utils.InfoCard;
 import io.github.struppigel.gui.utils.PortexSwingUtils;
 import io.github.struppigel.parser.sections.cert.AuthenticodeCertificate;
 import io.github.struppigel.parser.sections.cert.AuthenticodeSignature;
@@ -51,7 +52,7 @@ public class AuthenticodePanel extends JPanel {
     static final String ISSUES_TAB = "Issues";
 
     private final FileContentPreviewPanel previewPanel;
-    private final JTextArea summary = new JTextArea();
+    private final InfoCard summary = new InfoCard();
     private final JTabbedPane tabs = new JTabbedPane();
     // the signature of each tab, in the order of the tabs; the other tabs follow
     private List<AuthenticodeSignature> signatures = new ArrayList<>();
@@ -60,9 +61,6 @@ public class AuthenticodePanel extends JPanel {
     public AuthenticodePanel(FileContentPreviewPanel previewPanel) {
         super(new BorderLayout());
         this.previewPanel = previewPanel;
-        summary.setEditable(false);
-        summary.setLineWrap(true);
-        summary.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         add(summary, BorderLayout.NORTH);
         add(tabs, BorderLayout.CENTER);
     }
@@ -84,7 +82,7 @@ public class AuthenticodePanel extends JPanel {
         tabs.removeAll();
         shownTable = table;
         signatures = table.getAllSignatures();
-        summary.setText(AuthenticodeTables.summary(table, verification, hexEnabled));
+        showSummary(AuthenticodeTables.summary(table, verification, hexEnabled));
         for (AuthenticodeSignature signature : signatures) {
             tabs.addTab(AuthenticodeTables.title(signature),
                     createSignatureTab(data.getFile(), signature, AuthenticodeTables.resultFor(signature, verification),
@@ -107,7 +105,7 @@ public class AuthenticodePanel extends JPanel {
 
     private void clear() {
         tabs.removeAll();
-        summary.setText("");
+        summary.clear().render();
         signatures = new ArrayList<>();
         shownTable = null;
     }
@@ -201,7 +199,29 @@ public class AuthenticodePanel extends JPanel {
     }
 
     String getSummaryText() {
-        return summary.getText();
+        return summary.getPlainText();
+    }
+
+    /**
+     * Shows the lines of the summary as rows, the integrity as a colored badge.
+     */
+    private void showSummary(String text) {
+        summary.clear();
+        for (String line : text.split("\r?\n")) {
+            int colon = line.indexOf(": ");
+            if (colon <= 0) {
+                summary.paragraph(line);
+                continue;
+            }
+            String label = line.substring(0, colon);
+            String value = line.substring(colon + 2);
+            if ("Integrity".equals(label)) {
+                summary.badgeRow(label, value, AuthenticodeTables.kindOf(value));
+            } else {
+                summary.row(label, value);
+            }
+        }
+        summary.render();
     }
 
     /**

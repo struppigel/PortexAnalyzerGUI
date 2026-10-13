@@ -3,7 +3,6 @@ package io.github.struppigel.gui.pedetails.signatures;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,15 +26,6 @@ class RuleMatchTest {
         assertEquals(2, rows.size());
         assertArrayEquals(new Object[]{"UPX", "", "E8 ??", 1L, ""}, rows.get(0));
         assertArrayEquals(new Object[]{"UPX", "", "90", 2L, ""}, rows.get(1));
-    }
-
-    @Test
-    void yaraRuleMatchRows() {
-        List<PatternMatch> patterns = Collections.singletonList(new PatternMatch(0, "$mz", "4D 5A"));
-        YaraRuleMatch match = new YaraRuleMatch("IsPE", patterns, Collections.emptyList());
-
-        assertArrayEquals(new Object[]{"Yara", "IsPE", "Full file"}, match.toSummaryRow());
-        assertArrayEquals(new Object[]{"IsPE", "$mz", "4D 5A", 0L, ""}, match.toPatternRows().get(0));
     }
 
     @Test

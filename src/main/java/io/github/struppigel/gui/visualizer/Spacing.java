@@ -21,23 +21,23 @@ import javax.swing.*;
 import javax.swing.border.Border;
 
 /**
- * The spacing that all parts of the visualization share.
+ * The spacing that all parts of the GUI share.
  */
-final class Spacing {
+public final class Spacing {
 
     /** between a panel's edge and its content */
-    static final int PAD = 8;
+    public static final int PAD = 8;
     /** between neighboring components */
-    static final int GAP = 6;
+    public static final int GAP = 6;
 
     private Spacing() {
     }
 
-    static Border padding() {
+    public static Border padding() {
         return BorderFactory.createEmptyBorder(PAD, PAD, PAD, PAD);
     }
 
-    static Border padding(int top, int left, int bottom, int right) {
+    public static Border padding(int top, int left, int bottom, int right) {
         return BorderFactory.createEmptyBorder(top, left, bottom, right);
     }
 }

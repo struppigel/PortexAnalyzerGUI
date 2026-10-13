@@ -254,6 +254,16 @@ public class VisualizationModel {
     }
 
     /**
+     * Marks the structure that the user picked in a list, and asks the views to show it if they do not.
+     *
+     * @param offset the offset that the other views describe, so that they keep their content
+     */
+    public void showRegion(FileRegion region, long offset) {
+        selectRegion(region, offset);
+        fireViewRequested(region.getStart(), true);
+    }
+
+    /**
      * Selects a range of bytes.
      */
     public void selectRange(long from, long toExclusive) {

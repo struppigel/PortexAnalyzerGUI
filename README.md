@@ -20,7 +20,7 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 * Overlay and overlay signature scanning, dump or remove overlay
 * Version information and manifest
 * Icon extraction and saving as PNG
-* Customized signature scanning via Yara. Internal signature scans using PEiD signatures and an internal filetype scanner.
+* Internal signature scans using PEiD signatures and an internal filetype scanner.
 
 ## Supported OS and JRE
 

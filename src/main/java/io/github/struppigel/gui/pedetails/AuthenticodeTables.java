@@ -17,6 +17,7 @@
  */
 package io.github.struppigel.gui.pedetails;
 
+import io.github.struppigel.gui.utils.InfoCard;
 import io.github.struppigel.parser.PhysicalLocation;
 import io.github.struppigel.parser.sections.cert.AuthenticodeCertificate;
 import io.github.struppigel.parser.sections.cert.AuthenticodeSignature;
@@ -118,6 +119,21 @@ final class AuthenticodeTables {
             line += ", signed by " + signerName(signer.get());
         }
         return line;
+    }
+
+    /**
+     * @param status the integrity as shown in the summary, e.g., "VALID, signed by Microsoft" or "Not signed"
+     * @return how to color a badge with the status
+     */
+    static InfoCard.Kind kindOf(String status) {
+        if (status.startsWith("VALID")) {
+            return InfoCard.Kind.GOOD;
+        } else if (status.startsWith("INVALID")) {
+            return InfoCard.Kind.BAD;
+        } else if (status.startsWith("UNVERIFIABLE")) {
+            return InfoCard.Kind.WARN;
+        }
+        return InfoCard.Kind.NEUTRAL;
     }
 
     /**

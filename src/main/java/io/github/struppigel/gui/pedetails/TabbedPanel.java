@@ -19,6 +19,7 @@ package io.github.struppigel.gui.pedetails;
 
 import io.github.struppigel.parser.StandardField;
 import io.github.struppigel.gui.PEFieldsTable;
+import io.github.struppigel.gui.utils.InfoCard;
 import io.github.struppigel.gui.utils.TableContent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -135,7 +136,7 @@ public class TabbedPanel extends JPanel {
     private void addTableAndDescription(JTable table, JPanel tab, String description) {
         tables.add(table);
         if(description.length() > 0) {
-            tab.add(new JScrollPane(new JTextArea(description)));
+            tab.add(new JScrollPane(new InfoCard().addText(description).render()));
         }
         JScrollPane sPane = new JScrollPane(table);
         tab.add(sPane);

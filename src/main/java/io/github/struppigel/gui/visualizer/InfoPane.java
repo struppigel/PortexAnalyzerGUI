@@ -177,6 +177,7 @@ public class InfoPane extends JPanel {
         } else if (offset < 0 || offset >= vis.getFileLength()) {
             rows.add(new String[]{null, "Point at the visualization to see the structures and bytes there."});
             rows.add(new String[]{null, "Ctrl + wheel zooms, Ctrl + G goes to an offset."});
+            rows.add(new String[]{null, "In the hex view, drag to mark bytes and press Ctrl + C to copy them."});
         } else {
             describeOffset(rows, vis, offset);
         }
@@ -456,7 +457,13 @@ public class InfoPane extends JPanel {
         @Override
         public void mouseClicked(MouseEvent e) {
             FileRegion region = regionAt(e);
-            if (region != null && e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e) && zoomAction != null) {
+            if (region == null || !SwingUtilities.isLeftMouseButton(e)) {
+                return;
+            }
+            if (e.getClickCount() == 1) {
+                // marks the structure in the views; the offset stays, so that this list keeps its content
+                model.showRegion(region, shownOffset >= 0 ? shownOffset : region.getStart());
+            } else if (e.getClickCount() == 2 && zoomAction != null) {
                 zoomAction.accept(region);
             }
         }

@@ -244,6 +244,74 @@ class InteractiveVisualizerPanelTest {
         });
     }
 
+    private Point centerOf(long offset, Track track) {
+        Point p = canvas.pixelOf(offset, track);
+        return new Point(p.x + canvas.level().cellWidth / 2, p.y + canvas.level().cellHeight / 2);
+    }
+
+    private void drag(Point from, Point to) {
+        long when = System.currentTimeMillis();
+        int button = java.awt.event.InputEvent.BUTTON1_DOWN_MASK;
+        canvas.dispatchEvent(new java.awt.event.MouseEvent(canvas, java.awt.event.MouseEvent.MOUSE_PRESSED, when,
+                button, from.x, from.y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+        canvas.dispatchEvent(new java.awt.event.MouseEvent(canvas, java.awt.event.MouseEvent.MOUSE_DRAGGED, when,
+                button, to.x, to.y, 0, false, java.awt.event.MouseEvent.BUTTON1));
+        canvas.dispatchEvent(new java.awt.event.MouseEvent(canvas, java.awt.event.MouseEvent.MOUSE_RELEASED, when,
+                0, to.x, to.y, 1, false, java.awt.event.MouseEvent.BUTTON1));
+    }
+
+    @Test
+    void draggingInTheHexViewMarksBytesAndCopiesThemWithoutSpaces() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            canvas.zoom(100, null);
+            canvas.setFirstRow(0);
+            assertTrue(canvas.level().hex);
+
+            drag(centerOf(0, Track.HEX), centerOf(1, Track.HEX));
+
+            assertTrue(model.hasRangeSelection());
+            assertEquals(0, model.getRangeStart());
+            assertEquals(2, model.getRangeEnd());
+            assertEquals(2, canvas.markedByteCount());
+            assertEquals("4d5a", canvas.markedBytes(false), "'MZ' without spaces");
+            assertEquals("MZ", canvas.markedBytes(true));
+        });
+    }
+
+    @Test
+    void draggingInTheAsciiAreaMarksTheString() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            canvas.zoom(100, null);
+            canvas.setFirstRow(0);
+
+            drag(centerOf(1, Track.ASCII), centerOf(0, Track.ASCII));
+
+            assertEquals(0, model.getRangeStart(), "backwards works too");
+            assertEquals(2, model.getRangeEnd());
+            assertEquals("MZ", canvas.markedBytes(true));
+        });
+    }
+
+    @Test
+    void nothingMarkedCopiesNothing() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            assertEquals(0, canvas.markedByteCount());
+            assertNull(canvas.markedBytes(false));
+        });
+    }
+
+    @Test
+    void bytesAreCopiedAsLowerCaseHexOrPrintableCharacters() {
+        byte[] bytes = {0x5a, 0x5d, 0x00, (byte) 0xff, 0x41, 0x20};
+
+        assertEquals("5a5d00ff4120", DetailCanvas.toHex(bytes, bytes.length));
+        assertEquals("5a5d", DetailCanvas.toHex(bytes, 2));
+        assertEquals("Z]..A ", DetailCanvas.toText(bytes, bytes.length));
+    }
+
     private Point pointIn(Track track) {
         for (DetailCanvas.TrackLayout t : canvas.trackLayouts()) {
             if (t.track == track) {
@@ -451,6 +519,43 @@ class InteractiveVisualizerPanelTest {
             panel.getHexWidthChooser().setSelectedIndex(0);
             assertEquals(Arrays.asList(16, 0), reported);
             assertEquals(0, canvas.getHexBytesPerLine());
+        });
+    }
+
+    @Test
+    void clickingAStructureInTheListMarksItInTheViews() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            model.select(peSignature());
+            InfoPane info = panel.getInfoPane();
+            info.updateNow();
+            JList<FileRegion> list = info.getRegionList();
+            assertTrue(list.getModel().getSize() > 1);
+            int shown = list.getModel().getSize();
+            // the outermost structure, the innermost one is already selected
+            FileRegion first = list.getModel().getElementAt(shown - 1);
+            long selectedBefore = model.getSelectedOffset();
+            BufferedImage before = canvas.renderToImage();
+            Rectangle cell = list.getCellBounds(shown - 1, shown - 1);
+
+            list.dispatchEvent(new java.awt.event.MouseEvent(list, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0,
+                    cell.x + 5, cell.y + 5, 1, false, java.awt.event.MouseEvent.BUTTON1));
+
+            assertSame(first, model.getSelectedRegion());
+            assertEquals(selectedBefore, model.getSelectedOffset(), "the list keeps its offset");
+            info.updateNow();
+            assertEquals(shown, list.getModel().getSize(), "the list keeps its content");
+            BufferedImage after = canvas.renderToImage();
+            boolean changed = false;
+            for (int y = 0; y < before.getHeight() && !changed; y++) {
+                for (int x = 0; x < before.getWidth(); x++) {
+                    if (before.getRGB(x, y) != after.getRGB(x, y)) {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            assertTrue(changed, "the structure is marked in the detail view");
         });
     }
 

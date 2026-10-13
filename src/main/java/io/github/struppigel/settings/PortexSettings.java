@@ -81,8 +81,8 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
                                 String value = pair[1];
                                 this.put(key, value);
                             } catch (IllegalArgumentException e) {
-                                LOGGER.warn("Non-existing settings key read! Will be ignored " + e);
-                                e.printStackTrace();
+                                // e.g., the keys of features that were removed
+                                LOGGER.info("Ignoring unknown settings key " + pair[0].trim());
                             }
                         }
                     }
@@ -99,7 +99,6 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
     private void applyDefaults() {
         // apply defaults
-        applySettingIfNotSet(DISABLE_YARA_WARNINGS, "0");
         applySettingIfNotSet(DISABLE_UPDATE, "0");
         applySettingIfNotSet(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
         applySettingIfNotSet(VALUES_AS_HEX, "1");

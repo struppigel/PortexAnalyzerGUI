@@ -18,10 +18,7 @@
 package io.github.struppigel.settings;
 
 public enum PortexSettingsKey {
-    YARA_PATH,
-    YARA_SIGNATURE_PATH,
     DISABLE_UPDATE,
-    DISABLE_YARA_WARNINGS,
     // possible values are in LookAndFeelSetting
     LOOK_AND_FEEL,
     VALUES_AS_HEX,

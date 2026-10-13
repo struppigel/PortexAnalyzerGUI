@@ -56,7 +56,7 @@ public class DetailCanvas extends JComponent {
     static final int GAP = VisualizationRenderer.TRACK_GAP;
     private static final Color BACKGROUND = new Color(30, 30, 30);
     private static final Color RULER_TEXT = new Color(170, 170, 170);
-    private static final Color SELECTION_FILL = new Color(255, 255, 0, 60);
+    private static final int SELECTION_FILL_ALPHA = 85;
     private static final Color SELECTION_CELL = Color.yellow;
     private static final Color HOVER_CELL = Color.white;
     private static final Color HOVER_FILL = new Color(255, 255, 255, 70);
@@ -98,6 +98,10 @@ public class DetailCanvas extends JComponent {
     private Point dragStart;
     private long dragStartRow;
     private long rangeAnchor = -1;
+    // the area the user started marking in, decides whether Ctrl + C copies hex digits or characters
+    private Track markTrack = Track.HEX;
+    private static final long MAX_COPY_BYTES = 4L * 1024 * 1024;
+    private static final char[] LOWER_HEX = "0123456789abcdef".toCharArray();
 
     public DetailCanvas(VisualizationModel model) {
         this(model, RenderSupport.RENDER_POOL);
@@ -126,6 +130,88 @@ public class DetailCanvas extends JComponent {
         addMouseListener(mouse);
         addMouseMotionListener(mouse);
         addMouseWheelListener(mouse);
+        KeyStroke copyKey = KeyStroke.getKeyStroke(KeyEvent.VK_C, copyModifier());
+        getInputMap(WHEN_FOCUSED).put(copyKey, "copy-marked-bytes");
+        getActionMap().put("copy-marked-bytes", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                copyMarkedBytes(markTrack == Track.ASCII);
+            }
+        });
+    }
+
+    /** Ctrl, Command on macOS; the toolkit throws in headless mode, where the tests run */
+    private static int copyModifier() {
+        return GraphicsEnvironment.isHeadless() ? InputEvent.CTRL_DOWN_MASK
+                : Toolkit.getDefaultToolkit().getMenuShortcutKeyMask();
+    }
+
+    /**
+     * @return the number of marked bytes, 0 if none are marked
+     */
+    long markedByteCount() {
+        if (!model.hasRangeSelection() || model.getVisualization() == null) {
+            return 0;
+        }
+        long end = Math.min(model.getRangeEnd(), model.getVisualization().getFileLength());
+        return Math.max(0, end - model.getRangeStart());
+    }
+
+    /**
+     * @param asText the characters of the ASCII area, otherwise hex digits without spaces
+     * @return the marked bytes, null if no bytes are marked or too many to copy
+     */
+    String markedBytes(boolean asText) {
+        long count = markedByteCount();
+        if (count <= 0 || count > MAX_COPY_BYTES) {
+            return null;
+        }
+        byte[] bytes = new byte[(int) count];
+        int read;
+        try {
+            read = model.getVisualization().getSource().read(model.getRangeStart(), bytes, 0, bytes.length);
+        } catch (ByteSourceClosedException e) {
+            return null; // another file is being loaded
+        }
+        return asText ? toText(bytes, read) : toHex(bytes, read);
+    }
+
+    private void copyMarkedBytes(boolean asText) {
+        String text = markedBytes(asText);
+        if (text != null) {
+            Toolkit.getDefaultToolkit().getSystemClipboard()
+                    .setContents(new java.awt.datatransfer.StringSelection(text), null);
+        }
+    }
+
+    static String toHex(byte[] bytes, int length) {
+        char[] out = new char[length * 2];
+        for (int i = 0; i < length; i++) {
+            out[2 * i] = LOWER_HEX[(bytes[i] >> 4) & 0xf];
+            out[2 * i + 1] = LOWER_HEX[bytes[i] & 0xf];
+        }
+        return new String(out);
+    }
+
+    /**
+     * @return the characters of the bytes, bytes that are no printable ASCII characters as dots like in the ASCII area
+     */
+    static String toText(byte[] bytes, int length) {
+        char[] out = new char[length];
+        for (int i = 0; i < length; i++) {
+            int value = bytes[i] & 0xff;
+            out[i] = value >= 32 && value <= 126 ? (char) value : '.';
+        }
+        return new String(out);
+    }
+
+    private Track trackAt(Point p) {
+        for (TrackLayout t : trackLayouts()) {
+            if (p.x >= t.x && p.x < t.x + t.width) {
+                return t.track;
+            }
+        }
+        return null;
     }
 
     /**
@@ -591,6 +677,7 @@ public class DetailCanvas extends JComponent {
         paintRuler(g, mapping, level, lastRow);
         paintSelectionFill(g, layouts, mapping, level, lastRow);
         paintHexText(g, layouts, mapping, level, lastRow, textTiles);
+        paintSelectionOutline(g, layouts, mapping, level, lastRow);
         paintCellOutlines(g, layouts, mapping, level, lastRow);
     }
 
@@ -766,14 +853,96 @@ public class DetailCanvas extends JComponent {
 
     private void paintSelectionFill(Graphics g, List<TrackLayout> layouts, ViewMapping mapping, ZoomLevel level,
                                     long lastRow) {
-        g.setColor(SELECTION_FILL);
+        Color mark = selectionMark();
+        g.setColor(new Color(mark.getRed(), mark.getGreen(), mark.getBlue(), SELECTION_FILL_ALPHA));
+        for (long[] range : selectedRanges()) {
+            paintRange(g, layouts, mapping, level, lastRow, range[0], range[1]);
+        }
+    }
+
+    /**
+     * @return the selected byte ranges: the range the user marked, otherwise the parts of the selected structure
+     */
+    private List<long[]> selectedRanges() {
+        List<long[]> ranges = new ArrayList<>();
         if (model.hasRangeSelection()) {
-            paintRange(g, layouts, mapping, level, lastRow, model.getRangeStart(), model.getRangeEnd());
+            ranges.add(new long[]{model.getRangeStart(), model.getRangeEnd()});
         } else if (model.getSelectedRegion() != null) {
             for (PhysicalLocation loc : model.getSelectedRegion().getLocations()) {
-                paintRange(g, layouts, mapping, level, lastRow, loc.from(), loc.from() + loc.size());
+                ranges.add(new long[]{loc.from(), loc.from() + loc.size()});
             }
         }
+        return ranges;
+    }
+
+    /**
+     * @return the color that marks the selected bytes: a light version of the accent color of the theme
+     */
+    private static Color selectionMark() {
+        Color accent = UIManager.getColor("Component.accentColor");
+        return accent == null ? Color.yellow
+                : new Color((accent.getRed() + 255) / 2, (accent.getGreen() + 255) / 2, (accent.getBlue() + 255) / 2);
+    }
+
+    /**
+     * Draws a line around the selected bytes in every track, so that the structure stands out also where it is
+     * small or next to others.
+     */
+    private void paintSelectionOutline(Graphics g, List<TrackLayout> layouts, ViewMapping mapping, ZoomLevel level,
+                                       long lastRow) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            for (long[] range : selectedRanges()) {
+                long start = range[0];
+                long end = Math.min(range[1], mapping.getFileLength());
+                if (end <= start) {
+                    continue;
+                }
+                long startRow = mapping.rowOf(start);
+                long endRow = mapping.rowOf(end - 1);
+                if (endRow < firstRow || startRow > lastRow) {
+                    continue;
+                }
+                for (TrackLayout t : layouts) {
+                    Polygon outline = outlineOf(t, mapping, level, start, end, startRow, endRow);
+                    // a faint dark line next to a thin line in the tint of the theme
+                    g2.setColor(new Color(0, 0, 0, 80));
+                    g2.setStroke(new BasicStroke(3));
+                    g2.drawPolygon(outline);
+                    Color mark = selectionMark();
+                    g2.setColor(new Color(mark.getRed(), mark.getGreen(), mark.getBlue(), 230));
+                    g2.setStroke(new BasicStroke(1));
+                    g2.drawPolygon(outline);
+                }
+            }
+        } finally {
+            g2.dispose();
+        }
+    }
+
+    /**
+     * @return the shape of the bytes in a track: the end of the first row, whole rows, the beginning of the last row
+     */
+    private Polygon outlineOf(TrackLayout t, ViewMapping mapping, ZoomLevel level, long start, long end,
+                              long startRow, long endRow) {
+        int xStart = t.x + mapping.columnOf(start) * t.cellWidth;
+        int xEnd = t.x + (mapping.columnOf(end - 1) + 1) * t.cellWidth;
+        int xLeft = t.x;
+        int xRight = t.x + level.columns * t.cellWidth;
+        int top = pixelRow(startRow, level);
+        int firstBottom = pixelRow(startRow + 1, level);
+        int lastTop = pixelRow(endRow, level);
+        int bottom = pixelRow(endRow + 1, level);
+        if (startRow == endRow) {
+            return new Polygon(new int[]{xStart, xEnd, xEnd, xStart}, new int[]{top, top, bottom, bottom}, 4);
+        }
+        return new Polygon(new int[]{xStart, xRight, xRight, xEnd, xEnd, xLeft, xLeft, xStart},
+                new int[]{top, top, lastTop, lastTop, bottom, bottom, firstBottom, firstBottom}, 8);
+    }
+
+    // far away rows are cut off, so that large ranges do not overflow
+    private int pixelRow(long row, ZoomLevel level) {
+        return (int) Math.max(-100000, Math.min(100000, (row - firstRow) * level.cellHeight));
     }
 
     private void paintCellOutlines(Graphics g, List<TrackLayout> layouts, ViewMapping mapping, ZoomLevel level,
@@ -902,7 +1071,13 @@ public class DetailCanvas extends JComponent {
             dragged = false;
             dragStart = e.getPoint();
             dragStartRow = firstRow;
-            rangeAnchor = e.isShiftDown() ? offsetAt(e.getPoint()) : -1;
+            // in the hex view dragging marks bytes like in a text, elsewhere it scrolls and Shift marks
+            boolean marking = SwingUtilities.isLeftMouseButton(e) && ladder != null
+                    && (e.isShiftDown() || level().hex);
+            rangeAnchor = marking ? offsetAt(e.getPoint()) : -1;
+            if (rangeAnchor >= 0) {
+                markTrack = trackAt(e.getPoint()) == Track.ASCII ? Track.ASCII : Track.HEX;
+            }
         }
 
         @Override
@@ -920,7 +1095,14 @@ public class DetailCanvas extends JComponent {
             }
             dragged = true;
             if (rangeAnchor >= 0) {
-                long offset = offsetAt(e.getPoint());
+                Point p = e.getPoint();
+                // dragging above or below the view scrolls on, like in a text
+                if (p.y < 0) {
+                    setFirstRow(firstRow - Math.max(1, -p.y / level().cellHeight));
+                } else if (p.y >= getHeight()) {
+                    setFirstRow(firstRow + Math.max(1, (p.y - getHeight()) / level().cellHeight));
+                }
+                long offset = offsetAt(new Point(p.x, Math.max(0, Math.min(getHeight() - 1, p.y))));
                 if (offset >= 0) {
                     long bytesPerCell = level().bytesPerCell;
                     long from = Math.min(rangeAnchor, offset);
@@ -976,6 +1158,23 @@ public class DetailCanvas extends JComponent {
                 return;
             }
             JPopupMenu menu = new JPopupMenu();
+            long marked = markedByteCount();
+            if (marked > 0) {
+                String size = marked + (marked == 1 ? " byte" : " bytes");
+                JMenuItem hexItem = new JMenuItem("Copy " + size + " as hex");
+                hexItem.addActionListener(a -> copyMarkedBytes(false));
+                JMenuItem textItem = new JMenuItem("Copy " + size + " as text");
+                textItem.addActionListener(a -> copyMarkedBytes(true));
+                if (marked > MAX_COPY_BYTES) {
+                    hexItem.setEnabled(false);
+                    textItem.setEnabled(false);
+                    hexItem.setToolTipText("Mark at most " + MAX_COPY_BYTES / (1024 * 1024) + " MiB to copy");
+                    textItem.setToolTipText(hexItem.getToolTipText());
+                }
+                menu.add(hexItem);
+                menu.add(textItem);
+                menu.addSeparator();
+            }
             if (region != null) {
                 JMenuItem zoomItem = new JMenuItem("Zoom to " + region.getName());
                 zoomItem.addActionListener(a -> zoomToRegion(region));

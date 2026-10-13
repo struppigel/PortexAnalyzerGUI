@@ -24,3 +24,20 @@ resources/feather
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+
+# Build output
+target/
+
+# Never commit PE samples, they can be malicious
+*.exe
+*.dll
+*.sys
+portextestfiles/
+
+# no personal scripts
+*.ps1
+*.bat
+
+# Dotfiles and dot folders, e.g., IDE and tool settings
+.*
+!.gitignore

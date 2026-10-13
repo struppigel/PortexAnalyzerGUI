@@ -42,6 +42,7 @@ public class CompactVisualizerPanel extends JPanel {
         super(new BorderLayout());
         this.model = model;
         this.overview = new OverviewStrip(model, TRACK_WIDTH, false);
+        overview.setTooltipHint("double-click to show it in the visualization");
         add(overview, BorderLayout.CENTER);
         setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
         overview.addMouseListener(new MouseAdapter() {

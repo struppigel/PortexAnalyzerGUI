@@ -24,21 +24,17 @@ class PortexSettingsTest {
     void defaultsWithoutSettingsFile() {
         PortexSettings settings = new PortexSettings(settingsFile());
 
-        assertEquals("0", settings.get(DISABLE_YARA_WARNINGS));
         assertEquals("0", settings.get(DISABLE_UPDATE));
         assertEquals("PORTEX", settings.get(LOOK_AND_FEEL));
         assertEquals("1", settings.get(VALUES_AS_HEX));
         assertEquals("1", settings.get(CONTENT_PREVIEW));
         assertEquals("0", settings.get(HEX_BYTES_PER_LINE));
-        assertFalse(settings.containsKey(YARA_PATH));
-        assertFalse(settings.containsKey(YARA_SIGNATURE_PATH));
     }
 
     @Test
     void writtenSettingsAreReadBack() throws Exception {
         PortexSettings settings = new PortexSettings(settingsFile());
-        settings.put(YARA_PATH, "C:\\tools\\yara64.exe");
-        settings.put(YARA_SIGNATURE_PATH, "C:\\rules\\all.yar");
+        settings.put(HEX_BYTES_PER_LINE, "16");
         settings.put(VALUES_AS_HEX, "0");
         settings.put(LOOK_AND_FEEL, LookAndFeelSetting.SYSTEM.toString());
 
@@ -58,14 +54,25 @@ class PortexSettingsTest {
         assertTrue(settings.valueEquals(DISABLE_UPDATE, "1"));
     }
 
+    @Test
+    void settingsOfTheRemovedYaraScanAreIgnored() throws Exception {
+        Files.write(settingsFile().toPath(), Arrays.asList("YARA_PATH:::C:\\tools\\yara64.exe",
+                "YARA_SIGNATURE_PATH:::C:\\rules\\all.yar", "DISABLE_YARA_WARNINGS:::1", "DISABLE_UPDATE:::1"),
+                StandardCharsets.UTF_8);
+
+        PortexSettings settings = new PortexSettings(settingsFile());
+
+        assertEquals("1", settings.get(DISABLE_UPDATE));
+        assertEquals(5, settings.size(), settings.toString());
+    }
+
     /**
      * Keys are stored by name, so renaming one silently drops the users' setting.
      */
     @Test
     void storedNamesAreUnchanged() {
-        assertEquals(Arrays.asList("YARA_PATH", "YARA_SIGNATURE_PATH", "DISABLE_UPDATE", "DISABLE_YARA_WARNINGS",
-                "LOOK_AND_FEEL", "VALUES_AS_HEX", "CONTENT_PREVIEW", "HEX_BYTES_PER_LINE"),
-                names(PortexSettingsKey.values()));
+        assertEquals(Arrays.asList("DISABLE_UPDATE", "LOOK_AND_FEEL", "VALUES_AS_HEX", "CONTENT_PREVIEW",
+                "HEX_BYTES_PER_LINE"), names(PortexSettingsKey.values()));
         assertEquals(Arrays.asList("PORTEX", "SYSTEM"), names(LookAndFeelSetting.values()));
     }
 

@@ -45,9 +45,8 @@ public class FileContentPreviewPanel extends JPanel {
     private static final int PREVIEW_SIZE = 0x2000;
     /** the width of the panel in characters, the text wraps at it */
     static final int COLUMNS = 24;
-    // behind dark text of light themes and behind light text of dark themes
-    private static final Color LIGHT_HIGHLIGHT = new Color(255, 225, 110);
-    private static final Color DARK_HIGHLIGHT = new Color(140, 85, 0);
+    // the accent of the themes, if the look and feel has none
+    private static final Color DEFAULT_ACCENT = new Color(0xAA0000);
 
     private final JTextArea contentDisplay = new JTextArea("Offset: 0");
     private final List<OffsetListener> offsetListeners = new ArrayList<>();
@@ -118,6 +117,7 @@ public class FileContentPreviewPanel extends JPanel {
      */
     public void setOpenVisualizationAction(LongConsumer action) {
         this.openVisualization = action;
+        contentDisplay.setToolTipText(action == null ? null : "Double-click a byte to show it in the visualization");
     }
 
     /**
@@ -213,11 +213,20 @@ public class FileContentPreviewPanel extends JPanel {
     }
 
     /**
-     * @return a highlight color on which text of the given color is readable
+     * @return a highlight in the accent color of the theme, on which text of the given color is readable: dark
+     * behind light text, light behind dark text
      */
     static Color highlightColorFor(Color text) {
+        Color accent = UIManager.getColor("Component.accentColor");
+        if (accent == null) {
+            accent = DEFAULT_ACCENT;
+        }
         double luminance = (0.299 * text.getRed() + 0.587 * text.getGreen() + 0.114 * text.getBlue()) / 255;
-        return luminance > 0.5 ? DARK_HIGHLIGHT : LIGHT_HIGHLIGHT;
+        Color other = luminance > 0.5 ? Color.black : Color.white;
+        double accentShare = luminance > 0.5 ? 0.85 : 0.3;
+        return new Color((int) Math.round(accent.getRed() * accentShare + other.getRed() * (1 - accentShare)),
+                (int) Math.round(accent.getGreen() * accentShare + other.getGreen() * (1 - accentShare)),
+                (int) Math.round(accent.getBlue() * accentShare + other.getBlue() * (1 - accentShare)));
     }
 
     /**

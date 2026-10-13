@@ -2,6 +2,7 @@ package io.github.struppigel.gui.pedetails;
 
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.PEComponentTree;
+import io.github.struppigel.gui.utils.InfoCard;
 import io.github.struppigel.gui.utils.TestPEData;
 import io.github.struppigel.gui.utils.WorkerKiller;
 import io.github.struppigel.gui.visualizer.DetailCanvas;
@@ -457,7 +458,11 @@ class PEDetailsPanelTest {
     }
 
     private String visibleText() throws Exception {
-        return onEdtGet(() -> findVisible(details, JTextArea.class).stream()
-                .map(JTextArea::getText).collect(Collectors.joining("\n")));
+        return onEdtGet(() -> {
+            List<String> parts = findVisible(details, JTextArea.class).stream()
+                    .map(JTextArea::getText).collect(Collectors.toList());
+            findVisible(details, InfoCard.class).forEach(card -> parts.add(card.getPlainText()));
+            return String.join("\n", parts);
+        });
     }
 }

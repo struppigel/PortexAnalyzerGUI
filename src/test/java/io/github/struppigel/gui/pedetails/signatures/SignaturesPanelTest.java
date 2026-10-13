@@ -2,12 +2,9 @@ package io.github.struppigel.gui.pedetails.signatures;
 
 import io.github.struppigel.gui.PEFieldsTable;
 import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
-import io.github.struppigel.settings.PortexSettings;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import javax.swing.*;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,9 +13,6 @@ import static io.github.struppigel.testsupport.Swing.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SignaturesPanelTest {
-
-    @TempDir
-    Path tempDir;
 
     @Test
     void showsNoMatchesRow() throws Exception {
@@ -62,8 +56,7 @@ class SignaturesPanelTest {
     }
 
     private SignaturesPanel panel() throws Exception {
-        PortexSettings settings = new PortexSettings(tempDir.resolve("settings.ini").toFile());
-        return onEdtGet(() -> new SignaturesPanel(settings, new FileContentPreviewPanel()));
+        return onEdtGet(() -> new SignaturesPanel(new FileContentPreviewPanel()));
     }
 
     /**
