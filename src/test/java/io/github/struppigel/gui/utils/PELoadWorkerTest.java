@@ -3,6 +3,11 @@ package io.github.struppigel.gui.utils;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.parser.FileFormatException;
 import io.github.struppigel.testsupport.TestFiles;
+import io.github.struppigel.tools.Hasher;
+import io.github.struppigel.tools.layout.RegionType;
+import io.github.struppigel.tools.layout.StructureMap;
+import io.github.struppigel.tools.sigscanner.LocationKind;
+import io.github.struppigel.tools.sigscanner.SignatureMatch;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -113,6 +118,39 @@ class PELoadWorkerTest {
         assertFalse(TestPEData.load(DOTNET).overlayExists());
     }
 
+    @ParameterizedTest
+    @MethodSource("allPE")
+    void structureMapAndAnomalies(String sample) throws Exception {
+        FullPEData data = TestPEData.load(sample);
+        StructureMap map = data.getStructureMap();
+        long peSignature = data.getPeData().getCOFFFileHeader().getOffset() - 4;
+
+        assertEquals(TestFiles.file(sample).length(), map.getFileLength());
+        // not necessarily the innermost region, the headers of tiny files overlap
+        assertTrue(map.regionsAt(peSignature).stream().anyMatch(r -> r.getType() == RegionType.PE_SIGNATURE));
+        assertNotNull(data.getAnomalies());
+        assertEquals(data.getAnomaliesTable().size(), data.getAnomalies().size());
+    }
+
+    @Test
+    void structureMapContainsOverlayAndResources() throws Exception {
+        assertFalse(TestPEData.load(OVERLAY).getStructureMap().getRegions(RegionType.OVERLAY).isEmpty());
+        assertFalse(TestPEData.load(RESOURCES).getStructureMap().getRegions(RegionType.RESOURCE).isEmpty());
+    }
+
+    @Test
+    void overlaySignatures() throws Exception {
+        FullPEData data = TestPEData.load(OVERLAY);
+        long overlayOffset = data.getOverlay().getOffset();
+
+        assertFalse(data.getOverlaySignatures().isEmpty());
+        for (SignatureMatch match : data.getOverlaySignatures()) {
+            assertEquals(LocationKind.OVERLAY, match.getLocationKind());
+            assertEquals(overlayOffset, match.getRegionStart());
+            assertTrue(match.getOffset() >= overlayOffset);
+        }
+    }
+
     @Test
     void resourceTableRows() throws Exception {
         FullPEData data = TestPEData.load(RESOURCES);
@@ -124,7 +162,10 @@ class PELoadWorkerTest {
             assertEquals(6, row.length);
             assertInstanceOf(Long.class, row[3]);
             assertInstanceOf(Long.class, row[4]);
+            assertInstanceOf(String.class, row[5]);
         }
+        // the sample embeds an executable in its resources
+        assertTrue(data.getResourceTableEntries().stream().anyMatch(row -> !((String) row[5]).isEmpty()));
     }
 
     @Test
@@ -160,6 +201,61 @@ class PELoadWorkerTest {
     }
 
     @Test
+    void signedFileIsVerified() throws Exception {
+        FullPEData data = TestPEData.load(SIGNED);
+
+        assertTrue(data.hasCertificateTable());
+        assertTrue(data.getAuthenticodeVerification().get().isValid());
+        String sha256 = data.getAuthenticodeVerification().get().getComputedImageDigests().get("SHA-256");
+        assertTrue(data.getHashesReport().contains("Authentihash (SHA-256): " + sha256.toLowerCase()),
+                data.getHashesReport());
+    }
+
+    @Test
+    void unsignedFileHasNoCertificateTable() throws Exception {
+        FullPEData data = TestPEData.load(NATIVE_X86);
+
+        assertFalse(data.hasCertificateTable());
+        assertFalse(data.getAuthenticodeVerification().isPresent());
+    }
+
+    /**
+     * Like VirusTotal, the hashes show the authentihash of every file, signed or not.
+     */
+    @Test
+    void unsignedFileHasAuthentihash() throws Exception {
+        FullPEData data = TestPEData.load(NATIVE_X86);
+
+        assertTrue(data.getHashesReport().contains("Authentihash (SHA-256): " + authentihash(data, "SHA-256")),
+                data.getHashesReport());
+    }
+
+    /**
+     * Verification only computes the SHA-1 digest of a SHA-1 signature, but the SHA-256 authentihash is shown too.
+     */
+    @Test
+    void sha1SignedFileHasSha256Authentihash() throws Exception {
+        FullPEData data = TestPEData.load(SIGNED_SHA1);
+        String sha1 = data.getAuthenticodeVerification().get().getComputedImageDigests().get("SHA-1").toLowerCase();
+        String report = data.getHashesReport();
+
+        String sha256Line = "Authentihash (SHA-256): " + authentihash(data, "SHA-256");
+        String sha1Line = "Authentihash (SHA-1): " + sha1;
+        assertTrue(report.contains(sha256Line), report);
+        assertTrue(report.contains(sha1Line), report);
+        assertTrue(report.indexOf(sha256Line) < report.indexOf(sha1Line), report);
+        assertEquals(authentihash(data, "SHA-1"), sha1);
+    }
+
+    @Test
+    void brokenCertificateTableHasAuthentihash() throws Exception {
+        FullPEData data = TestPEData.load(CERT_BROKEN);
+
+        assertTrue(data.getHashesReport().contains("Authentihash (SHA-256): " + authentihash(data, "SHA-256")),
+                data.getHashesReport());
+    }
+
+    @Test
     void noPeFileIsRejected() {
         File file = TestFiles.file(NOT_PE);
 
@@ -167,8 +263,16 @@ class PELoadWorkerTest {
     }
 
     private static String hex(String algorithm, byte[] bytes) throws Exception {
+        return hex(MessageDigest.getInstance(algorithm).digest(bytes));
+    }
+
+    private static String authentihash(FullPEData data, String algorithm) throws Exception {
+        return hex(new Hasher(data.getPeData()).authentihash(MessageDigest.getInstance(algorithm)));
+    }
+
+    private static String hex(byte[] digest) {
         StringBuilder sb = new StringBuilder();
-        for (byte b : MessageDigest.getInstance(algorithm).digest(bytes)) {
+        for (byte b : digest) {
             sb.append(String.format("%02x", b));
         }
         return sb.toString();

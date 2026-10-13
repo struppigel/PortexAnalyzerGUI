@@ -95,4 +95,15 @@ public class PortexSwingUtils {
         }
         return null;
     }
+
+    /**
+     * Shows text that starts with &lt;html&gt; as it is, so that text from the analyzed file is never rendered as
+     * HTML, which could, e.g., load remote images. Must be called before the text is set, because Swing decides
+     * whether to render HTML when the text changes.
+     *
+     * @param component the label or renderer that shows text from the file
+     */
+    public static void disableHtml(JComponent component) {
+        component.putClientProperty("html.disable", Boolean.TRUE);
+    }
 }

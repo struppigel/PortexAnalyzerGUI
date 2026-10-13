@@ -21,8 +21,12 @@ import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
 import io.github.struppigel.gui.pedetails.PEDetailsPanel;
 import io.github.struppigel.gui.utils.PELoadWorker;
 import io.github.struppigel.gui.utils.PortexSwingUtils;
+import io.github.struppigel.gui.utils.ThemeIcon;
 import io.github.struppigel.gui.utils.WorkerKiller;
 import io.github.struppigel.gui.utils.WriteSettingsWorker;
+import io.github.struppigel.gui.visualizer.CompactVisualizerPanel;
+import io.github.struppigel.gui.visualizer.VisualizationModel;
+import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.settings.LookAndFeelSetting;
 import io.github.struppigel.settings.PortexSettings;
 import io.github.struppigel.settings.PortexSettingsKey;
@@ -56,9 +60,12 @@ import static javax.swing.SwingWorker.StateValue.DONE;
 public class MainFrame extends JFrame {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JLabel filePathLabel = new JLabel();
-    private final VisualizerPanel visualizerPanel = new VisualizerPanel();;
+    private final VisualizationModel visModel = new VisualizationModel();
+    private final CompactVisualizerPanel visualizerPanel = new CompactVisualizerPanel(visModel);
     private final PEDetailsPanel peDetailsPanel;
     private final PortexSettings settings;
+    // the theme the GUI started with, a changed theme setting applies after a restart
+    private final boolean darkTheme;
     private FullPEData pedata = null;
     private PEComponentTree peComponentTree;
     ;
@@ -68,15 +75,34 @@ public class MainFrame extends JFrame {
     private final static String currVersion = "/upd_version.txt";
     private final static String releasePage = "https://github.com/struppigel/PortexAnalyzerGUI/releases";
     private final JLabel progressText = new JLabel("Loading ...");
-    private final JPanel cardPanel = new JPanel(new CardLayout());
+    private final JPanel cardPanel = new JPanel(new CardLayout()) {
+        @Override
+        public Dimension getPreferredSize() {
+            // only the visible card counts, so that the narrow visualizer is not as wide as the hex preview
+            for (Component card : getComponents()) {
+                if (card.isVisible()) {
+                    Dimension size = card.getPreferredSize();
+                    Insets insets = getInsets();
+                    return new Dimension(size.width + insets.left + insets.right,
+                            size.height + insets.top + insets.bottom);
+                }
+            }
+            return super.getPreferredSize();
+        }
+    };
     private FileContentPreviewPanel fileContent = new FileContentPreviewPanel();
 
     public MainFrame(PortexSettings settings) {
         super("Portex Analyzer v. " + AboutFrame.version);
 
         this.settings = settings;
-        peDetailsPanel = new PEDetailsPanel(cardPanel, this, settings, fileContent);
+        this.darkTheme = ThemeIcon.isDarkTheme(settings);
+        peDetailsPanel = new PEDetailsPanel(cardPanel, this, settings, fileContent, visModel);
         peComponentTree = new PEComponentTree(peDetailsPanel);
+        peDetailsPanel.setRegionNavigator(this::showInTree);
+        visualizerPanel.setRegionNavigator(this::showInTree);
+        visualizerPanel.setOpenVisualizationAction(this::showInVisualization);
+        fileContent.setOpenVisualizationAction(this::showInVisualization);
 
         initGUI();
         initDropTargets();
@@ -95,6 +121,26 @@ public class MainFrame extends JFrame {
 
     public void refreshSelection() {
         peComponentTree.refreshSelection();
+    }
+
+    /**
+     * Shows a structure that the user picked in the visualization in the tree and the details panel, and the
+     * clicked offset in the content preview.
+     */
+    private void showInTree(FileRegion region, long offset) {
+        // the details panel navigates to the start of the structure, which must not replace the user's selection
+        visModel.withoutReveal(() -> peComponentTree.selectNodeFor(region));
+        fileContent.showContentAtOffset(offset, visModel);
+    }
+
+    /**
+     * Opens the visualization zoomed in to the offset, e.g., after a double click into the overview at the side.
+     */
+    private void showInVisualization(long offset) {
+        peComponentTree.selectVisualization();
+        fileContent.showContentAtOffset(offset, visModel);
+        // after the layout, the visualization gets wider when it is shown, because the side panel is hidden
+        invokeLater(() -> peDetailsPanel.zoomVisualizationTo(offset));
     }
 
     private static class UpdateWorker extends SwingWorker<Boolean, Void> {
@@ -200,22 +246,13 @@ public class MainFrame extends JFrame {
     }
 
     public void setPeData(FullPEData data) {
-        try {
-            this.pedata = data;
-            visualizerPanel.visualizePE(pedata.getFile());
-            peDetailsPanel.setPeData(pedata);
-            peComponentTree.setPeData(pedata);
-            peComponentTree.setSelectionRow(0);
-            fileContent.setPeData(pedata);
-        } catch (IOException e) {
-            String message = "Could not load PE file! Reason: " + e.getMessage();
-            LOGGER.error(message);
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
-                    message,
-                    "Unable to load",
-                    JOptionPane.ERROR_MESSAGE);
-        }
+        this.pedata = data;
+        // first, so that the visualization knows the file when the other panels navigate to offsets
+        visModel.load(pedata);
+        peDetailsPanel.setPeData(pedata);
+        peComponentTree.setPeData(pedata);
+        peComponentTree.setSelectionRow(0);
+        fileContent.setPeData(pedata);
     }
 
     private void initGUI() {
@@ -224,6 +261,12 @@ public class MainFrame extends JFrame {
         setLocationRelativeTo(null);
         setVisible(true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                visModel.dispose(); // stops the statistics and releases the file
+            }
+        });
 
         // Init main panel that holds everything
         JPanel panel = new JPanel();
@@ -251,7 +294,7 @@ public class MainFrame extends JFrame {
     private void initToolbar() {
         JToolBar toolBar = new JToolBar();
 
-        ImageIcon ico = new ImageIcon(getClass().getResource("/icons8-hexadecimal-24.png"));
+        ImageIcon ico = ThemeIcon.HEX.load(darkTheme);
         JToggleButton hexButton = new JToggleButton(ico);
         hexButton.setSelected(settings.valueEquals(PortexSettingsKey.VALUES_AS_HEX, "1"));
         hexButton.addItemListener(e -> {
@@ -265,7 +308,7 @@ public class MainFrame extends JFrame {
             }
             new WriteSettingsWorker(settings).execute();
         });
-        ImageIcon imgIco = new ImageIcon(getClass().getResource("/icons8-image-24.png"));
+        ImageIcon imgIco = ThemeIcon.IMAGE.load(darkTheme);
         JToggleButton imgButton = new JToggleButton(imgIco);
         imgButton.setSelected(settings.valueEquals(PortexSettingsKey.CONTENT_PREVIEW, "0"));
         imgButton.addItemListener(e -> {
@@ -277,6 +320,7 @@ public class MainFrame extends JFrame {
                 ((CardLayout) cardPanel.getLayout()).show(cardPanel, "FILE_CONTENT");
                 settings.put(PortexSettingsKey.CONTENT_PREVIEW, "1");
             }
+            cardPanel.revalidate(); // the cards have different widths
             cardPanel.repaint();
             fileContent.repaint();
             new WriteSettingsWorker(settings).execute();
@@ -407,7 +451,7 @@ public class MainFrame extends JFrame {
     private JMenu createFileMenu() {
         // open file
         JMenu fileMenu = new JMenu("File");
-        JMenuItem open = new JMenuItem("Open...", new ImageIcon(getClass().getResource("/laptop-bug-icon.png")));
+        JMenuItem open = new JMenuItem("Open...", ThemeIcon.OPEN.load(darkTheme));
         fileMenu.add(open);
         open.addActionListener(arg0 -> {
             String path = PortexSwingUtils.getOpenFileNameFromUser(this);
@@ -418,7 +462,7 @@ public class MainFrame extends JFrame {
         });
 
         // close application
-        JMenuItem exit = new JMenuItem("Exit", new ImageIcon(getClass().getResource("/moon-icon.png")));
+        JMenuItem exit = new JMenuItem("Exit", ThemeIcon.EXIT.load(darkTheme));
         fileMenu.add(exit);
         exit.addActionListener(arg0 -> dispose());
         return fileMenu;

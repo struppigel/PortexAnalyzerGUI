@@ -25,9 +25,19 @@ public final class TestFiles {
     public static final String NATIVE_X86 = "Haus/TLSCallback_x86.exe";
     public static final String ICONS_X64 = "Haus/add-import.exe";
     public static final String NOT_PE = "Haus/notPeFile.txt";
+    /** validly signed, one signature with an RFC 3161 timestamp */
+    public static final String SIGNED = "testfiles/strings.exe";
+    /** a SHA-1 signature with a nested SHA-256 signature */
+    public static final String SIGNED_NESTED = "testfiles/invalidCodeView";
+    /** modified after signing, the image digest does not match */
+    public static final String SIGNED_MODIFIED = "corkami/standard.exe";
+    /** a SHA-1 signature only, modified after signing */
+    public static final String SIGNED_SHA1 = "Haus/firefox_invalid_x64.exe";
+    /** a certificate table with invalid entries inside a section */
+    public static final String CERT_BROKEN = "Haus/cff-chrome_elf.dll";
 
     public static final List<String> ALL_PE = Arrays.asList(
-            DOTNET, OVERLAY, RESOURCES, SMALLEST_PE, DEBUG_INFO, NATIVE_X86, ICONS_X64);
+            DOTNET, OVERLAY, RESOURCES, SMALLEST_PE, DEBUG_INFO, NATIVE_X86, ICONS_X64, SIGNED, CERT_BROKEN);
 
     public static final List<String> ALL_DOTNET = Arrays.asList(DOTNET, DOTNET_CORE, DOTNET_PINVOKE);
 

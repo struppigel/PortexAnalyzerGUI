@@ -26,6 +26,8 @@ import org.apache.logging.log4j.Logger;
 import javax.swing.*;
 import javax.swing.UIManager.LookAndFeelInfo;
 import java.awt.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Sets the look and feel and starts the GUI
@@ -63,10 +65,30 @@ public class Starter {
         }
     }
 
-    private static void setPortexLookAndFeel() {
-        UIManager.put("nimbusBase", new Color(15, 0, 0));
-        UIManager.put("nimbusBlueGrey", new Color(170, 0, 0));
-        UIManager.put("control", Color.black);
+    /**
+     * @return the colors of the PortEx theme, a dark Nimbus, as keys and values for the UIManager
+     */
+    public static Map<String, Color> portexThemeColors() {
+        Map<String, Color> colors = new LinkedHashMap<>();
+        colors.put("nimbusBase", new Color(15, 0, 0));
+        colors.put("nimbusBlueGrey", new Color(170, 0, 0));
+        colors.put("control", Color.black);
+        colors.put("text", Color.white);
+        colors.put("nimbusSelectionBackground", Color.gray);
+        colors.put("nimbusSelectedText", Color.white);
+        colors.put("textHighlight", Color.lightGray);
+        colors.put("nimbusFocus", new Color(0xBA3A1E));
+        colors.put("nimbusSelection", new Color(170, 0, 0));
+        colors.put("textBackground", Color.darkGray);
+        colors.put("nimbusLightBackground", Color.black);
+        // background of tool tips, otherwise Nimbus paints the white text on light yellow
+        colors.put("info", new Color(40, 40, 40));
+        colors.put("Table.alternateRowColor", new Color(20,20,20));
+        return colors;
+    }
+
+    public static void setPortexLookAndFeel() {
+        portexThemeColors().forEach(UIManager::put);
 
        // UIManager.put("ToggleButton.disabled", Color.yellow);
         //UIManager.put("ToggleButton.foreground", Color.yellow);
@@ -74,17 +96,6 @@ public class Starter {
         //UIManager.put("ToolBar.background", new Color(100, 0, 0));
         //UIManager.put("ToolBar.disabled", Color.green);
         //UIManager.put("ToolBar.foreground", Color.red);
-
-        UIManager.put("text", Color.white);
-
-        UIManager.put("nimbusSelectionBackground", Color.gray);
-        UIManager.put("nimbusSelectedText", Color.white);
-        UIManager.put("textHighlight", Color.lightGray);
-        UIManager.put("nimbusFocus", new Color(0xBA3A1E));
-        UIManager.put("nimbusSelection", new Color(170, 0, 0));
-        UIManager.put("textBackground", Color.darkGray);
-        UIManager.put("nimbusLightBackground", Color.black);
-        UIManager.put("Table.alternateRowColor", new Color(20,20,20));
 /*
         UIManager.put("ToolBar.background", Color.blue);
         UIManager.put("ToolBar.foreground", Color.blue);

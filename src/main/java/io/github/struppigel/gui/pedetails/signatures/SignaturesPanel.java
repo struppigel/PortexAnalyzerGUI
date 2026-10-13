@@ -51,7 +51,7 @@ public class SignaturesPanel extends JPanel {
     private final String[] summaryHeaders = {"Source", "Match name", "Scan mode"};
 
     //e.g. XORedPE, "This program", "0xcafebabe", "Resource"
-    private final String[] patternHeaders = {"Match name", "Pattern name", "Pattern content", "Offset"}; //, "Location"};
+    private final String[] patternHeaders = {"Match name", "Pattern name", "Pattern content", "Offset", "Location"};
     private boolean hexEnabled = true;
     private boolean ignoreYaraScan = true;
     private JTextField yaraPathTextField = new JTextField(30);

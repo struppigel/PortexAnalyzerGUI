@@ -21,6 +21,8 @@ import io.github.struppigel.parser.*;
 import io.github.struppigel.parser.sections.SectionHeader;
 import io.github.struppigel.parser.sections.SectionLoader;
 import io.github.struppigel.parser.sections.SectionTable;
+import io.github.struppigel.parser.sections.cert.AuthenticodeVerification;
+import io.github.struppigel.parser.sections.cert.CertificateTable;
 import io.github.struppigel.parser.sections.clr.*;
 import io.github.struppigel.parser.sections.debug.*;
 import io.github.struppigel.parser.sections.edata.ExportEntry;
@@ -33,8 +35,12 @@ import io.github.struppigel.parser.sections.rsrc.version.VersionInfo;
 import io.github.struppigel.tools.*;
 import io.github.struppigel.tools.anomalies.Anomaly;
 import io.github.struppigel.tools.anomalies.PEAnomalyScanner;
-import io.github.struppigel.tools.sigscanner.FileTypeScanner;
-import io.github.struppigel.tools.sigscanner.MatchedSignature;
+import io.github.struppigel.tools.layout.Detail;
+import io.github.struppigel.tools.layout.SignatureHit;
+import io.github.struppigel.tools.layout.StructureMap;
+import io.github.struppigel.tools.layout.StructureMapBuilder;
+import io.github.struppigel.tools.sigscanner.LocationKind;
+import io.github.struppigel.tools.sigscanner.SignatureMatch;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.MainFrame;
 import com.google.common.base.Optional;
@@ -47,11 +53,13 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Loads and computes all the data related to PE files, so that this code does not run in the event dispatch thread.
@@ -84,7 +92,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(10);
 
         publish("Calculating Hashes...");
-        ReportCreator r = ReportCreator.newInstance(data.getFile());
+        ReportCreator r = new ReportCreator(data);
         String hashesReport = createHashesReport(data);
         List<Object[]> hashesForSections = createHashTableEntries(data);
         setProgress(20);
@@ -102,6 +110,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(40);
 
         publish("Scanning for signatures...");
+        // scans all default locations once, later calls of getSignatureMatches are cache hits
+        data.getSignatureMatches();
         String rehintsReport = r.reversingHintsReport();
         setProgress(50);
 
@@ -122,14 +132,26 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         data.loadExtendedDllCharacteristics(); // preload it so it can be accessed next time
         setProgress(80);
 
+        publish("Verifying Authenticode signatures...");
+        java.util.Optional<CertificateTable> certificateTable = loadCertificateTable(data);
+        java.util.Optional<AuthenticodeVerification> verification = certificateTable.isPresent()
+                ? loadAuthenticodeVerification(data) : java.util.Optional.empty();
+        hashesReport += createAuthentihashReport(data, verification);
+        setProgress(83);
+
         publish("Scanning for Anomalies...");
-        List<Object[]> anomaliesTable = createAnomalyTableEntries(data);
-        setProgress(90);
+        List<Anomaly> anomalies = PEAnomalyScanner.newInstance(data).getAnomalies();
+        List<Object[]> anomaliesTable = createAnomalyTableEntries(anomalies);
+        setProgress(85);
 
         publish("Scanning Overlay...");
         Overlay overlay = new Overlay(data);
         double overlayEntropy = ShannonEntropy.entropy(data.getFile(), overlay.getOffset(), overlay.getSize());
-        List<String> overlaySignatures = data.getOverlaySignatures().stream().map(MatchedSignature::toString).collect(Collectors.toList());
+        List<SignatureMatch> overlaySignatures = data.getSignatureMatches(LocationKind.OVERLAY);
+        setProgress(95);
+
+        publish("Mapping structures...");
+        StructureMap structureMap = createStructureMap(data, anomalies);
         setProgress(100);
 
         publish("Done!");
@@ -137,7 +159,96 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                 impEntries, delayLoadEntries, boundImportEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
                 hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
                 rehintsReport, stringTableEntries, dotnetMetaDataRootEntries, maybeCLR, dotNetStreamHeaders,
-                optimizedStreamEntries, clrTables, clrTableHeaders);
+                optimizedStreamEntries, clrTables, clrTableHeaders, anomalies, structureMap,
+                certificateTable, verification);
+    }
+
+    /**
+     * Parses the certificate table. A table that cannot be parsed must not prevent showing the file.
+     */
+    private java.util.Optional<CertificateTable> loadCertificateTable(PEData data) {
+        try {
+            return data.loadCertificateTable();
+        } catch (AnalysisInterruptedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            LOGGER.error("Could not parse the certificate table: " + e.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
+    /**
+     * Verifies the integrity of the signatures, which hashes the whole file. The anomaly scanner uses the cached
+     * result.
+     */
+    private java.util.Optional<AuthenticodeVerification> loadAuthenticodeVerification(PEData data) {
+        try {
+            return data.loadAuthenticodeVerification();
+        } catch (AnalysisInterruptedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            LOGGER.error("Could not verify the Authenticode signatures: " + e.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
+    /**
+     * @return the Authenticode image digests, one line per algorithm: SHA-256 for every file, signed or not, like
+     *         VirusTotal shows it, and the other algorithms that the signatures use
+     */
+    private String createAuthentihashReport(PEData data, java.util.Optional<AuthenticodeVerification> verification) {
+        // computed to verify the signatures, so these are not hashed again
+        Map<String, String> digests = new LinkedHashMap<>();
+        if (verification.isPresent()) {
+            digests.putAll(verification.get().getComputedImageDigests());
+        }
+        String sha256 = digests.remove("SHA-256");
+        if (sha256 == null) {
+            sha256 = computeSha256Authentihash(data);
+        }
+        String text = "";
+        if (sha256 != null) {
+            text += "Authentihash (SHA-256): " + sha256.toLowerCase() + NL;
+        }
+        for (Map.Entry<String, String> digest : digests.entrySet()) {
+            text += "Authentihash (" + digest.getKey() + "): " + digest.getValue().toLowerCase() + NL;
+        }
+        return text;
+    }
+
+    /**
+     * @return the SHA-256 authentihash, null if the file cannot be read
+     */
+    private String computeSha256Authentihash(PEData data) {
+        try {
+            return hash(new Hasher(data).authentihash(MessageDigest.getInstance("SHA-256")));
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        } catch (AnalysisInterruptedException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            LOGGER.error("Could not compute the authentihash: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Builds the structure map for the visualization. Must run in this thread, because the caches of PEData are not
+     * thread-safe. A file whose structures cannot be mapped is still shown, only without structures.
+     */
+    private StructureMap createStructureMap(PEData data, List<Anomaly> anomalies) {
+        try {
+            return new StructureMapBuilder(data)
+                    .withDetail(Detail.FINE)
+                    .withAnomalies(anomalies)
+                    .withSignatureMatches(SignatureHit.fromMatches(data.getSignatureMatches()))
+                    .build();
+        } catch (AnalysisInterruptedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            LOGGER.error("Could not map the structures of the file: " + e.getMessage());
+            return StructureMap.empty(data.getFile().length());
+        }
     }
 
     private Object[] createBoundImportEntry(BoundImportDescriptor bi) {
@@ -222,8 +333,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                 .collect(Collectors.toList());
     }
 
-    private List<Object[]> createAnomalyTableEntries(PEData data) {
-        List<Anomaly> anomalies = PEAnomalyScanner.newInstance(data).getAnomalies();
+    private List<Object[]> createAnomalyTableEntries(List<Anomaly> anomalies) {
         return anomalies.stream()
                 .map(a -> new Object[]{a.description(), a.getType(), a.subtype(), a.key()})
                 .collect(Collectors.toList());
@@ -351,6 +461,10 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
     private List<Object[]> createResourceTableEntries(PEData pedata) {
         List<Resource> resources = pedata.loadResources();
+        Map<Long, List<String>> signaturesByResource = new HashMap<>();
+        for (SignatureMatch m : pedata.getSignatureMatches(LocationKind.RESOURCE)) {
+            signaturesByResource.computeIfAbsent(m.getRegionStart(), k -> new ArrayList<>()).add(m.getName());
+        }
         List<Object[]> entries = new ArrayList<>();
         for (Resource r : resources) {
             Map<Level, IDOrName> lvlIds = r.getLevelIDs();
@@ -360,15 +474,10 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             if(nameLvl != null && langLvl != null) {
                 String nameId = nameLvl.toString();
                 String langId = langLvl.toString();
-                String signatures;
                 long offset = r.rawBytesLocation().from();
                 long size = r.rawBytesLocation().size();
-
-                Stream<String> scanresults = FileTypeScanner.apply(pedata.getFile())
-                        .scanAtReport(offset).stream()
-                        // TODO this is a hack because lack of support from PortEx for scanAt function
-                        .map(s -> s.contains("bytes matched:") ? s.split("bytes matched:")[0] : s);
-                signatures = scanresults.collect(Collectors.joining(", "));
+                String signatures = String.join(", ",
+                        signaturesByResource.getOrDefault(offset, Collections.emptyList()));
                 Object[] entry = {r.getType(), nameId, langId, offset, size, signatures};
                 entries.add(entry);
             }

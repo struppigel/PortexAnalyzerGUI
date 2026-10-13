@@ -22,8 +22,8 @@ class YaraOutputParserTest {
         assertEquals("IsPE", match.ruleName);
         List<Object[]> rows = match.toPatternRows();
         assertEquals(2, rows.size());
-        assertArrayEquals(new Object[]{"IsPE", "$mz", " 4D 5A", 0L, "NaN"}, rows.get(0));
-        assertArrayEquals(new Object[]{"IsPE", "$text", " This program cannot be run in DOS mode", 0x4eL, "NaN"},
+        assertArrayEquals(new Object[]{"IsPE", "$mz", " 4D 5A", 0L, ""}, rows.get(0));
+        assertArrayEquals(new Object[]{"IsPE", "$text", " This program cannot be run in DOS mode", 0x4eL, ""},
                 rows.get(1));
     }
 

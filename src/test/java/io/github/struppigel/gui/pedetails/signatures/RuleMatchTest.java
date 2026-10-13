@@ -14,7 +14,7 @@ class RuleMatchTest {
     void patternRow() {
         PatternMatch pattern = new PatternMatch(0x4d, "$mz", "4D 5A");
 
-        assertArrayEquals(new Object[]{"rule", "$mz", "4D 5A", 0x4dL, "NaN"}, pattern.toPatternRow("rule"));
+        assertArrayEquals(new Object[]{"rule", "$mz", "4D 5A", 0x4dL, ""}, pattern.toPatternRow("rule"));
     }
 
     @Test
@@ -25,8 +25,8 @@ class RuleMatchTest {
         assertArrayEquals(new Object[]{"PEiD", "UPX", "Entry Point"}, match.toSummaryRow());
         List<Object[]> rows = match.toPatternRows();
         assertEquals(2, rows.size());
-        assertArrayEquals(new Object[]{"UPX", "", "E8 ??", 1L, "NaN"}, rows.get(0));
-        assertArrayEquals(new Object[]{"UPX", "", "90", 2L, "NaN"}, rows.get(1));
+        assertArrayEquals(new Object[]{"UPX", "", "E8 ??", 1L, ""}, rows.get(0));
+        assertArrayEquals(new Object[]{"UPX", "", "90", 2L, ""}, rows.get(1));
     }
 
     @Test
@@ -35,7 +35,7 @@ class RuleMatchTest {
         YaraRuleMatch match = new YaraRuleMatch("IsPE", patterns, Collections.emptyList());
 
         assertArrayEquals(new Object[]{"Yara", "IsPE", "Full file"}, match.toSummaryRow());
-        assertArrayEquals(new Object[]{"IsPE", "$mz", "4D 5A", 0L, "NaN"}, match.toPatternRows().get(0));
+        assertArrayEquals(new Object[]{"IsPE", "$mz", "4D 5A", 0L, ""}, match.toPatternRows().get(0));
     }
 
     @Test

@@ -18,6 +18,7 @@
 package io.github.struppigel.gui;
 
 import io.github.struppigel.gui.pedetails.PEDetailsPanel;
+import io.github.struppigel.tools.layout.FileRegion;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -57,6 +58,7 @@ public class PEComponentTree extends JPanel {
     private static final String BOUND_IMPORTS_TEXT = "Bound Imports";
     private static final String EXPORTS_TEXT = "Exports";
     private static final String DEBUG_TEXT = "Debug";
+    private static final String AUTHENTICODE_TEXT = "Authenticode";
     private static final String ANOMALY_TEXT = "Anomalies";
     private static final String HASHES_TEXT = "Hashes";
     private static final String VISUALIZATION_TEXT = "Visualization";
@@ -116,6 +118,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode bound = new DefaultMutableTreeNode(BOUND_IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
         DefaultMutableTreeNode debug = new DefaultMutableTreeNode(DEBUG_TEXT);
+        DefaultMutableTreeNode authenticode = new DefaultMutableTreeNode(AUTHENTICODE_TEXT);
 
         // .NET related
         DefaultMutableTreeNode dotNet = new DefaultMutableTreeNode(DOT_NET_TEXT);
@@ -177,6 +180,10 @@ public class PEComponentTree extends JPanel {
 
         if(peData.hasDebugInfo()) {
             pe.add(debug);
+        }
+
+        if(peData.hasCertificateTable()) {
+            pe.add(authenticode);
         }
 
         if (peData.overlayExists()) {
@@ -265,9 +272,59 @@ public class PEComponentTree extends JPanel {
         this.setVisible(true);
     }
 
+    /**
+     * Selects the tree node that shows the structure and thus shows the structure in the details panel.
+     *
+     * @return true if there is a node for the structure
+     */
+    public boolean selectNodeFor(FileRegion region) {
+        for (String label : RegionTreeLabels.labelsFor(region, clrTableNames)) {
+            if (selectNode(label)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Selects the Visualization node, which shows the visualization in the details panel.
+     */
+    public void selectVisualization() {
+        selectNode(VISUALIZATION_TEXT);
+    }
+
+    private boolean selectNode(String label) {
+        TreePath path = findPath(label);
+        if (path == null) {
+            return false;
+        }
+        peTree.expandPath(path.getParentPath());
+        if (path.equals(peTree.getSelectionPath())) {
+            selectionChanged(path); // no selection event for the same node, but the view shall update
+        } else {
+            peTree.setSelectionPath(path);
+        }
+        peTree.scrollPathToVisible(path);
+        return true;
+    }
+
+    private TreePath findPath(String label) {
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) peTree.getModel().getRoot();
+        Enumeration<?> nodes = root.preorderEnumeration();
+        while (nodes.hasMoreElements()) {
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) nodes.nextElement();
+            if (!node.isRoot() && label.equals(node.getUserObject())) {
+                return new TreePath(node.getPath());
+            }
+        }
+        return null;
+    }
+
     private void selectionChanged(TreePath path) {
         if (path == null)
             return; // this happens when a selected node was removed, e.g., new file with no overlay loaded
+        if (peDetailsPanel == null)
+            return; // only in tests
         String node = path.getLastPathComponent().toString();
         LOGGER.debug("Tree selection changed to " + node);
         switch (node) {
@@ -324,6 +381,9 @@ public class PEComponentTree extends JPanel {
                 return;
             case DEBUG_TEXT:
                 peDetailsPanel.showDebugInfo();
+                return;
+            case AUTHENTICODE_TEXT:
+                peDetailsPanel.showAuthenticode();
                 return;
             case ANOMALY_TEXT:
                 peDetailsPanel.showAnomalies();

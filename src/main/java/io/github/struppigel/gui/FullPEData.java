@@ -19,6 +19,8 @@ package io.github.struppigel.gui;
 
 import io.github.struppigel.parser.PEData;
 import io.github.struppigel.parser.StandardField;
+import io.github.struppigel.parser.sections.cert.AuthenticodeVerification;
+import io.github.struppigel.parser.sections.cert.CertificateTable;
 import io.github.struppigel.parser.sections.clr.CLRSection;
 import io.github.struppigel.parser.sections.clr.CLRTable;
 import io.github.struppigel.parser.sections.clr.OptimizedStream;
@@ -27,6 +29,9 @@ import io.github.struppigel.parser.sections.idata.ImportDLL;
 import io.github.struppigel.parser.sections.rsrc.Resource;
 import io.github.struppigel.parser.sections.rsrc.icon.IconParser;
 import io.github.struppigel.tools.Overlay;
+import io.github.struppigel.tools.anomalies.Anomaly;
+import io.github.struppigel.tools.layout.StructureMap;
+import io.github.struppigel.tools.sigscanner.SignatureMatch;
 import io.github.struppigel.gui.utils.TableContent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -48,7 +53,7 @@ public class FullPEData {
     private final PEData pedata;
     private final Overlay overlay;
     private final double overlayEntropy;
-    private final List<String> overlaySignatures;
+    private final List<SignatureMatch> overlaySignatures;
     private final double[] sectionEntropies;
     private final List<ImportDLL> imports;
     private final List<Object[]> importTableEntries;
@@ -76,9 +81,13 @@ public class FullPEData {
     private final List<StandardField> optimizedStreamEntries;
     private final Map<String, List<List<Object>>> clrTables;
     private final Map<String, List<String>> clrTableHeaders;
+    private final List<Anomaly> anomalies;
+    private final StructureMap structureMap;
+    private final Optional<CertificateTable> certificateTable;
+    private final Optional<AuthenticodeVerification> authenticodeVerification;
 
     private final long OFFSET_DEFAULT = 0L;
-    public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<String> overlaySignatures,
+    public FullPEData(PEData data, Overlay overlay, double overlayEntropy, List<SignatureMatch> overlaySignatures,
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries, List<Object[]> delayLoadEntries,
                       List<Object[]> boundImportEntries,
                       List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
@@ -87,7 +96,10 @@ public class FullPEData {
                       List<Object[]> anomaliesTable, List<TableContent> debugTableEntries, List<Object[]> vsInfoTable,
                       String rehintsReport, List<Object[]> stringTableEntries, List<StandardField> dotNetMetadataRootTableEntries,
                       java.util.Optional<CLRSection> maybeCLR, List<Object[]> dotNetStreamHeaders, List<StandardField> optimizedStreamEntries,
-                      Map<String, List<List<Object>>> clrTables, Map<String, List<String>> clrTableHeaders) {
+                      Map<String, List<List<Object>>> clrTables, Map<String, List<String>> clrTableHeaders,
+                      List<Anomaly> anomalies, StructureMap structureMap,
+                      Optional<CertificateTable> certificateTable,
+                      Optional<AuthenticodeVerification> authenticodeVerification) {
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -115,9 +127,32 @@ public class FullPEData {
         this.optimizedStreamEntries = optimizedStreamEntries;
         this.clrTables = clrTables;
         this.clrTableHeaders = clrTableHeaders;
+        this.anomalies = anomalies;
+        this.structureMap = structureMap;
+        this.certificateTable = certificateTable;
+        this.authenticodeVerification = authenticodeVerification;
     }
 
     public Map<String, List<String>> getClrTableHeaders() { return clrTableHeaders; }
+
+    /**
+     * @return the parsed certificate table, also if it is broken or empty; absent if the file declares none
+     */
+    public Optional<CertificateTable> getCertificateTable() { return certificateTable; }
+
+    public boolean hasCertificateTable() { return certificateTable.isPresent(); }
+
+    /**
+     * @return the result of the integrity check of the signatures, absent if there is no certificate table
+     */
+    public Optional<AuthenticodeVerification> getAuthenticodeVerification() { return authenticodeVerification; }
+
+    public List<Anomaly> getAnomalies() { return anomalies; }
+
+    /**
+     * @return the structures of the file by offset; built while loading, immutable and safe to use in any thread
+     */
+    public StructureMap getStructureMap() { return structureMap; }
 
     public Map<String, List<List<Object>>> getClrTables() { return clrTables; }
 
@@ -133,7 +168,7 @@ public class FullPEData {
         return overlayEntropy;
     }
 
-    public List<String> getOverlaySignatures() {
+    public List<SignatureMatch> getOverlaySignatures() {
         return overlaySignatures;
     }
 

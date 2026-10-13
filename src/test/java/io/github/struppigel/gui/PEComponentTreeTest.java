@@ -47,6 +47,7 @@ class PEComponentTreeTest {
         assertEquals(data.hasBoundImportEntries(), labels.contains("Bound Imports"));
         assertEquals(data.hasExports(), labels.contains("Exports"));
         assertEquals(data.hasDebugInfo(), labels.contains("Debug"));
+        assertEquals(data.hasCertificateTable(), labels.contains("Authenticode"));
         assertEquals(data.overlayExists(), labels.contains("Overlay"));
         assertEquals(data.isDotNet(), labels.contains(".NET Headers"));
     }
