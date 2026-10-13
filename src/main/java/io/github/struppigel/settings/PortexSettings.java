@@ -104,6 +104,7 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
         applySettingIfNotSet(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
         applySettingIfNotSet(VALUES_AS_HEX, "1");
         applySettingIfNotSet(CONTENT_PREVIEW, "1");
+        applySettingIfNotSet(HEX_BYTES_PER_LINE, "0");
     }
 
     private void applySettingIfNotSet(PortexSettingsKey key, String value) {

@@ -1,5 +1,6 @@
 package io.github.struppigel.gui.visualizer;
 
+import com.formdev.flatlaf.FlatLaf;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.Starter;
 import io.github.struppigel.gui.utils.TestPEData;
@@ -37,7 +38,7 @@ class InfoPaneTest {
         LookAndFeel previous = UIManager.getLookAndFeel();
         try {
             onEdt(() -> {
-                Starter.setPortexLookAndFeel();
+                Starter.setDarkLookAndFeel();
                 model = new VisualizationModel();
                 InfoPane pane = new InfoPane(model, () -> 1);
                 model.loadSynchronously(data);
@@ -73,7 +74,7 @@ class InfoPaneTest {
             });
         } finally {
             onEdt(() -> {
-                Starter.portexThemeColors().keySet().forEach(key -> UIManager.put(key, null));
+                FlatLaf.setGlobalExtraDefaults(null);
                 UIManager.setLookAndFeel(previous);
             });
         }

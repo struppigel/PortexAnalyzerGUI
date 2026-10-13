@@ -17,7 +17,6 @@
  */
 package io.github.struppigel.gui.visualizer;
 
-import io.github.struppigel.gui.utils.HexFont;
 import io.github.struppigel.tools.ShannonEntropy;
 import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.layout.StructureMap;
@@ -36,6 +35,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -50,11 +50,12 @@ public class InfoPane extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private static final int UPDATE_DELAY_MS = 33;
     private static final int SHOWN_CELL_BYTES = 16;
+    private static final int SHOWN_BYTES_PER_ROW = 8;
     private static final String NL = "\n";
 
     private final VisualizationModel model;
     private final LongSupplier bytesPerCell;
-    private final JTextArea header = new JTextArea();
+    private final InfoGrid grid = new InfoGrid();
     private final DefaultListModel<FileRegion> regionListModel = new DefaultListModel<>();
     private final JList<FileRegion> regionList = new JList<FileRegion>(regionListModel) {
         @Override
@@ -81,21 +82,24 @@ public class InfoPane extends JPanel {
         super(new BorderLayout());
         this.model = model;
         this.bytesPerCell = bytesPerCell;
-        header.setEditable(false);
-        header.setRows(10); // fixed height, so that the list of structures does not jump
-        header.setLineWrap(true);
-        header.setWrapStyleWord(true);
-        header.setFont(HexFont.font(Font.PLAIN, 13));
-        header.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         regionList.setCellRenderer(new RegionRenderer());
         regionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         regionList.addMouseListener(new RegionMouseHandler());
         JLabel title = new JLabel("Structures, innermost first");
-        title.setBorder(BorderFactory.createEmptyBorder(6, 4, 2, 4));
+        title.setFont(title.getFont().deriveFont(Font.BOLD));
+        JPanel titlePanel = new JPanel(new BorderLayout(0, Spacing.GAP / 2));
+        titlePanel.setBorder(Spacing.padding(Spacing.GAP, Spacing.PAD, 0, Spacing.PAD));
+        titlePanel.add(title, BorderLayout.NORTH);
+        titlePanel.add(new JSeparator(), BorderLayout.SOUTH);
         JPanel regionPanel = new JPanel(new BorderLayout());
-        regionPanel.add(title, BorderLayout.NORTH);
-        regionPanel.add(new JScrollPane(regionList, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
-                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER), BorderLayout.CENTER);
+        regionPanel.add(titlePanel, BorderLayout.NORTH);
+        // flat on the color of the panel, like the grid above and the legend below
+        regionList.setBackground(regionPanel.getBackground());
+        JScrollPane regionScroll = new JScrollPane(regionList, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        regionScroll.setBorder(null);
+        regionScroll.getViewport().setBackground(regionPanel.getBackground());
+        regionPanel.add(regionScroll, BorderLayout.CENTER);
         // the cells wrap at the width of the list, they must be measured again when it changes
         regionList.addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override
@@ -104,7 +108,7 @@ public class InfoPane extends JPanel {
                 regionList.setFixedCellHeight(-1);
             }
         });
-        add(header, BorderLayout.NORTH);
+        add(grid, BorderLayout.NORTH);
         add(regionPanel, BorderLayout.CENTER);
         setPreferredSize(new Dimension(300, 400));
 
@@ -167,44 +171,48 @@ public class InfoPane extends JPanel {
     void updateNow() {
         FileVisualization vis = model.getVisualization();
         long offset = describedOffset();
-        StringBuilder text = new StringBuilder();
+        List<String[]> rows = new ArrayList<>();
         if (vis == null) {
-            text.append("No file loaded");
+            rows.add(new String[]{null, "No file loaded"});
         } else if (offset < 0 || offset >= vis.getFileLength()) {
-            text.append("Point at the visualization to see").append(NL)
-                    .append("the structures and bytes there.").append(NL)
-                    .append("Ctrl + wheel zooms, Ctrl + G goes to an offset.");
+            rows.add(new String[]{null, "Point at the visualization to see the structures and bytes there."});
+            rows.add(new String[]{null, "Ctrl + wheel zooms, Ctrl + G goes to an offset."});
         } else {
-            describeOffset(text, vis, offset);
+            describeOffset(rows, vis, offset);
         }
         if (vis != null && model.hasRangeSelection()) {
-            describeRange(text, vis.getStructureMap().getFileLength(), vis.getSource());
+            describeRange(rows, vis.getStructureMap().getFileLength());
         }
-        header.setText(text.toString());
+        grid.setRows(rows);
         updateRegions(vis, offset);
     }
 
-    private void describeOffset(StringBuilder text, FileVisualization vis, long offset) {
+    private static String[] mono(String label, String value) {
+        return new String[]{label, value, "mono"};
+    }
+
+    private void describeOffset(List<String[]> rows, FileVisualization vis, long offset) {
         ByteSource source = vis.getSource();
         long cellSize = Math.max(1, bytesPerCell.getAsLong());
         long cellStart = offset - offset % cellSize;
         long cellEnd = Math.min(vis.getFileLength(), cellStart + cellSize);
         String kind = model.getHoverOffset() >= 0 ? "" : "  (selected)";
-        text.append("Offset   ").append(format(offset)).append(kind).append(NL);
+        rows.add(mono("Offset", format(offset) + kind));
         try {
             int value = source.byteAt(offset);
             if (value >= 0) {
-                text.append("Byte     ").append(String.format("%02X  %3d  '%s'", value, value, printable(value)))
-                        .append(NL);
+                rows.add(mono("Byte", String.format("%02X  %3d  '%s'", value, value, printable(value))));
             }
             if (cellSize > 1) {
-                text.append("Cell     ").append(format(cellStart)).append(" - ").append(format(cellEnd - 1))
-                        .append(" (").append(cellEnd - cellStart).append(" bytes)").append(NL);
+                rows.add(mono("Cell", format(cellStart) + " - " + format(cellEnd - 1)
+                        + " (" + (cellEnd - cellStart) + " bytes)"));
                 byte[] bytes = new byte[(int) Math.min(SHOWN_CELL_BYTES, cellEnd - cellStart)];
                 int read = source.read(cellStart, bytes, 0, bytes.length);
-                text.append("         ").append(hexBytes(bytes, read)).append(NL);
+                for (int from = 0; from < read; from += SHOWN_BYTES_PER_ROW) {
+                    rows.add(mono("", hexBytes(bytes, from, Math.min(read, from + SHOWN_BYTES_PER_ROW))));
+                }
             }
-            describeStatistics(text, vis, cellStart, cellEnd);
+            describeStatistics(rows, vis, cellStart, cellEnd);
         } catch (ByteSourceClosedException e) {
             // another file is being loaded
         } catch (RuntimeException e) {
@@ -212,7 +220,7 @@ public class InfoPane extends JPanel {
         }
     }
 
-    private void describeStatistics(StringBuilder text, FileVisualization vis, long cellStart, long cellEnd) {
+    private void describeStatistics(List<String[]> rows, FileVisualization vis, long cellStart, long cellEnd) {
         ByteStatistics statistics = vis.getStatistics();
         long cellSize = cellEnd - cellStart;
         double mean;
@@ -220,7 +228,7 @@ public class InfoPane extends JPanel {
         double[] fractions = new double[ByteClass.values().length];
         if (cellSize >= statistics.getBlockSize()) {
             if (cellEnd > statistics.getComputedLength()) {
-                text.append("Entropy  computing ...").append(NL);
+                rows.add(new String[]{"Entropy", "computing ..."});
                 return;
             }
             statistics.aggregate(cellStart, cellEnd, stats);
@@ -242,28 +250,26 @@ public class InfoPane extends JPanel {
             }
         }
         if (!Double.isNaN(mean)) {
-            text.append("Entropy  ").append(String.format("%.2f mean, %.2f max (bits per byte)", mean * 8, max * 8))
-                    .append(NL);
+            rows.add(new String[]{"Entropy", String.format("%.2f mean, %.2f max bits per byte", mean * 8, max * 8)});
         }
-        text.append("Bytes    ").append(String.format("zero %.0f%%, 0xFF %.0f%%, text %.0f%%, control %.0f%%, high %.0f%%",
-                100 * fractions[ByteClass.ZERO.ordinal()], 100 * fractions[ByteClass.MAX.ordinal()],
+        rows.add(new String[]{"Bytes", String.format("zero %.0f%%, 0xFF %.0f%%",
+                100 * fractions[ByteClass.ZERO.ordinal()], 100 * fractions[ByteClass.MAX.ordinal()])});
+        rows.add(new String[]{"", String.format("text %.0f%%, control %.0f%%, high %.0f%%",
                 100 * fractions[ByteClass.PRINTABLE.ordinal()], 100 * fractions[ByteClass.CONTROL.ordinal()],
-                100 * fractions[ByteClass.HIGH.ordinal()])).append(NL);
+                100 * fractions[ByteClass.HIGH.ordinal()])});
     }
 
-    private void describeRange(StringBuilder text, long fileLength, ByteSource source) {
+    private void describeRange(List<String[]> rows, long fileLength) {
         long start = model.getRangeStart();
         long end = Math.min(fileLength, model.getRangeEnd());
-        text.append(NL).append("Range    ").append(format(start)).append(" - ").append(format(end - 1))
-                .append(" (").append(end - start).append(" bytes)").append(NL);
+        rows.add(mono("Range", format(start) + " - " + format(end - 1) + " (" + (end - start) + " bytes)"));
         if (start == rangeEntropyStart && end == rangeEntropyEnd && rangeEntropy != null) {
-            text.append("Entropy  ").append(String.format("%.2f bits per byte", rangeEntropy * 8)).append(NL);
+            rows.add(new String[]{"Entropy", String.format("%.2f bits per byte", rangeEntropy * 8)});
         } else {
-            text.append("Entropy  computing ...").append(NL);
+            rows.add(new String[]{"Entropy", "computing ..."});
             computeRangeEntropy(model.getPeData().getFile(), start, end);
         }
     }
-
     private void computeRangeEntropy(File file, long start, long end) {
         if (rangeWorker != null && start == rangeEntropyStart && end == rangeEntropyEnd) {
             return; // already computing
@@ -316,7 +322,7 @@ public class InfoPane extends JPanel {
      * @return the shown text and the names of the shown structures, for tests
      */
     String getInfoText() {
-        StringBuilder text = new StringBuilder(header.getText());
+        StringBuilder text = new StringBuilder(grid.getText());
         for (int i = 0; i < regionListModel.size(); i++) {
             text.append(NL).append(regionListModel.get(i).getName());
         }
@@ -338,9 +344,9 @@ public class InfoPane extends JPanel {
         return value >= 0x20 && value < 0x7f ? String.valueOf((char) value) : ".";
     }
 
-    private static String hexBytes(byte[] bytes, int length) {
+    private static String hexBytes(byte[] bytes, int from, int to) {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < length; i++) {
+        for (int i = from; i < to; i++) {
             sb.append(String.format("%02X ", bytes[i]));
         }
         return sb.toString().trim();
@@ -358,7 +364,7 @@ public class InfoPane extends JPanel {
 
         RegionRenderer() {
             super(new BorderLayout(GAP, 0));
-            setBorder(BorderFactory.createEmptyBorder(3, 4, 3, 4));
+            setBorder(Spacing.padding(Spacing.GAP / 2 + 1, Spacing.PAD, Spacing.GAP / 2 + 1, Spacing.PAD));
             swatch.setVerticalAlignment(SwingConstants.TOP);
             swatch.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
             JPanel texts = new JPanel(new BorderLayout());
@@ -375,8 +381,6 @@ public class InfoPane extends JPanel {
             text.setWrapStyleWord(true);
             text.setEditable(false);
             text.setOpaque(false);
-            // Nimbus paints the background of text areas even if they are not opaque, unless it is transparent
-            text.setBackground(new Color(0, 0, 0, 0));
             text.setBorder(null);
             text.setFont(regionList.getFont().deriveFont(style));
             return text;
@@ -385,13 +389,12 @@ public class InfoPane extends JPanel {
         @Override
         public Component getListCellRendererComponent(JList<? extends FileRegion> list, FileRegion region, int index,
                                                       boolean isSelected, boolean cellHasFocus) {
-            // copies, because Nimbus replaces colors of the look and feel (UIResource) with those of the panel
-            Color background = new Color((isSelected ? list.getSelectionBackground() : list.getBackground()).getRGB());
-            Color foreground = new Color((isSelected ? list.getSelectionForeground() : list.getForeground()).getRGB());
-            setBackground(background);
+            setBackground(isSelected ? list.getSelectionBackground() : list.getBackground());
             setOpaque(true);
+            Color foreground = isSelected ? list.getSelectionForeground() : list.getForeground();
             name.setForeground(foreground);
-            details.setForeground(foreground);
+            Color muted = UIManager.getColor("Label.disabledForeground");
+            details.setForeground(isSelected || muted == null ? foreground : muted);
             FileVisualization vis = model.getVisualization();
             swatch.setIcon(new SwatchIcon(vis == null ? Color.gray : vis.getColorScheme().colorOf(region)));
             name.setText(region.getName());
@@ -529,12 +532,12 @@ public class InfoPane extends JPanel {
 
         @Override
         public int getIconWidth() {
-            return 12;
+            return 16;
         }
 
         @Override
         public int getIconHeight() {
-            return 12;
+            return 16;
         }
     }
 }

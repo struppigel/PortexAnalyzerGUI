@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 /**
@@ -60,6 +61,9 @@ public class InteractiveVisualizerPanel extends JPanel {
     private final InfoPane infoPane;
     private final LegendPanel legendPanel;
     private JComboBox<String> hexColorChooser;
+    private JComboBox<String> hexWidthChooser;
+    private IntConsumer hexWidthListener;
+    private boolean settingHexWidth;
 
     public InteractiveVisualizerPanel(VisualizationModel model) {
         this(model, RenderSupport.RENDER_POOL);
@@ -75,23 +79,76 @@ public class InteractiveVisualizerPanel extends JPanel {
         infoPane.setZoomAction(canvas::zoomToRegion);
         initOverviewNavigation();
 
-        JPanel visuals = new JPanel(new BorderLayout());
-        overview.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 4));
+        JPanel visuals = new JPanel(new BorderLayout(Spacing.GAP, 0));
+        visuals.setBorder(Spacing.padding(Spacing.GAP, Spacing.GAP, Spacing.GAP, 0));
         visuals.add(overview, BorderLayout.WEST);
         visuals.add(canvas, BorderLayout.CENTER);
         visuals.add(canvas.getScrollBar(), BorderLayout.EAST);
 
-        JPanel side = new JPanel(new BorderLayout());
-        side.add(infoPane, BorderLayout.CENTER);
-        side.add(legendPanel, BorderLayout.SOUTH);
+        JPanel main = new JPanel(new BorderLayout());
+        main.add(visuals, BorderLayout.CENTER);
+        main.add(createStatusBar(), BorderLayout.SOUTH);
 
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, visuals, side);
+        legendPanel.setPreferredSize(new Dimension(300, 150));
+        JSplitPane side = new JSplitPane(JSplitPane.VERTICAL_SPLIT, infoPane, legendPanel);
+        side.setResizeWeight(0.6);
+        side.setContinuousLayout(true);
+        side.setBorder(null);
+
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, main, side);
         split.setResizeWeight(1.0);
         split.setContinuousLayout(true);
+        split.setBorder(null);
 
         add(createToolBar(), BorderLayout.NORTH);
         add(split, BorderLayout.CENTER);
         initKeyBindings();
+    }
+
+    private JComponent createStatusBar() {
+        JLabel status = new JLabel(" ");
+        status.setBorder(Spacing.padding(Spacing.GAP / 2, Spacing.PAD, Spacing.GAP / 2, Spacing.PAD));
+        status.setForeground(UIManager.getColor("Label.disabledForeground"));
+        PortexSwingUtils.disableHtml(status);
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.add(new JSeparator(), BorderLayout.NORTH);
+        bar.add(status, BorderLayout.CENTER);
+        VisualizationModel.Listener refresh = new VisualizationModel.Listener() {
+            @Override
+            public void visibleRangeChanged() {
+                status.setText(statusText());
+            }
+
+            @Override
+            public void dataChanged() {
+                status.setText(statusText());
+            }
+
+            @Override
+            public void styleChanged() {
+                status.setText(statusText());
+            }
+        };
+        model.addListener(refresh);
+        status.setText(statusText());
+        return bar;
+    }
+
+    /**
+     * @return the zoom level and the part of the file that is visible
+     */
+    private String statusText() {
+        FileVisualization vis = model.getVisualization();
+        if (vis == null || canvas.getLadder().isEmpty()) {
+            return " ";
+        }
+        long bytesPerCell = canvas.getBytesPerCell();
+        long end = Math.min(model.getVisibleEnd(), vis.getFileLength());
+        String cells = canvas.level().hex ? "hex, " + canvas.level().columns + " bytes per line"
+                : bytesPerCell + (bytesPerCell == 1 ? " byte" : " bytes") + " per cell";
+        return String.format("Zoom %d of %d, %s, showing 0x%X - 0x%X of 0x%X",
+                canvas.getLevelIndex() + 1, canvas.getLadder().size(), cells, model.getVisibleStart(),
+                Math.max(0, end - 1), Math.max(0, vis.getFileLength() - 1));
     }
 
     private void initOverviewNavigation() {
@@ -133,22 +190,17 @@ public class InteractiveVisualizerPanel extends JPanel {
     private JToolBar createToolBar() {
         JToolBar toolBar = new JToolBar();
         toolBar.setFloatable(false);
-        toolBar.add(toggle("Byte plot", "Show the byte plot", model.isByteplotVisible(), model::setByteplotVisible));
-        toolBar.add(toggle("Entropy", "Show the entropy", model.isEntropyVisible(), model::setEntropyVisible));
-        toolBar.add(toggle("Structure", "Show the PE structure", model.isStructureVisible(), model::setStructureVisible));
-        toolBar.add(toggle("Markers", "Show anomalies and signature matches", model.isMarkersVisible(),
-                model::setMarkersVisible));
-        toolBar.addSeparator();
-        toolBar.add(button("Zoom in", "Zoom in (Ctrl + mouse wheel, +)", () -> canvas.zoom(1, null)));
-        toolBar.add(button("Zoom out", "Zoom out (Ctrl + mouse wheel, -)", () -> canvas.zoom(-1, null)));
-        toolBar.add(button("Whole file", "Show the whole file", canvas::zoomToFit));
-        toolBar.add(button("Go to ...", "Go to an offset (Ctrl + G)", canvas::goToOffset));
+        toolBar.setBorder(Spacing.padding(Spacing.GAP / 2, Spacing.GAP, Spacing.GAP / 2, Spacing.GAP));
+        toolBar.add(button(ToolIcons.zoomIn(), "Zoom in (Ctrl + mouse wheel, +)", () -> canvas.zoom(1, null)));
+        toolBar.add(button(ToolIcons.zoomOut(), "Zoom out (Ctrl + mouse wheel, -)", () -> canvas.zoom(-1, null)));
+        toolBar.add(button(ToolIcons.wholeFile(), "Show the whole file", canvas::zoomToFit));
+        toolBar.add(button(ToolIcons.goTo(), "Go to an offset (Ctrl + G)", canvas::goToOffset));
         toolBar.addSeparator();
         toolBar.add(new JLabel("Hex colors "));
         toolBar.add(hexColorChooser());
+        toolBar.add(new JLabel("  Hex width "));
+        toolBar.add(hexWidthChooser());
         toolBar.addSeparator();
-        JToggleButton legendButton = toggle("Legend", "Show the legend", true, legendPanel::setVisible);
-        toolBar.add(legendButton);
         JButton exportButton = new JButton("Save image ...");
         exportButton.setToolTipText("Save the visualization as PNG");
         JPopupMenu exportMenu = new JPopupMenu();
@@ -193,20 +245,61 @@ public class InteractiveVisualizerPanel extends JPanel {
         return hexColorChooser;
     }
 
-    private interface BooleanSetter {
-        void set(boolean value);
+    /** bytes per line of the hex view, 0 fits the width of the view */
+    private static final int[] HEX_WIDTHS = {0, 8, 16, 24, 32, 48, 64};
+
+    private JComboBox<String> hexWidthChooser() {
+        String[] names = new String[HEX_WIDTHS.length];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = HEX_WIDTHS[i] == 0 ? "Auto" : HEX_WIDTHS[i] + " bytes";
+        }
+        JComboBox<String> chooser = new JComboBox<>(names);
+        chooser.setToolTipText("Bytes per line of the hex view; Auto fits the width of the view, "
+                + "larger values are limited to what fits");
+        chooser.setFocusable(false);
+        chooser.setMaximumSize(chooser.getPreferredSize());
+        chooser.addActionListener(e -> {
+            if (settingHexWidth) {
+                return;
+            }
+            int bytes = HEX_WIDTHS[chooser.getSelectedIndex()];
+            canvas.setHexBytesPerLine(bytes);
+            if (hexWidthListener != null) {
+                hexWidthListener.accept(bytes);
+            }
+        });
+        this.hexWidthChooser = chooser;
+        return chooser;
     }
 
-    private static JToggleButton toggle(String text, String tooltip, boolean selected, BooleanSetter setter) {
-        JToggleButton button = new JToggleButton(text, selected);
-        button.setToolTipText(tooltip);
-        button.setFocusable(false);
-        button.addActionListener(e -> setter.set(button.isSelected()));
-        return button;
+    JComboBox<String> getHexWidthChooser() {
+        return hexWidthChooser;
     }
 
-    private static JButton button(String text, String tooltip, Runnable action) {
-        JButton button = new JButton(text);
+    /**
+     * @param bytesPerLine the bytes per line of the hex view, 0 or a value that is not offered fits the width of
+     *                     the view
+     */
+    public void setHexBytesPerLine(int bytesPerLine) {
+        int index = Math.max(0, java.util.Arrays.binarySearch(HEX_WIDTHS, bytesPerLine));
+        settingHexWidth = true;
+        try {
+            hexWidthChooser.setSelectedIndex(index);
+        } finally {
+            settingHexWidth = false;
+        }
+        canvas.setHexBytesPerLine(HEX_WIDTHS[index]);
+    }
+
+    /**
+     * @param listener receives the bytes per line when the user picks another width, 0 for auto
+     */
+    public void setHexBytesPerLineListener(IntConsumer listener) {
+        this.hexWidthListener = listener;
+    }
+
+    private static JButton button(Icon icon, String tooltip, Runnable action) {
+        JButton button = new JButton(icon);
         button.setToolTipText(tooltip);
         button.setFocusable(false);
         button.addActionListener(e -> action.run());

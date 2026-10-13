@@ -383,14 +383,22 @@ public class MainFrame extends JFrame {
         JMenu settingsMenu = new JMenu("Settings");
         JCheckBoxMenuItem disableYaraWarn = new JCheckBoxMenuItem("Disable Yara warnings");
         JCheckBoxMenuItem disableUpdateCheck = new JCheckBoxMenuItem("Disable update check");
-        JCheckBoxMenuItem systemTheme = new JCheckBoxMenuItem("Use system theme");
+        JMenu themeMenu = new JMenu("Theme");
+        JRadioButtonMenuItem darkTheme = new JRadioButtonMenuItem("Dark");
+        JRadioButtonMenuItem brightTheme = new JRadioButtonMenuItem("Bright");
+        ButtonGroup themes = new ButtonGroup();
+        themes.add(darkTheme);
+        themes.add(brightTheme);
+        themeMenu.add(darkTheme);
+        themeMenu.add(brightTheme);
         disableUpdateCheck.setState(settings.valueEquals(PortexSettingsKey.DISABLE_UPDATE, "1"));
         disableYaraWarn.setState(settings.valueEquals(PortexSettingsKey.DISABLE_YARA_WARNINGS, "1"));
-        systemTheme.setState(settings.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.SYSTEM.toString()));
+        darkTheme.setSelected(this.darkTheme);
+        brightTheme.setSelected(!this.darkTheme);
 
         settingsMenu.add(disableYaraWarn);
         settingsMenu.add(disableUpdateCheck);
-        settingsMenu.add(systemTheme);
+        settingsMenu.add(themeMenu);
 
         disableYaraWarn.addActionListener(e -> {
             if(disableYaraWarn.getState()) {
@@ -418,22 +426,24 @@ public class MainFrame extends JFrame {
             }
         });
 
-        systemTheme.addActionListener(e -> {
+        java.awt.event.ActionListener themeChanged = e -> {
+            LookAndFeelSetting chosen = darkTheme.isSelected() ? LookAndFeelSetting.PORTEX : LookAndFeelSetting.SYSTEM;
+            if (settings.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, chosen.toString())) {
+                return;
+            }
             JOptionPane.showMessageDialog(this,
                     "Please restart PortexAnalyzerGUI for the new theme!",
                     "Theme changed",
                     JOptionPane.INFORMATION_MESSAGE);
-            if(systemTheme.getState()) {
-                settings.put(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.SYSTEM.toString());
-            } else {
-                settings.put(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
-            }
+            settings.put(PortexSettingsKey.LOOK_AND_FEEL, chosen.toString());
             try {
                 settings.writeSettings();
             } catch (IOException ex) {
-                LOGGER.error(e);
+                LOGGER.error(ex);
             }
-        });
+        };
+        darkTheme.addActionListener(themeChanged);
+        brightTheme.addActionListener(themeChanged);
         return settingsMenu;
     }
 

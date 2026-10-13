@@ -17,6 +17,9 @@
  */
 package io.github.struppigel.gui;
 
+import com.formdev.flatlaf.FlatLaf;
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
 import io.github.struppigel.settings.LookAndFeelSetting;
 import io.github.struppigel.settings.PortexSettings;
 import io.github.struppigel.settings.PortexSettingsKey;
@@ -24,9 +27,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
-import javax.swing.UIManager.LookAndFeelInfo;
-import java.awt.*;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -34,15 +35,17 @@ import java.util.Map;
  */
 public class Starter {
     private static final Logger LOGGER = LogManager.getLogger();
+    // the dark red of the PortEx logo
+    private static final String ACCENT_COLOR = "#AA0000";
 
     public static void main(String[] args) {
 
         LOGGER.debug("starting program");
         PortexSettings s = new PortexSettings();
         if(s.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString())) {
-            setPortexLookAndFeel();
+            setDarkLookAndFeel();
         } else {
-            setSystemLookAndFeel();
+            setBrightLookAndFeel();
         }
         initMainFrame(s);
     }
@@ -51,70 +54,43 @@ public class Starter {
         SwingUtilities.invokeLater(() -> new MainFrame(s));
     }
 
-    private static void setSystemLookAndFeel() {
+    public static void setDarkLookAndFeel() {
+        Map<String, String> colors = new HashMap<>();
+        // neutral dark, red only marks selection, focus and pressed controls
+        colors.put("@background", "#1A1A1A");
+        colors.put("@foreground", "#F2F2F2");
+        colors.put("@componentBackground", "#000000");
+        colors.put("@menuBackground", "#121212");
+        colors.put("@buttonBackground", "#2E2E2E");
+        colors.put("Table.alternateRowColor", "#1E1E1E");
+        colors.put("TableHeader.background", "#2A2A2A");
+        colors.put("TableHeader.separatorColor", "#444444");
+        colors.put("Component.borderColor", "#3C3C3C");
+        colors.put("Separator.foreground", "#3C3C3C");
+        colors.put("ScrollBar.thumb", "#3C3C3C");
+        colors.put("ScrollBar.hoverThumbColor", "#555555");
+        colors.put("ScrollBar.pressedThumbColor", ACCENT_COLOR);
+        colors.put("ToolTip.background", "#282828");
+        colors.put("ToolTip.foreground", "#FFFFFF");
+        setup(new FlatDarkLaf(), colors);
+    }
+
+    public static void setBrightLookAndFeel() {
+        Map<String, String> colors = new HashMap<>();
+        colors.put("Table.alternateRowColor", "#F0F0F0");
+        setup(new FlatLightLaf(), colors);
+    }
+
+    private static void setup(LookAndFeel laf, Map<String, String> colors) {
+        Map<String, String> defaults = new HashMap<>(colors);
+        defaults.put("@accentColor", ACCENT_COLOR);
+        FlatLaf.setGlobalExtraDefaults(defaults);
         try {
-            // Set System L&F
-            UIManager.setLookAndFeel(
-                    UIManager.getSystemLookAndFeelClassName());
-            UIManager.put("Table.alternateRowColor", new Color(240,240,240));
-        }
-        catch (ClassNotFoundException | InstantiationException
-               | IllegalAccessException
-               | UnsupportedLookAndFeelException e) {
+            UIManager.setLookAndFeel(laf);
+        } catch (UnsupportedLookAndFeelException e) {
             LOGGER.error(e.getMessage());
         }
     }
 
-    /**
-     * @return the colors of the PortEx theme, a dark Nimbus, as keys and values for the UIManager
-     */
-    public static Map<String, Color> portexThemeColors() {
-        Map<String, Color> colors = new LinkedHashMap<>();
-        colors.put("nimbusBase", new Color(15, 0, 0));
-        colors.put("nimbusBlueGrey", new Color(170, 0, 0));
-        colors.put("control", Color.black);
-        colors.put("text", Color.white);
-        colors.put("nimbusSelectionBackground", Color.gray);
-        colors.put("nimbusSelectedText", Color.white);
-        colors.put("textHighlight", Color.lightGray);
-        colors.put("nimbusFocus", new Color(0xBA3A1E));
-        colors.put("nimbusSelection", new Color(170, 0, 0));
-        colors.put("textBackground", Color.darkGray);
-        colors.put("nimbusLightBackground", Color.black);
-        // background of tool tips, otherwise Nimbus paints the white text on light yellow
-        colors.put("info", new Color(40, 40, 40));
-        colors.put("Table.alternateRowColor", new Color(20,20,20));
-        return colors;
-    }
-
-    public static void setPortexLookAndFeel() {
-        portexThemeColors().forEach(UIManager::put);
-
-       // UIManager.put("ToggleButton.disabled", Color.yellow);
-        //UIManager.put("ToggleButton.foreground", Color.yellow);
-        //UIManager.put("ToolBar.opaque", true);
-        //UIManager.put("ToolBar.background", new Color(100, 0, 0));
-        //UIManager.put("ToolBar.disabled", Color.green);
-        //UIManager.put("ToolBar.foreground", Color.red);
-/*
-        UIManager.put("ToolBar.background", Color.blue);
-        UIManager.put("ToolBar.foreground", Color.blue);
-        UIManager.put("ToolBar.disabled", Color.blue);
-        UIManager.put("ToolBar.opaque", false);
-*/
-
-        for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-            if ("Nimbus".equals(info.getName())) {
-                try {
-                    UIManager.setLookAndFeel(info.getClassName());
-                } catch (ClassNotFoundException | InstantiationException
-                         | IllegalAccessException
-                         | UnsupportedLookAndFeelException e) {
-                    LOGGER.error(e.getMessage());
-                }
-                break;
-            }
-        }
-    }
-
 }
+

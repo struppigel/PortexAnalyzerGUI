@@ -46,6 +46,18 @@ class ZoomLadderTest {
     }
 
     @Test
+    void hexLevelHasTheRequestedBytesPerLine() {
+        for (int columns : new int[]{8, 24, 64}) {
+            List<ZoomLevel> ladder = ZoomLadder.create(100_000, 256, 600, columns);
+            ZoomLevel hex = ladder.get(ladder.size() - 1);
+            assertTrue(hex.hex);
+            assertEquals(columns, hex.columns);
+        }
+        assertEquals(ZoomLadder.HEX_COLUMNS,
+                ZoomLadder.create(100_000, 256, 600).get(ZoomLadder.create(100_000, 256, 600).size() - 1).columns);
+    }
+
+    @Test
     void smallFilesStartAtSingleBytes() {
         List<ZoomLevel> ladder = ZoomLadder.create(268, 200, 600);
         assertEquals(1, ladder.get(0).bytesPerCell);

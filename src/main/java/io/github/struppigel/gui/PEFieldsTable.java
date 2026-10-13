@@ -25,9 +25,6 @@ import org.apache.logging.log4j.Logger;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.event.TableModelEvent;
-import javax.swing.plaf.synth.ColorType;
-import javax.swing.plaf.synth.SynthContext;
-import javax.swing.plaf.synth.SynthUI;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import java.awt.*;
@@ -320,20 +317,9 @@ public class PEFieldsTable extends JTable {
                 PortexSwingUtils.disableHtml((JComponent) usual);
             }
             Component look = usual.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-            Color background = look.getBackground();
-            Color foreground = look.getForeground();
-            Font font = look.getFont();
-            if (look instanceof JLabel && ((JLabel) look).getUI() instanceof SynthUI) {
-                // Nimbus paints labels with the colors of its style, not those of the component
-                SynthContext context = ((SynthUI) ((JLabel) look).getUI()).getContext((JLabel) look);
-                background = context.getStyle().getColor(context, ColorType.BACKGROUND);
-                foreground = context.getStyle().getColor(context, ColorType.TEXT_FOREGROUND);
-                font = context.getStyle().getFont(context);
-            }
-            // copies, because Nimbus replaces colors of the look and feel (UIResource) with its own
-            setBackground(new Color(background.getRGB()));
-            setForeground(new Color(foreground.getRGB()));
-            setFont(font);
+            setBackground(look.getBackground());
+            setForeground(look.getForeground());
+            setFont(look.getFont());
             setBorder(look instanceof JComponent ? ((JComponent) look).getBorder() : null);
             setText(value == null ? "" : value.toString());
             // the text area computes its preferred height for this width

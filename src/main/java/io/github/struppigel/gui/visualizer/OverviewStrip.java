@@ -204,10 +204,20 @@ public class OverviewStrip extends JComponent {
         int y = (int) (firstRow * CELL_SIZE);
         int h = (int) Math.max(2, (lastRow - firstRow + 1) * CELL_SIZE);
         int w = TRACKS.size() * trackWidth + (TRACKS.size() - 1) * GAP;
-        g.setColor(new Color(255, 255, 255, 50));
-        g.fillRect(0, y, w, h);
-        g.setColor(Color.white);
-        g.drawRect(0, y, w - 1, h - 1);
+        Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            g2.setColor(new Color(255, 255, 255, 60));
+            g2.fillRect(0, y, w, h);
+            // the dark line below keeps the white one visible on bright tracks
+            g2.setColor(new Color(0, 0, 0, 170));
+            g2.setStroke(new BasicStroke(4));
+            g2.drawRect(1, y + 1, w - 3, h - 3);
+            g2.setColor(Color.white);
+            g2.setStroke(new BasicStroke(2));
+            g2.drawRect(1, y + 1, w - 3, h - 3);
+        } finally {
+            g2.dispose();
+        }
     }
 
     private void schedule(RenderRequest request, FileVisualization vis) {

@@ -61,6 +61,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- PE samples are never committed, tests read them from the local PortEx corpus -->
         <portex.testfiles>${project.basedir}/../PortEx/portextestfiles</portex.testfiles>
+        <!-- override to build against a local PortEx snapshot, e.g. -Dportex.version=6.0.0-SNAPSHOT -->
+        <portex.version>5.0.7</portex.version>
     </properties>
     <profiles>
         <!-- compile against the Java 8 API when building with a newer JDK -->
@@ -96,9 +98,14 @@
             <version>2.19.0</version>
         </dependency>
         <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.7.2</version>
+        </dependency>
+        <dependency>
             <groupId>io.github.struppigel</groupId>
             <artifactId>portex_2.12</artifactId>
-            <version>5.0.7</version>
+            <version>${portex.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

@@ -79,6 +79,13 @@ final class ZoomLadder {
      * @return the levels from the whole file to hex
      */
     static List<ZoomLevel> create(long fileLength, int trackWidth, int viewHeight) {
+        return create(fileLength, trackWidth, viewHeight, HEX_COLUMNS);
+    }
+
+    /**
+     * @param hexColumns the bytes per line of the hex level
+     */
+    static List<ZoomLevel> create(long fileLength, int trackWidth, int viewHeight, int hexColumns) {
         // a power of two of columns for round row offsets, cells as large as the track width allows
         int columns = clamp(highestPowerOfTwo(Math.max(1, trackWidth / 4)), MIN_COLUMNS, MAX_COLUMNS);
         int cell = clamp(trackWidth / columns, 2, 8);
@@ -94,7 +101,7 @@ final class ZoomLadder {
             cell *= 2;
             levels.add(new ZoomLevel(columns, 1, cell, cell, false));
         }
-        levels.add(new ZoomLevel(HEX_COLUMNS, 1, HEX_SIDE_CELL_WIDTH, HEX_CELL_HEIGHT, true));
+        levels.add(new ZoomLevel(Math.max(1, hexColumns), 1, HEX_SIDE_CELL_WIDTH, HEX_CELL_HEIGHT, true));
         return Collections.unmodifiableList(levels);
     }
 

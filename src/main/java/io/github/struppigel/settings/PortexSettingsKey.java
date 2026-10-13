@@ -25,6 +25,8 @@ public enum PortexSettingsKey {
     // possible values are in LookAndFeelSetting
     LOOK_AND_FEEL,
     VALUES_AS_HEX,
-    CONTENT_PREVIEW;
+    CONTENT_PREVIEW,
+    // bytes per line of the hex view of the visualization, 0 fits the width of the window
+    HEX_BYTES_PER_LINE;
 
 }

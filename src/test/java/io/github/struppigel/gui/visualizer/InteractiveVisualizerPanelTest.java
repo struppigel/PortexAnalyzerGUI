@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
@@ -274,34 +275,20 @@ class InteractiveVisualizerPanelTest {
     }
 
     /**
-     * Next to the hex values there may be room for only one of byte plot and entropy. Switching one of them off must
-     * not show the other.
+     * The byte plot and the entropy are not shown next to the hex values, however wide the view is, the hex cells
+     * have their colors.
      */
     @Test
-    void switchingOffATrackNextToTheHexShowsNoOtherTrack() throws Exception {
+    void hexViewShowsNoSideTracks() throws Exception {
         load(NATIVE_X86);
         onEdt(() -> {
             canvas.zoom(100, null);
             assertTrue(canvas.level().hex);
             canvas.setSize(3000, canvas.getHeight());
             assertTrue(canvas.relayout());
-            List<DetailCanvas.TrackLayout> wide = canvas.trackLayouts();
-            assertEquals(Arrays.asList(Track.BYTEPLOT, Track.ENTROPY, Track.HEX, Track.ASCII), tracks());
-            DetailCanvas.TrackLayout last = wide.get(wide.size() - 1);
-            int sideTrack = wide.get(1).x - wide.get(0).x;
-            // room for exactly one side track
-            canvas.setSize(last.x + last.width - sideTrack, canvas.getHeight());
-            assertTrue(canvas.relayout());
-
-            List<Track> both = tracks();
-            assertEquals(Arrays.asList(Track.BYTEPLOT, Track.HEX, Track.ASCII), both, "the space is used");
-            model.setEntropyVisible(false);
-            assertEquals(both, tracks());
-            model.setEntropyVisible(true);
-            model.setByteplotVisible(false);
             assertEquals(Arrays.asList(Track.HEX, Track.ASCII), tracks());
             DetailCanvas.TrackLayout hex = canvas.trackLayouts().get(0);
-            assertTrue(hex.x + hex.width <= canvas.getWidth());
+            assertEquals(DetailCanvas.RULER_WIDTH, hex.x);
         });
     }
 
@@ -396,9 +383,119 @@ class InteractiveVisualizerPanelTest {
     }
 
     @Test
+    void hexViewHasTheChosenBytesPerLine() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            panel.setHexBytesPerLine(8);
+            canvas.zoom(100, null);
+            assertTrue(canvas.level().hex);
+            assertEquals(8, canvas.level().columns);
+            assertEquals(8, canvas.mapping().getColumns());
+            assertEquals(1, panel.getHexWidthChooser().getSelectedIndex());
+
+            Swing.layout(panel, 2600, 700);
+            canvas.relayout();
+            panel.setHexBytesPerLine(24);
+            assertEquals(24, canvas.level().columns);
+            assertTrue(canvas.level().hex, "stays at the hex level");
+            DetailCanvas.TrackLayout last = canvas.trackLayouts().get(canvas.trackLayouts().size() - 1);
+            assertTrue(last.x + last.width <= canvas.getWidth(), "the tracks fit into the canvas");
+        });
+    }
+
+    @Test
+    void tooManyBytesPerLineAreLimitedToTheWidth() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            panel.setHexBytesPerLine(64);
+            canvas.zoom(100, null);
+            assertTrue(canvas.level().columns < 64, "columns " + canvas.level().columns);
+            DetailCanvas.TrackLayout last = canvas.trackLayouts().get(canvas.trackLayouts().size() - 1);
+            assertTrue(last.x + last.width <= canvas.getWidth(), "the tracks fit into the canvas");
+        });
+    }
+
+    @Test
+    void autoHexWidthFollowsTheSizeOfTheView() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            canvas.zoom(100, null);
+            assertEquals(0, panel.getHexWidthChooser().getSelectedIndex(), "auto is the default");
+            int narrow = canvas.level().columns;
+            int perByte = 30;
+            int room = canvas.getWidth() - DetailCanvas.RULER_WIDTH - DetailCanvas.GAP;
+            assertEquals(room / perByte, narrow, "uses all the room");
+
+            Swing.layout(panel, 2600, 700);
+            canvas.relayout();
+            assertTrue(canvas.level().hex, "stays at the hex level");
+            assertTrue(canvas.level().columns > narrow, canvas.level().columns + " after " + narrow);
+            room = canvas.getWidth() - DetailCanvas.RULER_WIDTH - DetailCanvas.GAP;
+            assertEquals(room / perByte, canvas.level().columns, "uses all the room");
+            DetailCanvas.TrackLayout last = canvas.trackLayouts().get(canvas.trackLayouts().size() - 1);
+            assertTrue(last.x + last.width <= canvas.getWidth(), "the tracks fit into the canvas");
+        });
+    }
+
+    @Test
+    void pickingAHexWidthIsReported() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            List<Integer> reported = new ArrayList<>();
+            panel.setHexBytesPerLineListener(reported::add);
+
+            panel.setHexBytesPerLine(32); // not the user
+            assertTrue(reported.isEmpty());
+
+            panel.getHexWidthChooser().setSelectedIndex(2);
+            panel.getHexWidthChooser().setSelectedIndex(0);
+            assertEquals(Arrays.asList(16, 0), reported);
+            assertEquals(0, canvas.getHexBytesPerLine());
+        });
+    }
+
+    @Test
     void legendListsPresentStructures() throws Exception {
         load(OVERLAY);
         onEdt(() -> assertTrue(panel.getLegendPanel().entryCount() > 0));
+    }
+
+    @Test
+    void layerCheckBoxesSwitchTheLayersAndTheSectionsStay() throws Exception {
+        load(OVERLAY);
+        onEdt(() -> {
+            LegendPanel legend = panel.getLegendPanel();
+            int entries = legend.entryCount();
+            List<JCheckBox> boxes = Swing.findAll(legend, JCheckBox.class);
+            assertEquals(Arrays.asList("Byte plot", "Entropy", "PE structure", "Markers"),
+                    boxes.stream().map(AbstractButton::getText).collect(Collectors.toList()));
+
+            boxes.get(0).doClick();
+            boxes.get(1).doClick();
+            boxes.get(3).doClick();
+
+            assertFalse(model.isByteplotVisible());
+            assertFalse(model.isEntropyVisible());
+            assertFalse(model.isMarkersVisible());
+            assertTrue(model.isStructureVisible());
+            assertEquals(entries, legend.entryCount(), "the colors stay when the layers are off");
+            assertFalse(boxes.get(0).isSelected());
+
+            boxes.get(0).doClick();
+            assertTrue(model.isByteplotVisible());
+        });
+    }
+
+    @Test
+    void layerCheckBoxesFollowTheModel() throws Exception {
+        load(OVERLAY);
+        onEdt(() -> {
+            List<JCheckBox> boxes = Swing.findAll(panel.getLegendPanel(), JCheckBox.class);
+            model.setEntropyVisible(false);
+            assertFalse(boxes.get(1).isSelected());
+            model.setEntropyVisible(true);
+            assertTrue(boxes.get(1).isSelected());
+        });
     }
 
     @Test

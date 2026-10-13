@@ -59,6 +59,9 @@ public class DetailCanvas extends JComponent {
     private static final Color SELECTION_FILL = new Color(255, 255, 0, 60);
     private static final Color SELECTION_CELL = Color.yellow;
     private static final Color HOVER_CELL = Color.white;
+    private static final Color HOVER_FILL = new Color(255, 255, 255, 70);
+    private static final int OUTLINE_MIN_CELL = 6;
+    private static final int MAX_AUTO_HEX_COLUMNS = 128;
     private static final int SCROLL_ROWS_PER_NOTCH = 3;
     /** the scroll bar works with int, rows of large files at fine zoom levels are scaled down */
     private static final long MAX_SCROLL_VALUE = 1_000_000_000L;
@@ -71,6 +74,9 @@ public class DetailCanvas extends JComponent {
     private List<ZoomLevel> ladder;
     private int ladderTrackWidth;
     private int ladderHeight;
+    private int ladderHexColumns;
+    // 0 fits the width of the canvas
+    private int hexBytesPerLine = 0;
     private int levelIndex = 0;
     private long firstRow = 0;
     private long scrollScale = 1;
@@ -170,12 +176,15 @@ public class DetailCanvas extends JComponent {
         }
         int n = baseTracks().size();
         int trackWidth = Math.max(16, (getWidth() - RULER_WIDTH - (n - 1) * GAP) / n);
-        if (ladder == null || trackWidth != ladderTrackWidth || getHeight() != ladderHeight) {
+        int hexColumns = effectiveHexColumns();
+        if (ladder == null || trackWidth != ladderTrackWidth || getHeight() != ladderHeight
+                || hexColumns != ladderHexColumns) {
             long top = ladder == null ? 0 : mapping().cellStart(firstRow, 0);
             ZoomLevel previous = ladder == null ? null : level();
-            ladder = ZoomLadder.create(vis.getFileLength(), trackWidth, getHeight());
+            ladder = ZoomLadder.create(vis.getFileLength(), trackWidth, getHeight(), hexColumns);
             ladderTrackWidth = trackWidth;
             ladderHeight = getHeight();
+            ladderHexColumns = hexColumns;
             levelIndex = previous == null ? 0 : ZoomLadder.closest(ladder, previous);
             firstRow = 0;
             setFirstRowUnchecked(mapping().rowOf(Math.max(0, Math.min(top, vis.getFileLength() - 1))));
@@ -186,6 +195,33 @@ public class DetailCanvas extends JComponent {
 
     ZoomLevel level() {
         return ladder.get(levelIndex);
+    }
+
+    /**
+     * @param bytesPerLine the bytes per line of the hex view, 0 to fit the width of the view; more than fit are
+     *                     limited to what fits
+     */
+    void setHexBytesPerLine(int bytesPerLine) {
+        this.hexBytesPerLine = Math.max(0, bytesPerLine);
+        relayout();
+        repaint();
+    }
+
+    int getHexBytesPerLine() {
+        return hexBytesPerLine;
+    }
+
+    /**
+     * @return the bytes per line the hex view has now
+     */
+    private int effectiveHexColumns() {
+        int perByte = VisualizationRenderer.cellWidthOf(Track.HEX, ZoomLadder.HEX_SIDE_CELL_WIDTH)
+                + VisualizationRenderer.cellWidthOf(Track.ASCII, ZoomLadder.HEX_SIDE_CELL_WIDTH);
+        int fit = Math.max(1, (getWidth() - RULER_WIDTH - GAP) / perByte);
+        if (hexBytesPerLine > 0) {
+            return Math.min(hexBytesPerLine, fit);
+        }
+        return Math.min(fit, MAX_AUTO_HEX_COLUMNS);
     }
 
     List<ZoomLevel> getLadder() {
@@ -238,18 +274,7 @@ public class DetailCanvas extends JComponent {
         ZoomLevel level = level();
         List<Track> tracks = new ArrayList<>();
         if (level.hex) {
-            // the bytes are more important; which side tracks fit does not depend on the switched on tracks, so
-            // that switching one off never shows another
-            List<Track> fitting = new ArrayList<>();
-            for (Track side : new Track[]{Track.BYTEPLOT, Track.ENTROPY}) {
-                fitting.add(side);
-                if (width(fitting, level) + hexWidth(level) > getWidth()) {
-                    break;
-                }
-                if (side == Track.BYTEPLOT ? model.isByteplotVisible() : model.isEntropyVisible()) {
-                    tracks.add(side);
-                }
-            }
+            // the bytes get all the room, their colors are those of the picked hex background
             tracks.add(Track.HEX);
             tracks.add(Track.ASCII);
         } else {
@@ -264,19 +289,6 @@ public class DetailCanvas extends JComponent {
             x += width + GAP;
         }
         return layouts;
-    }
-
-    private static int width(List<Track> tracks, ZoomLevel level) {
-        int width = RULER_WIDTH;
-        for (Track track : tracks) {
-            width += level.columns * VisualizationRenderer.cellWidthOf(track, level.cellWidth) + GAP;
-        }
-        return width;
-    }
-
-    private static int hexWidth(ZoomLevel level) {
-        return level.columns * (VisualizationRenderer.cellWidthOf(Track.HEX, level.cellWidth)
-                + VisualizationRenderer.cellWidthOf(Track.ASCII, level.cellWidth)) + GAP;
     }
 
     // --- coordinates ---
@@ -766,8 +778,8 @@ public class DetailCanvas extends JComponent {
 
     private void paintCellOutlines(Graphics g, List<TrackLayout> layouts, ViewMapping mapping, ZoomLevel level,
                                    long lastRow) {
-        paintCell(g, layouts, mapping, level, lastRow, model.getSelectedOffset(), SELECTION_CELL);
-        paintCell(g, layouts, mapping, level, lastRow, model.getHoverOffset(), HOVER_CELL);
+        paintCell(g, layouts, mapping, level, lastRow, model.getSelectedOffset(), SELECTION_CELL, null);
+        paintCell(g, layouts, mapping, level, lastRow, model.getHoverOffset(), HOVER_CELL, HOVER_FILL);
     }
 
     private void paintRange(Graphics g, List<TrackLayout> layouts, ViewMapping mapping, ZoomLevel level,
@@ -790,7 +802,7 @@ public class DetailCanvas extends JComponent {
     }
 
     private void paintCell(Graphics g, List<TrackLayout> layouts, ViewMapping mapping, ZoomLevel level, long lastRow,
-                           long offset, Color color) {
+                           long offset, Color color, Color fill) {
         if (offset < 0 || offset >= mapping.getFileLength()) {
             return;
         }
@@ -800,9 +812,23 @@ public class DetailCanvas extends JComponent {
         }
         int y = (int) ((row - firstRow) * level.cellHeight);
         int column = mapping.columnOf(offset);
-        g.setColor(color);
-        for (TrackLayout t : layouts) {
-            g.drawRect(t.x + column * t.cellWidth, y, Math.max(1, t.cellWidth - 1), Math.max(1, level.cellHeight - 1));
+        Graphics2D g2 = (Graphics2D) g.create();
+        try {
+            for (TrackLayout t : layouts) {
+                int x = t.x + column * t.cellWidth;
+                int w = Math.max(1, t.cellWidth - 1);
+                int h = Math.max(1, level.cellHeight - 1);
+                if (fill != null) {
+                    g2.setColor(fill);
+                    g2.fillRect(x, y, w + 1, h + 1);
+                }
+                g2.setColor(color);
+                // a thin outline would vanish next to tiny cells
+                g2.setStroke(new BasicStroke(t.cellWidth >= OUTLINE_MIN_CELL ? 2 : 1));
+                g2.drawRect(x, y, w, h);
+            }
+        } finally {
+            g2.dispose();
         }
     }
 

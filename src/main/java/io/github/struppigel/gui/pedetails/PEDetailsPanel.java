@@ -38,6 +38,7 @@ import io.github.struppigel.gui.visualizer.RegionNavigator;
 import io.github.struppigel.gui.visualizer.VisualizationModel;
 import io.github.struppigel.parser.sections.debug.ExtendedDLLCharacteristics;
 import io.github.struppigel.settings.PortexSettings;
+import io.github.struppigel.settings.PortexSettingsKey;
 import io.github.struppigel.parser.PhysicalLocation;
 import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.sigscanner.SignatureMatch;
@@ -133,6 +134,17 @@ public class PEDetailsPanel extends JPanel {
     }
 
     /**
+     * @return the bytes per line of the hex view the user picked, 0 for auto
+     */
+    private int savedHexBytesPerLine() {
+        try {
+            return Integer.parseInt(settings.get(PortexSettingsKey.HEX_BYTES_PER_LINE));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
      * Every navigation to an offset, e.g., in the tree or a table, goes through the preview. The visualization
      * selects the structure there, and the preview shows the offsets the user clicks in the visualization.
      */
@@ -191,6 +203,15 @@ public class PEDetailsPanel extends JPanel {
 
         // interactive visualization
         visualizerView = new InteractiveVisualizerPanel(visModel);
+        visualizerView.setHexBytesPerLine(savedHexBytesPerLine());
+        visualizerView.setHexBytesPerLineListener(bytes -> {
+            settings.put(PortexSettingsKey.HEX_BYTES_PER_LINE, String.valueOf(bytes));
+            try {
+                settings.writeSettings();
+            } catch (IOException e) {
+                LOGGER.error(e);
+            }
+        });
 
         // icons page + button
         JPanel iconWrapperPanel = new JPanel();

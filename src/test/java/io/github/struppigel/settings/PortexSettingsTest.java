@@ -29,6 +29,7 @@ class PortexSettingsTest {
         assertEquals("PORTEX", settings.get(LOOK_AND_FEEL));
         assertEquals("1", settings.get(VALUES_AS_HEX));
         assertEquals("1", settings.get(CONTENT_PREVIEW));
+        assertEquals("0", settings.get(HEX_BYTES_PER_LINE));
         assertFalse(settings.containsKey(YARA_PATH));
         assertFalse(settings.containsKey(YARA_SIGNATURE_PATH));
     }
@@ -63,7 +64,8 @@ class PortexSettingsTest {
     @Test
     void storedNamesAreUnchanged() {
         assertEquals(Arrays.asList("YARA_PATH", "YARA_SIGNATURE_PATH", "DISABLE_UPDATE", "DISABLE_YARA_WARNINGS",
-                "LOOK_AND_FEEL", "VALUES_AS_HEX", "CONTENT_PREVIEW"), names(PortexSettingsKey.values()));
+                "LOOK_AND_FEEL", "VALUES_AS_HEX", "CONTENT_PREVIEW", "HEX_BYTES_PER_LINE"),
+                names(PortexSettingsKey.values()));
         assertEquals(Arrays.asList("PORTEX", "SYSTEM"), names(LookAndFeelSetting.values()));
     }
 
