@@ -43,7 +43,7 @@ import io.github.struppigel.tools.sigscanner.LocationKind;
 import io.github.struppigel.tools.sigscanner.SignatureMatch;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.MainFrame;
-import com.google.common.base.Optional;
+import java.util.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -83,7 +83,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(0);
         publish("Loading Headers...");
         PEData data = PELoader.loadPE(file);
-        java.util.Optional<CLRSection> maybeCLR = loadCLRSection(data).transform(java.util.Optional::of).or(java.util.Optional.empty());
+        java.util.Optional<CLRSection> maybeCLR = loadCLRSection(data);
         List<StandardField> dotnetMetaDataRootEntries = createDotNetMetadataRootEntries(maybeCLR);
         List<Object[]> dotNetStreamHeaders = createDotNetStreamHeaders(maybeCLR);
         List<StandardField> optimizedStreamEntries = createOptimizedStreamEntries(maybeCLR);
@@ -172,7 +172,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         } catch (AnalysisInterruptedException e) {
             throw e;
         } catch (RuntimeException e) {
-            LOGGER.error("Could not parse the certificate table: " + e.getMessage());
+            LOGGER.error("Could not parse the certificate table", e);
             return java.util.Optional.empty();
         }
     }
@@ -187,7 +187,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         } catch (AnalysisInterruptedException e) {
             throw e;
         } catch (RuntimeException e) {
-            LOGGER.error("Could not verify the Authenticode signatures: " + e.getMessage());
+            LOGGER.error("Could not verify the Authenticode signatures", e);
             return java.util.Optional.empty();
         }
     }
@@ -227,7 +227,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         } catch (AnalysisInterruptedException e) {
             throw e;
         } catch (IOException | RuntimeException e) {
-            LOGGER.error("Could not compute the authentihash: " + e.getMessage());
+            LOGGER.error("Could not compute the authentihash", e);
             return null;
         }
     }
@@ -246,7 +246,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         } catch (AnalysisInterruptedException e) {
             throw e;
         } catch (RuntimeException e) {
-            LOGGER.error("Could not map the structures of the file: " + e.getMessage());
+            LOGGER.error("Could not map the structures of the file", e);
             return StructureMap.empty(data.getFile().length());
         }
     }
@@ -281,7 +281,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
             LOGGER.error(e);
             e.printStackTrace();
         }
-        return Optional.absent();
+        return Optional.empty();
     }
 
     private List<StandardField> createOptimizedStreamEntries(java.util.Optional<CLRSection> clr) {
@@ -335,7 +335,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
     private List<Object[]> createAnomalyTableEntries(List<Anomaly> anomalies) {
         return anomalies.stream()
-                .map(a -> new Object[]{a.description(), a.getType(), a.subtype(), a.key()})
+                .map(a -> new Object[]{a.description(), a.getType(), a.subtype(), a.key(), firstOffsetOrEmpty(a.locations())})
                 .collect(Collectors.toList());
     }
 
@@ -493,23 +493,32 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
                 String description = "";
                 String category = "";
                 if (symbol.isPresent()) {
-                    description = symbol.get().getDescription().or("");
+                    description = symbol.get().getDescription().orElse("");
                     // TODO replacing special chars is a hack for proper symbol descriptions, fix this in PortEx
                     category = symbol.get().getCategory().replace("]", "").replace("[", "");
-                    String subcategory = symbol.get().getSubCategory().or("").replace(">", "").replace("<", "");
+                    String subcategory = symbol.get().getSubCategory().orElse("").replace(">", "").replace("<", "");
                     if (!subcategory.equals("")) {
                         category += " -> " + subcategory;
                     }
                 }
-                Object[] entry = {dll.getName(), category, imp.getName(), description, imp.getRVA(), imp.getHint()};
+                Object[] entry = {dll.getName(), category, imp.getName(), description, imp.getRVA(), imp.getHint(),
+                        firstOffsetOrEmpty(imp.getLocations())};
                 entries.add(entry);
             }
             for (OrdinalImport imp : dll.getOrdinalImports()) {
-                Object[] entry = {dll.getName(), "", imp.getOrdinal() + "", "", imp.getRVA(), ""};
+                Object[] entry = {dll.getName(), "", imp.getOrdinal() + "", "", imp.getRVA(), "",
+                        firstOffsetOrEmpty(imp.getLocations())};
                 entries.add(entry);
             }
         }
         return entries;
+    }
+
+    /**
+     * @return the file offset of the first location, "" if there is none, so that the table shows no offset
+     */
+    private static Object firstOffsetOrEmpty(List<PhysicalLocation> locations) {
+        return locations.isEmpty() ? "" : (Object) locations.get(0).from();
     }
 
     private double[] calculateSectionEntropies(PEData data) {

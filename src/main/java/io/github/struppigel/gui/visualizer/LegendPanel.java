@@ -27,12 +27,15 @@ import io.github.struppigel.tools.visualizer.render.RenderStyle;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Switches the layers of the visualization on and off and shows their colors. Each layer has a section with a check
@@ -50,10 +53,14 @@ public class LegendPanel extends JPanel {
     public LegendPanel(VisualizationModel model) {
         super(new BorderLayout());
         this.model = model;
-        sections.add(new Section("Byte plot", model::isByteplotVisible, model::setByteplotVisible));
-        sections.add(new Section("Entropy", model::isEntropyVisible, model::setEntropyVisible));
-        sections.add(new Section("PE structure", model::isStructureVisible, model::setStructureVisible));
-        sections.add(new Section("Markers", model::isMarkersVisible, model::setMarkersVisible));
+        sections.add(new Section("Byte plot", model::isByteplotVisible, model::setByteplotVisible,
+                this::entryClicked, this::isActive));
+        sections.add(new Section("Entropy", model::isEntropyVisible, model::setEntropyVisible,
+                this::entryClicked, this::isActive));
+        sections.add(new Section("PE structure", model::isStructureVisible, model::setStructureVisible,
+                this::entryClicked, this::isActive));
+        sections.add(new Section("Markers", model::isMarkersVisible, model::setMarkersVisible,
+                this::entryClicked, this::isActive));
 
         JPanel stack = new JPanel();
         stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
@@ -81,8 +88,35 @@ public class LegendPanel extends JPanel {
             public void styleChanged() {
                 update();
             }
+
+            @Override
+            public void listedRegionsChanged() {
+                for (Section section : sections) {
+                    section.list.repaint();
+                }
+            }
         });
         update();
+    }
+
+    /**
+     * Lists the structures of the entry in the structures view, or the structures at the pointer again if the
+     * entry's structures are listed already.
+     */
+    void entryClicked(LegendEntry entry) {
+        if (isActive(entry)) {
+            model.clearListedRegions();
+        } else {
+            model.showRegions(entry.getLabel(), entry.getRegions());
+        }
+    }
+
+    /**
+     * @return true if the structures view lists the structures of the entry
+     */
+    private boolean isActive(LegendEntry entry) {
+        return model.hasListedRegions() && entry.getLabel().equals(model.getListedTitle())
+                && entry.getRegions().size() == model.getListedRegions().size();
     }
 
     void update() {
@@ -138,7 +172,8 @@ public class LegendPanel extends JPanel {
         private final JButton arrow = new JButton();
         private boolean folded = true;
 
-        Section(String title, BooleanSupplier layerVisible, Consumer<Boolean> setLayerVisible) {
+        Section(String title, BooleanSupplier layerVisible, Consumer<Boolean> setLayerVisible,
+                Consumer<LegendEntry> entryClicked, Predicate<LegendEntry> isActive) {
             super(new BorderLayout());
             this.layerVisible = layerVisible;
             check = new JCheckBox(title, layerVisible.getAsBoolean());
@@ -167,12 +202,33 @@ public class LegendPanel extends JPanel {
             header.add(arrow, BorderLayout.WEST);
             header.add(check, BorderLayout.CENTER);
 
-            list.setCellRenderer(new EntryRenderer());
+            list.setCellRenderer(new EntryRenderer(isActive));
             list.setFocusable(false);
             list.setOpaque(false);
             list.setFixedCellHeight(ENTRY_HEIGHT);
             list.setSelectionModel(new NoSelection());
             list.setBorder(Spacing.padding(0, Spacing.PAD * 3, Spacing.GAP / 2, Spacing.PAD));
+            MouseAdapter clicks = new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    LegendEntry entry = clickableEntryAt(e);
+                    if (entry != null && SwingUtilities.isLeftMouseButton(e)) {
+                        entryClicked.accept(entry);
+                    }
+                }
+
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    LegendEntry entry = clickableEntryAt(e);
+                    list.setCursor(Cursor.getPredefinedCursor(entry == null ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
+                    list.setToolTipText(entry == null ? null : isActive.test(entry)
+                            ? "Show the structures at the pointer again"
+                            : "Show the " + entry.getRegions().size() + " structures of " + entry.getLabel()
+                            + " in the structures view");
+                }
+            };
+            list.addMouseListener(clicks);
+            list.addMouseMotionListener(clicks);
 
             add(header, BorderLayout.NORTH);
             add(list, BorderLayout.CENTER);
@@ -185,6 +241,18 @@ public class LegendPanel extends JPanel {
                 entries.addElement(entry);
             }
             applyState();
+        }
+
+        /**
+         * @return the entry under the mouse if it has structures to list and its layer is shown, otherwise null
+         */
+        private LegendEntry clickableEntryAt(MouseEvent e) {
+            int index = list.locationToIndex(e.getPoint());
+            if (index < 0 || !list.isEnabled() || !list.getCellBounds(index, index).contains(e.getPoint())) {
+                return null;
+            }
+            LegendEntry entry = entries.get(index);
+            return entry.getRegions().isEmpty() ? null : entry;
         }
 
         private void applyState() {
@@ -243,7 +311,10 @@ public class LegendPanel extends JPanel {
 
     private static final class EntryRenderer extends DefaultListCellRenderer {
 
-        EntryRenderer() {
+        private final Predicate<LegendEntry> isActive;
+
+        EntryRenderer(Predicate<LegendEntry> isActive) {
+            this.isActive = isActive;
             // labels can come from the file, e.g., names of resource types
             PortexSwingUtils.disableHtml(this);
         }
@@ -255,6 +326,12 @@ public class LegendPanel extends JPanel {
             setOpaque(false);
             LegendEntry entry = (LegendEntry) value;
             setText(entry.getLabel());
+            if (list.isEnabled() && isActive.test(entry)) {
+                // the structures of this entry are listed in the structures view
+                setOpaque(true);
+                setBackground(list.getSelectionBackground());
+                setForeground(list.getSelectionForeground());
+            }
             Color color = entry.getColor();
             if (!list.isEnabled()) {
                 color = new Color(color.getRed(), color.getGreen(), color.getBlue(), ALPHA_OFF);

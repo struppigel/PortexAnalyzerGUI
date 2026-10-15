@@ -56,7 +56,7 @@ public class DetailCanvas extends JComponent {
     static final int GAP = VisualizationRenderer.TRACK_GAP;
     private static final Color BACKGROUND = new Color(30, 30, 30);
     private static final Color RULER_TEXT = new Color(170, 170, 170);
-    private static final int SELECTION_FILL_ALPHA = 85;
+    private static final int SELECTION_FILL_ALPHA = 150;
     private static final Color SELECTION_CELL = Color.yellow;
     private static final Color HOVER_CELL = Color.white;
     private static final Color HOVER_FILL = new Color(255, 255, 255, 70);
@@ -478,29 +478,16 @@ public class DetailCanvas extends JComponent {
     }
 
     /**
-     * Zooms so that the region fills most of the view and selects it.
+     * Zooms in fully, shows the beginning of the structure at the top and selects it.
      */
     public void zoomToRegion(FileRegion region) {
         if (region == null || !relayout()) {
             return;
         }
         long start = region.getStart();
-        long end = Math.max(start + 1, region.getEnd());
-        int target = 0;
-        for (int i = ladder.size() - 1; i >= 0; i--) {
-            ZoomLevel level = ladder.get(i);
-            long rows = (end - 1) / level.bytesPerRow() - start / level.bytesPerRow() + 1;
-            long fit = (long) (Math.max(1, getHeight() / level.cellHeight) * 0.8);
-            if (rows <= Math.max(1, fit)) {
-                target = i;
-                break;
-            }
-        }
-        levelIndex = target;
+        levelIndex = ladder.size() - 1;
         firstRow = 0;
-        long regionRows = mapping().rowOf(end - 1) - mapping().rowOf(start) + 1;
-        long margin = Math.max(0, (getHeight() / level().cellHeight - regionRows) / 2);
-        setFirstRowUnchecked(mapping().rowOf(start) - margin);
+        setFirstRowUnchecked(mapping().rowOf(start));
         model.selectRegion(region, start);
         viewChanged();
         repaint();
@@ -716,6 +703,7 @@ public class DetailCanvas extends JComponent {
             long end = Math.min(mapping.getFileLength(), start + (lastRow - firstRow + 1) * mapping.getBytesPerRow());
             byte[] bytes = new byte[(int) Math.max(0, end - start)];
             int read = model.getVisualization().getSource().read(start, bytes, 0, bytes.length);
+            List<long[]> selected = selectedRanges();
             for (TrackLayout t : layouts) {
                 Map<Long, TileCache.Tile> trackTiles = tiles.get(t.track);
                 if (trackTiles == null) {
@@ -733,6 +721,9 @@ public class DetailCanvas extends JComponent {
                     int cellX = mapping.columnOf(start + i) * t.cellWidth;
                     // the top left pixel has the cell color, the grid is at the bottom and right
                     int background = tile.image.getRGB(cellX, (int) (row % TILE_ROWS) * level.cellHeight);
+                    if (isSelected(start + i, selected)) {
+                        background = blendWithSelectionMark(background);
+                    }
                     g2.setColor(new Color(VisualizerColors.textRgbFor(background), true));
                     int value = bytes[i] & 0xff;
                     String text = ascii ? (value >= 33 && value <= 126 ? String.valueOf((char) value) : ".")
@@ -876,6 +867,27 @@ public class DetailCanvas extends JComponent {
     }
 
     /**
+     * @return the color of a cell below the selection fill, to choose a readable text color
+     */
+    private static int blendWithSelectionMark(int rgb) {
+        Color mark = selectionMark();
+        int alpha = SELECTION_FILL_ALPHA;
+        int r = (((rgb >> 16) & 0xFF) * (255 - alpha) + mark.getRed() * alpha) / 255;
+        int g = (((rgb >> 8) & 0xFF) * (255 - alpha) + mark.getGreen() * alpha) / 255;
+        int b = ((rgb & 0xFF) * (255 - alpha) + mark.getBlue() * alpha) / 255;
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static boolean isSelected(long offset, List<long[]> ranges) {
+        for (long[] range : ranges) {
+            if (offset >= range[0] && offset < range[1]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @return the color that marks the selected bytes: a light version of the accent color of the theme
      */
     private static Color selectionMark() {
@@ -905,13 +917,13 @@ public class DetailCanvas extends JComponent {
                 }
                 for (TrackLayout t : layouts) {
                     Polygon outline = outlineOf(t, mapping, level, start, end, startRow, endRow);
-                    // a faint dark line next to a thin line in the tint of the theme
-                    g2.setColor(new Color(0, 0, 0, 80));
-                    g2.setStroke(new BasicStroke(3));
+                    // a dark line next to a line in the tint of the theme
+                    g2.setColor(new Color(0, 0, 0, 140));
+                    g2.setStroke(new BasicStroke(4));
                     g2.drawPolygon(outline);
                     Color mark = selectionMark();
-                    g2.setColor(new Color(mark.getRed(), mark.getGreen(), mark.getBlue(), 230));
-                    g2.setStroke(new BasicStroke(1));
+                    g2.setColor(mark);
+                    g2.setStroke(new BasicStroke(2));
                     g2.drawPolygon(outline);
                 }
             }
@@ -1173,6 +1185,10 @@ public class DetailCanvas extends JComponent {
                 }
                 menu.add(hexItem);
                 menu.add(textItem);
+                JMenuItem saveMarkedItem = new JMenuItem("Save " + size + " as file...");
+                saveMarkedItem.addActionListener(a -> RegionSaver.saveWithDialog(DetailCanvas.this, model, "marked",
+                        Collections.singletonList(new long[]{model.getRangeStart(), model.getRangeStart() + marked})));
+                menu.add(saveMarkedItem);
                 menu.addSeparator();
             }
             if (region != null) {
@@ -1183,6 +1199,11 @@ public class DetailCanvas extends JComponent {
                     JMenuItem treeItem = new JMenuItem("Show in tree");
                     treeItem.addActionListener(a -> navigator.showInTree(region, offset));
                     menu.add(treeItem);
+                }
+                menu.add(RegionSaver.menuItem(DetailCanvas.this, model, region));
+                FileRegion selected = model.getSelectedRegion();
+                if (selected != null && selected != region) {
+                    menu.add(RegionSaver.menuItem(DetailCanvas.this, model, selected));
                 }
             }
             JMenuItem copyItem = new JMenuItem("Copy offset");

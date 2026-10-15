@@ -2,8 +2,13 @@ package io.github.struppigel.gui.utils;
 
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.parser.FileFormatException;
+import io.github.struppigel.parser.PhysicalLocation;
+import io.github.struppigel.parser.sections.idata.ImportDLL;
+import io.github.struppigel.parser.sections.idata.NameImport;
+import io.github.struppigel.parser.sections.idata.OrdinalImport;
 import io.github.struppigel.testsupport.TestFiles;
 import io.github.struppigel.tools.Hasher;
+import io.github.struppigel.tools.anomalies.Anomaly;
 import io.github.struppigel.tools.layout.RegionType;
 import io.github.struppigel.tools.layout.StructureMap;
 import io.github.struppigel.tools.sigscanner.LocationKind;
@@ -15,6 +20,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -65,16 +71,79 @@ class PELoadWorkerTest {
         assertTrue(data.hasImports());
         assertFalse(rows.isEmpty());
         for (Object[] row : rows) {
-            // DLL, Category, Name, Description, RVA, Hint
-            assertEquals(6, row.length);
+            // DLL, Category, Name, Description, RVA, Hint, Offset
+            assertEquals(7, row.length);
             assertInstanceOf(String.class, row[0]);
             assertInstanceOf(Long.class, row[4]);
+            assertInstanceOf(Long.class, row[6]);
             // name imports have an Integer hint, ordinal imports have no hint and no description
             if (!(row[5] instanceof Integer)) {
                 assertEquals("", row[5]);
                 assertEquals("", row[3]);
             }
         }
+        // the offset is the lookup table entry of the function
+        assertEquals(lookupEntryOffsets(data.getPeData().loadImports()), offsetsOf(rows));
+    }
+
+    @Test
+    void delayLoadImportTableRowsHaveTheOffsetOfTheirFunction() throws Exception {
+        FullPEData data = TestPEData.load("corkami/delay_imports.exe");
+        List<Object[]> rows = data.getDelayLoadEntries();
+
+        assertFalse(rows.isEmpty());
+        for (Object[] row : rows) {
+            assertEquals(7, row.length);
+            assertInstanceOf(Long.class, row[6]);
+        }
+        assertEquals(lookupEntryOffsets(data.getPeData().loadDelayLoadImports()), offsetsOf(rows));
+    }
+
+    /**
+     * @return the file offsets of the lookup table entries in the order of the rows: name imports, then ordinal
+     * imports of each DLL
+     */
+    private static List<Long> lookupEntryOffsets(List<ImportDLL> dlls) {
+        List<Long> offsets = new ArrayList<>();
+        for (ImportDLL dll : dlls) {
+            for (NameImport imp : dll.getNameImports()) {
+                offsets.add(imp.getLocations().get(0).from());
+            }
+            for (OrdinalImport imp : dll.getOrdinalImports()) {
+                offsets.add(imp.getLocations().get(0).from());
+            }
+        }
+        return offsets;
+    }
+
+    private static List<Long> offsetsOf(List<Object[]> rows) {
+        List<Long> offsets = new ArrayList<>();
+        for (Object[] row : rows) {
+            offsets.add((Long) row[6]);
+        }
+        return offsets;
+    }
+
+    @Test
+    void anomaliesTableRowsHaveTheOffsetOfTheirFirstLocation() throws Exception {
+        int withOffset = 0;
+        for (String sample : TestFiles.ALL_PE) {
+            FullPEData data = TestPEData.load(sample);
+            List<Anomaly> anomalies = data.getAnomalies();
+            List<Object[]> rows = data.getAnomaliesTable();
+            for (int i = 0; i < rows.size(); i++) {
+                // description, type, subtype, field or structure, offset
+                assertEquals(5, rows.get(i).length, sample);
+                List<PhysicalLocation> locations = anomalies.get(i).locations();
+                if (locations.isEmpty()) {
+                    assertEquals("", rows.get(i)[4], sample + " " + anomalies.get(i).description());
+                } else {
+                    assertEquals(locations.get(0).from(), rows.get(i)[4], sample);
+                    withOffset++;
+                }
+            }
+        }
+        assertTrue(withOffset > 0, "no anomaly with a location in the samples");
     }
 
     @Test

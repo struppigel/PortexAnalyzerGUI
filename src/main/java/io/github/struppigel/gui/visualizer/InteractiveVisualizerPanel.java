@@ -426,7 +426,7 @@ public class InteractiveVisualizerPanel extends JPanel {
             try {
                 success = get();
             } catch (InterruptedException | ExecutionException e) {
-                LOGGER.error("Could not save the image: " + e.getMessage());
+                LOGGER.error("Could not save the image", e);
             }
             if (success) {
                 JOptionPane.showMessageDialog(InteractiveVisualizerPanel.this,

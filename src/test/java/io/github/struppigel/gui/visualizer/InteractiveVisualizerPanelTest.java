@@ -414,16 +414,16 @@ class InteractiveVisualizerPanelTest {
     }
 
     @Test
-    void zoomToRegionFitsAndSelectsIt() throws Exception {
+    void zoomToRegionShowsItsBeginningInHex() throws Exception {
         load(NATIVE_X86);
         onEdt(() -> {
             FileRegion coff = model.getVisualization().getStructureMap()
                     .getRegions(RegionType.COFF_FILE_HEADER).get(0);
             canvas.zoomToRegion(coff);
             assertSame(coff, model.getSelectedRegion());
-            assertTrue(canvas.viewport().isVisible(coff.getStart()));
+            assertTrue(canvas.level().hex, canvas.level().toString());
+            assertEquals(canvas.mapping().rowOf(coff.getStart()), canvas.getFirstRow());
             assertTrue(canvas.viewport().isVisible(coff.getEnd() - 1));
-            assertTrue(canvas.level().bytesPerCell <= 2, canvas.level().toString());
         });
     }
 

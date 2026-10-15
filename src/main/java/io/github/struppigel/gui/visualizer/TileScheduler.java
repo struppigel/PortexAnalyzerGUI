@@ -64,7 +64,7 @@ final class TileScheduler {
             } catch (ByteSourceClosedException e) {
                 // the file was closed because another one was loaded
             } catch (Throwable t) {
-                LOGGER.error("Could not render a tile of the visualization: " + t);
+                LOGGER.error("Could not render a tile of the visualization", t);
             }
             TileCache.Tile result = tile;
             Runnable finish = () -> {

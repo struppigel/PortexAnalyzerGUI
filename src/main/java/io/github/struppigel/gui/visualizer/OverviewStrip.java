@@ -303,7 +303,7 @@ public class OverviewStrip extends JComponent {
             } catch (ByteSourceClosedException e) {
                 // another file was loaded meanwhile
             } catch (Throwable t) {
-                LOGGER.error("Could not render the overview: " + t);
+                LOGGER.error("Could not render the overview", t);
             }
             Rendered done = result;
             SwingUtilities.invokeLater(() -> {

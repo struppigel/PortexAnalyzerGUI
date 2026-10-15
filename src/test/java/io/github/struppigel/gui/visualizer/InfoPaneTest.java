@@ -7,6 +7,7 @@ import io.github.struppigel.gui.utils.TestPEData;
 import io.github.struppigel.gui.utils.WorkerKiller;
 import io.github.struppigel.testsupport.Swing;
 import io.github.struppigel.tools.layout.FileRegion;
+import io.github.struppigel.tools.layout.RegionType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +16,9 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 
 import static io.github.struppigel.testsupport.Swing.onEdt;
+import static io.github.struppigel.testsupport.Swing.onEdtGet;
 import static io.github.struppigel.testsupport.TestFiles.NATIVE_X86;
+import static io.github.struppigel.testsupport.TestFiles.OVERLAY;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InfoPaneTest {
@@ -77,6 +80,27 @@ class InfoPaneTest {
                 FlatLaf.setGlobalExtraDefaults(null);
                 UIManager.setLookAndFeel(previous);
             });
+        }
+    }
+
+    @Test
+    void aSelectedStructureShowsTheEntropyOfTheOverlayNode() throws Exception {
+        FullPEData data = TestPEData.load(OVERLAY);
+        InfoPane[] pane = new InfoPane[1];
+        FileRegion[] overlay = new FileRegion[1];
+        onEdt(() -> {
+            model = new VisualizationModel();
+            pane[0] = new InfoPane(model, () -> 1);
+            model.loadSynchronously(data);
+            overlay[0] = model.getVisualization().getStructureMap().getRegions(RegionType.OVERLAY).get(0);
+            model.selectRegion(overlay[0], overlay[0].getStart());
+            pane[0].updateNow();
+        });
+        String expected = String.format("%.2f bits per byte", data.getOverlayEntropy() * 8);
+        long end = System.currentTimeMillis() + 5000;
+        while (!onEdtGet(() -> pane[0].getInfoText().contains(expected))) {
+            assertTrue(System.currentTimeMillis() < end, "timed out, shown: " + onEdtGet(() -> pane[0].getInfoText()));
+            Thread.sleep(10);
         }
     }
 

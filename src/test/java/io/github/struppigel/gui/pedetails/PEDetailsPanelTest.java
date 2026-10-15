@@ -14,6 +14,7 @@ import io.github.struppigel.tools.visualizer.render.Track;
 import io.github.struppigel.testsupport.Swing;
 import io.github.struppigel.testsupport.TestFiles;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -113,8 +114,51 @@ class PEDetailsPanelTest {
 
         assertEquals("TABLE", details.getVisibleCardName());
         JTable table = singleVisibleTable();
-        assertEquals(Arrays.asList("DLL", "Category", "Name", "Description", "RVA", "Hint"), columnNames(table));
+        assertEquals(Arrays.asList("DLL", "Category", "Name", "Description", "RVA", "Hint", "Offset"),
+                columnNames(table));
         assertEquals(data.getImportTableEntries().size(), table.getRowCount());
+    }
+
+    @Test
+    void selectingAnImportRowMarksOnlyTheDataOfTheFunction() throws Exception {
+        load(NATIVE_X86);
+        select("Imports");
+        JTable table = singleVisibleTable();
+        int row = table.getRowCount() - 1;
+        long offset = (Long) table.getValueAt(row, 6);
+
+        onEdt(() -> table.setRowSelectionInterval(row, row));
+
+        // lookup table entry, hint and name, address table slot, not the whole lookup table
+        FileRegion region = onEdtGet(() -> details.getVisualizationModel().getSelectedRegion());
+        assertNotNull(region);
+        assertTrue(region.getLocations().size() <= 3, region.toString());
+        assertTrue(region.getLocations().stream().anyMatch(l -> l.from() == offset), region.toString());
+        assertEquals(offset, (long) onEdtGet(() -> preview.getCurrentOffset()));
+        waitFor(() -> preview.getText().startsWith("Offset: 0x" + Long.toHexString(offset)));
+        assertTrue(onEdtGet(() -> preview.highlightCount()) > 0);
+    }
+
+    @Test
+    void selectingAnAnomalyRowShowsItsLocation() throws Exception {
+        load(NATIVE_X86);
+        select("Anomalies");
+        JTable table = singleVisibleTable();
+        assertEquals("Offset", columnNames(table).get(4));
+        int row = -1;
+        for (int i = 0; i < table.getRowCount() && row < 0; i++) {
+            if (table.getValueAt(i, 4) instanceof Long) {
+                row = i;
+            }
+        }
+        Assumptions.assumeTrue(row >= 0, "the sample has no anomaly with a location");
+        int selectedRow = row;
+        long offset = (Long) table.getValueAt(selectedRow, 4);
+
+        onEdt(() -> table.setRowSelectionInterval(selectedRow, selectedRow));
+
+        assertEquals(offset, (long) onEdtGet(() -> preview.getCurrentOffset()));
+        assertEquals(offset, (long) onEdtGet(() -> details.getVisualizationModel().getSelectedOffset()));
     }
 
     @Test

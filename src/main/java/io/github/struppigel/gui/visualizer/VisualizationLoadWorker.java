@@ -72,7 +72,7 @@ class VisualizationLoadWorker extends SwingWorker<Void, Long> {
         try {
             get();
         } catch (InterruptedException | ExecutionException e) {
-            LOGGER.error("Could not compute the byte statistics: " + e.getMessage());
+            LOGGER.error("Could not compute the byte statistics", e);
         }
         model.statisticsProgressed(generation);
     }

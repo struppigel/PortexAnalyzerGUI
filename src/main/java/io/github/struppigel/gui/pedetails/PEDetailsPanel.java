@@ -44,7 +44,7 @@ import io.github.struppigel.settings.PortexSettingsKey;
 import io.github.struppigel.parser.PhysicalLocation;
 import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.sigscanner.SignatureMatch;
-import com.google.common.base.Optional;
+import java.util.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -1010,12 +1010,14 @@ public class PEDetailsPanel extends JPanel {
     private void showImportsForEntries(List<Object[]> entries, DataDirectoryKey dataDir) {
         if (peData == null) return;
         // Make beautiful with tabs
-        String[] tableHeader = {"DLL", "Category", "Name", "Description", "RVA", "Hint"};
-        PEFieldsTable table = showTextEntries(entries, tableHeader, -1);
+        String[] tableHeader = {"DLL", "Category", "Name", "Description", "RVA", "Hint", "Offset"};
+        PEFieldsTable table = showTextEntries(entries, tableHeader, 6);
         table.getColumnModel().getColumn(4).setPreferredWidth(100);
         table.getColumnModel().getColumn(5).setPreferredWidth(100);
         table.getColumnModel().getColumn(4).setMaxWidth(200);
         table.getColumnModel().getColumn(5).setMaxWidth(200);
+        table.getColumnModel().getColumn(6).setPreferredWidth(100);
+        table.getColumnModel().getColumn(6).setMaxWidth(200);
         showTablePanel();
         Long offset = getFileOffsetForDataDirectoryKeyOrZero(dataDir);
         previewPanel.showContentAtOffset(offset);
@@ -1081,11 +1083,13 @@ public class PEDetailsPanel extends JPanel {
 
     public void showAnomalies() {
         if (peData == null) return;
-        String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure "};
+        String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure ", "Offset"};
         List<Object[]> entries = peData.getAnomaliesTable();
 
-        PEFieldsTable table = showTextEntries(entries, tableHeader, -1);
+        PEFieldsTable table = showTextEntries(entries, tableHeader, 4);
         table.getColumnModel().getColumn(0).setPreferredWidth(500);
+        table.getColumnModel().getColumn(4).setPreferredWidth(100);
+        table.getColumnModel().getColumn(4).setMaxWidth(200);
         table.setWrappedColumn(0);
         showTablePanel();
     }

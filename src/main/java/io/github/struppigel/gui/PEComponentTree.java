@@ -26,6 +26,7 @@ import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.util.*;
@@ -228,9 +229,9 @@ public class PEComponentTree extends JPanel {
 
     // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
     private static void setNodeExpandedState(JTree tree, DefaultMutableTreeNode node, boolean expanded) {
-        List<DefaultMutableTreeNode> list = Collections.list(node.children());
-        for (DefaultMutableTreeNode treeNode : list) {
-            setNodeExpandedState(tree, treeNode, expanded);
+        List<? extends TreeNode> list = Collections.list(node.children());
+        for (TreeNode treeNode : list) {
+            setNodeExpandedState(tree, (DefaultMutableTreeNode) treeNode, expanded);
         }
         if (!expanded && node.isRoot()) {
             return;

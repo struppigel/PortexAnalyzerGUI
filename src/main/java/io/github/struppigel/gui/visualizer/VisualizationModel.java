@@ -40,6 +40,8 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +81,9 @@ public class VisualizationModel {
 
         /** the range of the file that the detail view shows changed */
         default void visibleRangeChanged() {}
+
+        /** a listing of structures was set or cleared, see {@link VisualizationModel#showRegions} */
+        default void listedRegionsChanged() {}
     }
 
     private final List<Listener> listeners = new ArrayList<>();
@@ -97,6 +102,9 @@ public class VisualizationModel {
     private long visibleStart = 0;
     private long visibleEnd = 0;
     private boolean revealSuppressed = false;
+    // the structures that the structures view lists instead of the ones at the pointer, null title if none
+    private String listedTitle;
+    private List<FileRegion> listedRegions = Collections.emptyList();
 
     private RenderStyle style = RenderStyle.defaults();
     private Track hexBackground = Track.STRUCTURE;
@@ -134,6 +142,8 @@ public class VisualizationModel {
         generation++;
         this.peData = data;
         resetSelection();
+        listedTitle = null;
+        listedRegions = Collections.emptyList();
         if (data != null) {
             visualization = createVisualization(data);
         }
@@ -147,7 +157,7 @@ public class VisualizationModel {
                 try {
                     visualization.getStatistics().compute(ProgressListener.NONE);
                 } catch (IOException e) {
-                    LOGGER.error("Could not compute the byte statistics: " + e.getMessage());
+                    LOGGER.error("Could not compute the byte statistics", e);
                 }
                 statisticsProgressed(generation);
             }
@@ -166,7 +176,7 @@ public class VisualizationModel {
             RegionColorScheme scheme = RegionColorScheme.of(map, colors(), RegionColorScheme.Mode.DEFAULT);
             return new FileVisualization(map, statistics, source, scheme);
         } catch (IOException | IllegalArgumentException e) {
-            LOGGER.error("Could not visualize " + file + ": " + e.getMessage());
+            LOGGER.error("Could not visualize " + file, e);
             closeSource();
             return null;
         }
@@ -321,7 +331,8 @@ public class VisualizationModel {
     static FileRegion revealedRegion(StructureMap map, long offset) {
         Optional<FileRegion> best = map.bestRegionStartingAt(offset);
         FileRegion region = best.isPresent() ? best.get() : map.innermostAt(offset).orElse(null);
-        while (region != null && region.getType().getPaintMode() == PaintMode.NONE) {
+        while (region != null && region.getType().getPaintMode() == PaintMode.NONE
+                && region.getType() != RegionType.IMPORT_FUNCTION) {
             Optional<FileRegion> parent = region.getParent();
             if (!parent.isPresent() || parent.get().getStart() != region.getStart()
                     || parent.get().getType() == RegionType.HEADERS) {
@@ -481,7 +492,55 @@ public class VisualizationModel {
         return structureVisible;
     }
 
+    // --- listing of structures ---
+
+    /**
+     * Makes the structures view list the structures, e.g. all of a type, instead of the ones at the pointer.
+     *
+     * @param title what the structures have in common
+     * @param regions the structures, they are shown by offset
+     */
+    public void showRegions(String title, List<FileRegion> regions) {
+        List<FileRegion> sorted = new ArrayList<>(regions);
+        sorted.sort(Comparator.comparingLong(FileRegion::getStart).thenComparingInt(FileRegion::getDepth));
+        listedTitle = title;
+        listedRegions = Collections.unmodifiableList(sorted);
+        fireListedRegionsChanged();
+    }
+
+    /**
+     * Makes the structures view show the structures at the pointer again.
+     */
+    public void clearListedRegions() {
+        if (listedTitle != null) {
+            listedTitle = null;
+            listedRegions = Collections.emptyList();
+            fireListedRegionsChanged();
+        }
+    }
+
+    public boolean hasListedRegions() {
+        return listedTitle != null;
+    }
+
+    /**
+     * @return what the listed structures have in common, null if no structures are listed
+     */
+    public String getListedTitle() {
+        return listedTitle;
+    }
+
+    public List<FileRegion> getListedRegions() {
+        return listedRegions;
+    }
+
     // --- events ---
+
+    private void fireListedRegionsChanged() {
+        for (Listener l : new ArrayList<>(listeners)) {
+            l.listedRegionsChanged();
+        }
+    }
 
     private void fireDataChanged() {
         for (Listener l : new ArrayList<>(listeners)) {

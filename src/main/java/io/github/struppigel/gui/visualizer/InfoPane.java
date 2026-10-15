@@ -52,6 +52,8 @@ public class InfoPane extends JPanel {
     private static final int SHOWN_CELL_BYTES = 16;
     private static final int SHOWN_BYTES_PER_ROW = 8;
     private static final String NL = "\n";
+    private static final String POINTER_TITLE = "Structures, innermost first";
+    private static final int MAX_LISTED_REGIONS = 2000;
 
     private final VisualizationModel model;
     private final LongSupplier bytesPerCell;
@@ -68,6 +70,10 @@ public class InfoPane extends JPanel {
     private boolean hexEnabled = true;
     private Consumer<FileRegion> zoomAction;
     private RegionNavigator navigator;
+    private final JLabel regionTitle = new JLabel(POINTER_TITLE);
+    private final JButton backButton = new JButton("Back to pointer");
+    // true while the list shows the structures that the legend picked
+    private boolean listingShown = false;
 
     private long shownOffset = Long.MIN_VALUE;
     private long rangeEntropyStart = -1;
@@ -85,11 +91,18 @@ public class InfoPane extends JPanel {
         regionList.setCellRenderer(new RegionRenderer());
         regionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         regionList.addMouseListener(new RegionMouseHandler());
-        JLabel title = new JLabel("Structures, innermost first");
+        JLabel title = regionTitle;
         title.setFont(title.getFont().deriveFont(Font.BOLD));
+        backButton.setFocusable(false);
+        backButton.setVisible(false);
+        backButton.setToolTipText("Show the structures at the pointer again");
+        backButton.addActionListener(e -> model.clearListedRegions());
+        JPanel titleRow = new JPanel(new BorderLayout(Spacing.GAP, 0));
+        titleRow.add(title, BorderLayout.CENTER);
+        titleRow.add(backButton, BorderLayout.EAST);
         JPanel titlePanel = new JPanel(new BorderLayout(0, Spacing.GAP / 2));
         titlePanel.setBorder(Spacing.padding(Spacing.GAP, Spacing.PAD, 0, Spacing.PAD));
-        titlePanel.add(title, BorderLayout.NORTH);
+        titlePanel.add(titleRow, BorderLayout.NORTH);
         titlePanel.add(new JSeparator(), BorderLayout.SOUTH);
         JPanel regionPanel = new JPanel(new BorderLayout());
         regionPanel.add(titlePanel, BorderLayout.NORTH);
@@ -131,6 +144,14 @@ public class InfoPane extends JPanel {
             @Override
             public void selectionChanged() {
                 scheduleUpdate();
+            }
+
+            @Override
+            public void listedRegionsChanged() {
+                if (model.hasListedRegions()) {
+                    listingShown = false; // fill the list with the new structures
+                }
+                updateNow();
             }
 
             @Override
@@ -183,6 +204,8 @@ public class InfoPane extends JPanel {
         }
         if (vis != null && model.hasRangeSelection()) {
             describeRange(rows, vis.getStructureMap().getFileLength());
+        } else if (vis != null && model.getSelectedRegion() != null) {
+            describeRegion(rows, model.getSelectedRegion(), vis.getStructureMap().getFileLength());
         }
         grid.setRows(rows);
         updateRegions(vis, offset);
@@ -264,10 +287,26 @@ public class InfoPane extends JPanel {
         long start = model.getRangeStart();
         long end = Math.min(fileLength, model.getRangeEnd());
         rows.add(mono("Range", format(start) + " - " + format(end - 1) + " (" + (end - start) + " bytes)"));
+        addExactEntropy(rows, "Entropy", start, end);
+    }
+
+    /**
+     * The entropy of the whole structure, computed like the one of the overlay in the tree. The entropy of the cell
+     * at the offset is the mean of 256 byte windows and differs.
+     */
+    private void describeRegion(List<String[]> rows, FileRegion region, long fileLength) {
+        long start = region.getStart();
+        long end = Math.min(fileLength, region.getEnd());
+        if (end > start) {
+            addExactEntropy(rows, "Region entropy", start, end);
+        }
+    }
+
+    private void addExactEntropy(List<String[]> rows, String label, long start, long end) {
         if (start == rangeEntropyStart && end == rangeEntropyEnd && rangeEntropy != null) {
-            rows.add(new String[]{"Entropy", String.format("%.2f bits per byte", rangeEntropy * 8)});
+            rows.add(new String[]{label, String.format("%.2f bits per byte", rangeEntropy * 8)});
         } else {
-            rows.add(new String[]{"Entropy", "computing ..."});
+            rows.add(new String[]{label, "computing ..."});
             computeRangeEntropy(model.getPeData().getFile(), start, end);
         }
     }
@@ -305,6 +344,18 @@ public class InfoPane extends JPanel {
     }
 
     private void updateRegions(FileVisualization vis, long offset) {
+        if (model.hasListedRegions()) {
+            if (!listingShown) {
+                showListedRegions();
+            }
+            return;
+        }
+        if (listingShown) {
+            listingShown = false;
+            shownOffset = Long.MIN_VALUE;
+            regionTitle.setText(POINTER_TITLE);
+            backButton.setVisible(false);
+        }
         if (offset == shownOffset) {
             return;
         }
@@ -320,6 +371,23 @@ public class InfoPane extends JPanel {
     }
 
     /**
+     * Lists the structures that the legend picked, instead of the ones at the pointer.
+     */
+    private void showListedRegions() {
+        listingShown = true;
+        shownOffset = Long.MIN_VALUE;
+        regionListModel.clear();
+        List<FileRegion> regions = model.getListedRegions();
+        int shown = Math.min(regions.size(), MAX_LISTED_REGIONS);
+        for (int i = 0; i < shown; i++) {
+            regionListModel.addElement(regions.get(i));
+        }
+        regionTitle.setText(model.getListedTitle() + (shown < regions.size()
+                ? " (first " + shown + " of " + regions.size() + ")" : " (" + regions.size() + ")"));
+        backButton.setVisible(true);
+    }
+
+    /**
      * @return the shown text and the names of the shown structures, for tests
      */
     String getInfoText() {
@@ -328,6 +396,13 @@ public class InfoPane extends JPanel {
             text.append(NL).append(regionListModel.get(i).getName());
         }
         return text.toString();
+    }
+
+    /**
+     * @return the title of the list of the structures, for tests
+     */
+    String getRegionTitle() {
+        return regionTitle.getText();
     }
 
     /**
@@ -494,6 +569,7 @@ public class InfoPane extends JPanel {
                 tree.addActionListener(a -> navigator.showInTree(region, region.getStart()));
                 menu.add(tree);
             }
+            menu.add(RegionSaver.menuItem(regionList, model, region));
             if (menu.getComponentCount() > 0) {
                 menu.show(regionList, e.getX(), e.getY());
             }

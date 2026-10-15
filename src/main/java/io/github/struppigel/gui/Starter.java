@@ -23,10 +23,13 @@ import com.formdev.flatlaf.FlatLightLaf;
 import io.github.struppigel.settings.LookAndFeelSetting;
 import io.github.struppigel.settings.PortexSettings;
 import io.github.struppigel.settings.PortexSettingsKey;
+import io.github.struppigel.gui.utils.LogSetup;
+import io.github.struppigel.gui.utils.UnhandledErrors;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
+import java.awt.GraphicsEnvironment;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,20 +37,61 @@ import java.util.Map;
  * Sets the look and feel and starts the GUI
  */
 public class Starter {
+    // the folder of the log file must be set before the first logger is created
+    static {
+        LogSetup.init();
+    }
+
     private static final Logger LOGGER = LogManager.getLogger();
     // the dark red of the PortEx logo
     private static final String ACCENT_COLOR = "#AA0000";
 
     public static void main(String[] args) {
-
-        LOGGER.debug("starting program");
-        PortexSettings s = new PortexSettings();
-        if(s.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString())) {
-            setDarkLookAndFeel();
-        } else {
-            setBrightLookAndFeel();
+        try {
+            UnhandledErrors.install();
+            logEnvironment();
+            LOGGER.debug("starting program");
+            PortexSettings s = new PortexSettings();
+            if(s.valueEquals(PortexSettingsKey.LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString())) {
+                setDarkLookAndFeel();
+            } else {
+                setBrightLookAndFeel();
+            }
+            initMainFrame(s);
+        } catch (Throwable t) {
+            LOGGER.fatal("The GUI could not be started", t);
+            if (!GraphicsEnvironment.isHeadless()) {
+                JOptionPane.showMessageDialog(null, "Portex Analyzer could not be started: " + t
+                        + "\n\nThe log file is " + LogSetup.logFile().getAbsolutePath(),
+                        "Startup error", JOptionPane.ERROR_MESSAGE);
+            }
+            System.exit(1);
         }
-        initMainFrame(s);
+    }
+
+    /**
+     * Writes what is needed to reproduce a problem on another machine to the log.
+     */
+    private static void logEnvironment() {
+        LOGGER.info("Portex Analyzer " + AboutFrame.version + " is starting");
+        for (String key : new String[]{"java.version", "java.vendor", "java.home", "os.name", "os.version", "os.arch",
+                "user.dir", "file.encoding", "java.awt.headless"}) {
+            LOGGER.info(key + " = " + System.getProperty(key));
+        }
+        Runtime runtime = Runtime.getRuntime();
+        LOGGER.info("max memory = " + runtime.maxMemory() / (1024 * 1024) + " MiB, processors = "
+                + runtime.availableProcessors());
+        LOGGER.info("application = " + locationOf(Starter.class));
+        LOGGER.info("PortEx = " + locationOf(io.github.struppigel.parser.PELoader.class));
+        LOGGER.info("log file = " + LogSetup.logFile().getAbsolutePath());
+    }
+
+    private static String locationOf(Class<?> type) {
+        try {
+            return String.valueOf(type.getProtectionDomain().getCodeSource().getLocation());
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
     }
 
     private static void initMainFrame(PortexSettings s) {

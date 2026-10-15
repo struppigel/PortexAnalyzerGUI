@@ -31,6 +31,7 @@
                             </manifest>
                             <manifestEntries>
                                 <Multi-Release>true</Multi-Release>
+                                <Enable-Native-Access>ALL-UNNAMED</Enable-Native-Access>
                             </manifestEntries>
                         </archive>
                         <descriptorRefs>
@@ -48,6 +49,7 @@
                 <systemPropertyVariables>
                     <java.awt.headless>true</java.awt.headless>
                     <portex.testfiles>${portex.testfiles}</portex.testfiles>
+                    <portex.log.dir>${project.build.directory}/test-logs</portex.log.dir>
                     <project.version>${project.version}</project.version>
                 </systemPropertyVariables>
             </configuration>
@@ -56,8 +58,8 @@
     </build>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- PE samples are never committed, tests read them from the local PortEx corpus -->
         <portex.testfiles>${project.basedir}/../PortEx/portextestfiles</portex.testfiles>
@@ -65,14 +67,14 @@
         <portex.version>5.0.7</portex.version>
     </properties>
     <profiles>
-        <!-- compile against the Java 8 API when building with a newer JDK -->
+        <!-- compile against the Java 17 API when building with a newer JDK -->
         <profile>
             <id>jdk9+</id>
             <activation>
                 <jdk>[9,)</jdk>
             </activation>
             <properties>
-                <maven.compiler.release>8</maven.compiler.release>
+                <maven.compiler.release>17</maven.compiler.release>
             </properties>
         </profile>
     </profiles>
@@ -81,11 +83,6 @@
             <groupId>net.ifok.image</groupId>
             <artifactId>image4j</artifactId>
             <version>0.7.2</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>33.4.8-jre</version>
         </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>

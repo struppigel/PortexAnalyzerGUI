@@ -3,6 +3,7 @@ package io.github.struppigel.gui.visualizer;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.utils.HexFont;
 import io.github.struppigel.gui.utils.TestPEData;
+import io.github.struppigel.parser.sections.idata.ImportDLL;
 import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.layout.RegionType;
 import io.github.struppigel.tools.visualizer.engine.ByteSourceClosedException;
@@ -88,6 +89,27 @@ class VisualizationModelTest {
         model.reveal(coff - 4);
         assertEquals(RegionType.PE_SIGNATURE, model.getSelectedRegion().getType());
         assertEquals(3, requested.size());
+        model.dispose();
+    }
+
+    @Test
+    void revealSelectsTheImportFunctionAtItsLookupTableEntry() throws Exception {
+        FullPEData data = TestPEData.load(NATIVE_X86);
+        VisualizationModel model = new VisualizationModel();
+        model.loadSynchronously(data);
+        ImportDLL dll = data.getPeData().loadImports().stream().max(
+                java.util.Comparator.comparingInt((ImportDLL d) -> d.getAllImports().size())).get();
+        assertTrue(dll.getAllImports().size() > 1);
+
+        // the first entry starts like the lookup table, it must not select the whole table
+        for (int index : new int[]{0, dll.getAllImports().size() - 1}) {
+            long offset = dll.getAllImports().get(index).getLocations().get(0).from();
+            model.reveal(offset);
+            FileRegion region = model.getSelectedRegion();
+            assertNotEquals(RegionType.IMPORT_LOOKUP_TABLE, region.getType());
+            assertTrue(region.getLocations().size() <= 3, region.toString());
+            assertTrue(region.getLocations().stream().anyMatch(l -> l.from() == offset), region.toString());
+        }
         model.dispose();
     }
 

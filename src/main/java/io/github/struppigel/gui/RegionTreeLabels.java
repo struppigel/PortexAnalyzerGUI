@@ -102,6 +102,11 @@ final class RegionTreeLabels {
             case IMPORT_DLL_NAME:
             case IMPORT_HINT_NAME:
                 return list("Imports");
+            case IMPORT_FUNCTION:
+                // functions of delay imports are shown by the node of their section
+                Optional<FileRegion> functionParent = region.getParent();
+                return functionParent.isPresent() && functionParent.get().getType() == RegionType.DELAY_IMPORT_SECTION
+                        ? Collections.<String>emptyList() : list("Imports");
             case DELAY_IMPORT_SECTION:
                 return list("Delay Load Imports");
             case BOUND_IMPORT_SECTION:
