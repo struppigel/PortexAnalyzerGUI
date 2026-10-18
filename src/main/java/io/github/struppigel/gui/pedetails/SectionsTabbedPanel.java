@@ -67,6 +67,14 @@ public class SectionsTabbedPanel extends JPanel {
         initializeContent();
     }
 
+    /**
+     * Shows nothing, e.g., for a file that is no PE file.
+     */
+    public void clear() {
+        peData = null;
+        cleanUpTabsAndTables();
+    }
+
     public void initializeContent() {
         LOGGER.debug("Init tabs for section tables");
         cleanUpTabsAndTables();

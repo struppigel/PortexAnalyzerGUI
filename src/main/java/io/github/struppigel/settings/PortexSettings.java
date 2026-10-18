@@ -34,6 +34,7 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
     private static final Logger LOGGER = LogManager.getLogger();
     private static final String SETTINGS_FILE_NAME = "settings.ini";
+    private static final String USER_SIGNATURES_FOLDER_NAME = "signatures";
     private static final String SETTINGS_DELIMITER = ":::";
     private final File settingsFile;
 
@@ -81,8 +82,8 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
                                 String value = pair[1];
                                 this.put(key, value);
                             } catch (IllegalArgumentException e) {
-                                LOGGER.warn("Non-existing settings key read! Will be ignored " + e);
-                                e.printStackTrace();
+                                // e.g., the keys of features that were removed
+                                LOGGER.info("Ignoring unknown settings key " + pair[0].trim());
                             }
                         }
                     }
@@ -99,11 +100,13 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
     private void applyDefaults() {
         // apply defaults
-        applySettingIfNotSet(DISABLE_YARA_WARNINGS, "0");
         applySettingIfNotSet(DISABLE_UPDATE, "0");
         applySettingIfNotSet(LOOK_AND_FEEL, LookAndFeelSetting.PORTEX.toString());
         applySettingIfNotSet(VALUES_AS_HEX, "1");
         applySettingIfNotSet(CONTENT_PREVIEW, "1");
+        applySettingIfNotSet(HEX_BYTES_PER_LINE, "0");
+        // empty, so that the folder moves with the application
+        applySettingIfNotSet(USER_SIGNATURES_FOLDER, "");
     }
 
     private void applySettingIfNotSet(PortexSettingsKey key, String value) {
@@ -114,6 +117,27 @@ public class PortexSettings extends HashMap<PortexSettingsKey, String> {
 
     public boolean valueEquals(PortexSettingsKey key, String value) {
         return this.containsKey(key) && this.get(key).equals(value);
+    }
+
+    /**
+     * @return the folder "signatures" next to the settings file, which holds the user's signatures unless another
+     *         folder is set
+     */
+    public File defaultUserSignaturesFolder() {
+        return new File(settingsFile.getAbsoluteFile().getParentFile(), USER_SIGNATURES_FOLDER_NAME);
+    }
+
+    /**
+     * @return the folder of the user's signature databases: the folder that is set, relative to the folder of the
+     *         settings file, or the default folder if none is set
+     */
+    public File userSignaturesFolder() {
+        String value = getOrDefault(USER_SIGNATURES_FOLDER, "").trim();
+        if (value.isEmpty()) {
+            return defaultUserSignaturesFolder();
+        }
+        File folder = new File(value);
+        return folder.isAbsolute() ? folder : new File(settingsFile.getAbsoluteFile().getParentFile(), value);
     }
 
     public void writeSettings() throws IOException {

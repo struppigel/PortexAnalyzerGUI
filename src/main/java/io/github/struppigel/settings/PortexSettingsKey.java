@@ -18,13 +18,14 @@
 package io.github.struppigel.settings;
 
 public enum PortexSettingsKey {
-    YARA_PATH,
-    YARA_SIGNATURE_PATH,
     DISABLE_UPDATE,
-    DISABLE_YARA_WARNINGS,
     // possible values are in LookAndFeelSetting
     LOOK_AND_FEEL,
     VALUES_AS_HEX,
-    CONTENT_PREVIEW;
+    CONTENT_PREVIEW,
+    // bytes per line of the hex view of the visualization, 0 fits the width of the window
+    HEX_BYTES_PER_LINE,
+    // folder of the user's signature databases, empty for the folder "signatures" next to the settings file
+    USER_SIGNATURES_FOLDER;
 
 }

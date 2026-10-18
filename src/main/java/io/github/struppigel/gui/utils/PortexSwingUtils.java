@@ -82,6 +82,27 @@ public class PortexSwingUtils {
         return null;
     }
 
+    /**
+     * Lets the user choose an existing folder.
+     *
+     * @param start the folder that the dialog shows first, its parent if it does not exist
+     * @return the chosen folder, null if the user cancelled
+     */
+    public static File getFolderFromUser(Component parent, File start, String title) {
+        File dir = start;
+        while (dir != null && !dir.isDirectory()) {
+            dir = dir.getParentFile();
+        }
+        JFileChooser fc = new JFileChooser(dir == null ? userdir : dir);
+        fc.setDialogTitle(title);
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        fc.setAcceptAllFileFilterUsed(false);
+        if (fc.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
+            return fc.getSelectedFile();
+        }
+        return null;
+    }
+
     public static String getSaveFolderNameFromUser(PEDetailsPanel parent) {
         JFileChooser fc = new JFileChooser(userdir);
         fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
@@ -94,5 +115,16 @@ public class PortexSwingUtils {
             }
         }
         return null;
+    }
+
+    /**
+     * Shows text that starts with &lt;html&gt; as it is, so that text from the analyzed file is never rendered as
+     * HTML, which could, e.g., load remote images. Must be called before the text is set, because Swing decides
+     * whether to render HTML when the text changes.
+     *
+     * @param component the label or renderer that shows text from the file
+     */
+    public static void disableHtml(JComponent component) {
+        component.putClientProperty("html.disable", Boolean.TRUE);
     }
 }

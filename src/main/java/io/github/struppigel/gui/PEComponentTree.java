@@ -18,6 +18,7 @@
 package io.github.struppigel.gui;
 
 import io.github.struppigel.gui.pedetails.PEDetailsPanel;
+import io.github.struppigel.tools.layout.FileRegion;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -25,6 +26,7 @@ import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.util.*;
@@ -57,6 +59,7 @@ public class PEComponentTree extends JPanel {
     private static final String BOUND_IMPORTS_TEXT = "Bound Imports";
     private static final String EXPORTS_TEXT = "Exports";
     private static final String DEBUG_TEXT = "Debug";
+    private static final String AUTHENTICODE_TEXT = "Authenticode";
     private static final String ANOMALY_TEXT = "Anomalies";
     private static final String HASHES_TEXT = "Hashes";
     private static final String VISUALIZATION_TEXT = "Visualization";
@@ -73,7 +76,7 @@ public class PEComponentTree extends JPanel {
     private List<String> clrTableNames = new ArrayList<>();
 
     private final PEDetailsPanel peDetailsPanel;
-    private FullPEData peData = null;
+    private FileData fileData = null;
     private JTree peTree;
 
     public PEComponentTree(PEDetailsPanel peDetailsPanel) {
@@ -81,8 +84,8 @@ public class PEComponentTree extends JPanel {
         initTree();
     }
 
-    public void setPeData(FullPEData peData) {
-        this.peData = peData;
+    public void setFileData(FileData fileData) {
+        this.fileData = fileData;
         updateTree();
     }
 
@@ -90,6 +93,34 @@ public class PEComponentTree extends JPanel {
         LOGGER.debug("Updating tree");
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) peTree.getModel().getRoot();
         root.removeAllChildren();
+        clrTableNames = new ArrayList<>();
+        DefaultMutableTreeNode dotNetOptStream = null;
+        if (fileData.asPE().isPresent()) {
+            dotNetOptStream = addPENodes(root, fileData.asPE().get());
+        }
+        // every file has these, also files that are no PE files
+        root.add(new DefaultMutableTreeNode(HASHES_TEXT));
+        root.add(new DefaultMutableTreeNode(VISUALIZATION_TEXT));
+        root.add(new DefaultMutableTreeNode(SIGNATURES_TEXT));
+
+        // no root
+        peTree.setRootVisible(false);
+        // reload the tree model to actually show the update
+        DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
+        model.reload();
+        // expand the tree per default except for .NET CLR tables
+        setTreeExpandedState(peTree, true);
+        if (dotNetOptStream != null) {
+            setNodeExpandedState(peTree, dotNetOptStream, false);
+        }
+    }
+
+    /**
+     * Adds the nodes of the PE structures and the anomalies.
+     *
+     * @return the node of the .NET tables, which stays collapsed
+     */
+    private DefaultMutableTreeNode addPENodes(DefaultMutableTreeNode root, FullPEData peData) {
         // create the child nodes
         // PE related
         // DOS/PE Headers
@@ -116,6 +147,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode bound = new DefaultMutableTreeNode(BOUND_IMPORTS_TEXT);
         DefaultMutableTreeNode exports = new DefaultMutableTreeNode(EXPORTS_TEXT);
         DefaultMutableTreeNode debug = new DefaultMutableTreeNode(DEBUG_TEXT);
+        DefaultMutableTreeNode authenticode = new DefaultMutableTreeNode(AUTHENTICODE_TEXT);
 
         // .NET related
         DefaultMutableTreeNode dotNet = new DefaultMutableTreeNode(DOT_NET_TEXT);
@@ -123,11 +155,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode dotNetStreams = new DefaultMutableTreeNode(DOT_NET_STREAM_HEADERS_TEXT);
         DefaultMutableTreeNode dotNetOptStream = new DefaultMutableTreeNode(DOT_NET_OPTIMIZED_STREAM_TEXT);
 
-        // Non-PE
         DefaultMutableTreeNode anomaly = new DefaultMutableTreeNode(ANOMALY_TEXT);
-        DefaultMutableTreeNode hashes = new DefaultMutableTreeNode(HASHES_TEXT);
-        DefaultMutableTreeNode vis = new DefaultMutableTreeNode(VISUALIZATION_TEXT);
-        DefaultMutableTreeNode signatures = new DefaultMutableTreeNode(SIGNATURES_TEXT);
 
         // adding the sub nodes for optional header
         optional.add(standard);
@@ -179,6 +207,10 @@ public class PEComponentTree extends JPanel {
             pe.add(debug);
         }
 
+        if(peData.hasCertificateTable()) {
+            pe.add(authenticode);
+        }
+
         if (peData.overlayExists()) {
             pe.add(overlay);
             LOGGER.debug("Overlay added to root node of tree");
@@ -199,18 +231,7 @@ public class PEComponentTree extends JPanel {
         }
 
         root.add(anomaly);
-        root.add(hashes);
-        root.add(vis);
-        root.add(signatures);
-
-        // no root
-        peTree.setRootVisible(false);
-        // reload the tree model to actually show the update
-        DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
-        model.reload();
-        // expand the tree per default except for .NET CLR tables
-        setTreeExpandedState(peTree, true);
-        setNodeExpandedState(peTree, dotNetOptStream, false);
+        return dotNetOptStream;
     }
 
     // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
@@ -221,9 +242,9 @@ public class PEComponentTree extends JPanel {
 
     // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
     private static void setNodeExpandedState(JTree tree, DefaultMutableTreeNode node, boolean expanded) {
-        List<DefaultMutableTreeNode> list = Collections.list(node.children());
-        for (DefaultMutableTreeNode treeNode : list) {
-            setNodeExpandedState(tree, treeNode, expanded);
+        List<? extends TreeNode> list = Collections.list(node.children());
+        for (TreeNode treeNode : list) {
+            setNodeExpandedState(tree, (DefaultMutableTreeNode) treeNode, expanded);
         }
         if (!expanded && node.isRoot()) {
             return;
@@ -265,9 +286,72 @@ public class PEComponentTree extends JPanel {
         this.setVisible(true);
     }
 
+    /**
+     * Selects the tree node that shows the structure and thus shows the structure in the details panel.
+     *
+     * @return true if there is a node for the structure
+     */
+    public boolean selectNodeFor(FileRegion region) {
+        for (String label : RegionTreeLabels.labelsFor(region, clrTableNames)) {
+            if (selectNode(label)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Selects the Visualization node, which shows the visualization in the details panel.
+     */
+    public void selectVisualization() {
+        selectNode(VISUALIZATION_TEXT);
+    }
+
+    /**
+     * @return the label of the selected node, e.g. to select the same node after the file was loaded again
+     */
+    public Optional<String> getSelectedLabel() {
+        TreePath path = peTree.getSelectionPath();
+        return path == null ? Optional.empty() : Optional.of(path.getLastPathComponent().toString());
+    }
+
+    /**
+     * Selects the first node with the label and thus shows it in the details panel.
+     *
+     * @return true if there is a node with the label
+     */
+    public boolean selectNode(String label) {
+        TreePath path = findPath(label);
+        if (path == null) {
+            return false;
+        }
+        peTree.expandPath(path.getParentPath());
+        if (path.equals(peTree.getSelectionPath())) {
+            selectionChanged(path); // no selection event for the same node, but the view shall update
+        } else {
+            peTree.setSelectionPath(path);
+        }
+        peTree.scrollPathToVisible(path);
+        return true;
+    }
+
+    private TreePath findPath(String label) {
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) peTree.getModel().getRoot();
+        Enumeration<?> nodes = root.preorderEnumeration();
+        while (nodes.hasMoreElements()) {
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) nodes.nextElement();
+            if (!node.isRoot() && label.equals(node.getUserObject())) {
+                return new TreePath(node.getPath());
+            }
+        }
+        return null;
+    }
+
     private void selectionChanged(TreePath path) {
         if (path == null)
             return; // this happens when a selected node was removed, e.g., new file with no overlay loaded
+        if (peDetailsPanel == null)
+            return; // only in tests
         String node = path.getLastPathComponent().toString();
         LOGGER.debug("Tree selection changed to " + node);
         switch (node) {
@@ -324,6 +408,9 @@ public class PEComponentTree extends JPanel {
                 return;
             case DEBUG_TEXT:
                 peDetailsPanel.showDebugInfo();
+                return;
+            case AUTHENTICODE_TEXT:
+                peDetailsPanel.showAuthenticode();
                 return;
             case ANOMALY_TEXT:
                 peDetailsPanel.showAnomalies();

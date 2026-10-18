@@ -20,11 +20,30 @@ Graphical interface for PortEx, a Portable Executable and Malware Analysis Libra
 * Overlay and overlay signature scanning, dump or remove overlay
 * Version information and manifest
 * Icon extraction and saving as PNG
-* Customized signature scanning via Yara. Internal signature scans using PEiD signatures and an internal filetype scanner.
+* Internal signature scans using PEiD signatures and an internal filetype scanner.
+* Scans with your own signatures in the signature format of PortEx
+
+## Your own signatures
+
+PortexAnalyzerGUI scans every file with your own signatures in addition to the signatures that come with PortEx.
+Write them in the [signature format of PortEx](https://github.com/struppigel/PortEx/blob/master/docs/SIGNATURES.md)
+and save them as `.sig` files in the folder `signatures` next to the program, e.g.:
+
+```
+[My packer]
+pattern = 60 BE ?? ?? ?? ?? 8D BE
+at = entrypoint
+type = packer
+```
+
+* All `.sig` files of the folder are loaded, subfolders are not. *Settings > Signatures* opens the folder, creates it
+  if necessary, and chooses another folder.
+* When you open a file, changed `.sig` files are loaded again. *Reload signatures* in the Signatures view or in the
+  Settings menu loads them again and scans the open file with them.
 
 ## Supported OS and JRE
 
-I test this program on Linux and Windows. But it should work on any OS with JRE version 24 or higher.
+I test this program on Linux and Windows. But it should work on any OS with JRE version 17 or higher.
 
 ## Future
 

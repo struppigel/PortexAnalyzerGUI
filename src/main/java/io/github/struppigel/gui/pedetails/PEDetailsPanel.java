@@ -27,16 +27,26 @@ import io.github.struppigel.parser.optheader.OptionalHeader;
 import io.github.struppigel.parser.sections.SectionHeader;
 import io.github.struppigel.parser.sections.SectionLoader;
 import io.github.struppigel.parser.sections.SectionTable;
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.MainFrame;
 import io.github.struppigel.gui.PEFieldsTable;
-import io.github.struppigel.gui.VisualizerPanel;
 import io.github.struppigel.gui.pedetails.signatures.SignaturesPanel;
+import io.github.struppigel.gui.usersignatures.UserSignatureSet;
+import io.github.struppigel.gui.utils.InfoCard;
 import io.github.struppigel.gui.utils.PortexSwingUtils;
 import io.github.struppigel.gui.utils.TableContent;
+import io.github.struppigel.gui.visualizer.InteractiveVisualizerPanel;
+import io.github.struppigel.gui.visualizer.RegionNavigator;
+import io.github.struppigel.gui.visualizer.Spacing;
+import io.github.struppigel.gui.visualizer.VisualizationModel;
 import io.github.struppigel.parser.sections.debug.ExtendedDLLCharacteristics;
 import io.github.struppigel.settings.PortexSettings;
-import com.google.common.base.Optional;
+import io.github.struppigel.settings.PortexSettingsKey;
+import io.github.struppigel.tools.ChecksumCheck;
+import io.github.struppigel.tools.sigscanner.LocationKind;
+import io.github.struppigel.tools.sigscanner.SignatureMatch;
+import java.util.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -61,19 +71,22 @@ import static io.github.struppigel.parser.optheader.StandardFieldEntryKey.ADDR_O
  */
 public class PEDetailsPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
-    private static final String DEFAULT_SAVE_FILENAME = "portex_visualization.png";
     private final String NL = System.getProperty("line.separator");
     private final JPanel rightPanel;
     private final MainFrame parent;
     private final PortexSettings settings;
+    private FileData fileData;
+    // null if the file is no PE file or could not be parsed as one
     private FullPEData peData;
 
     /**
      * Part of table panel
      */
     private final List<JTable> tables = new ArrayList<>();
-    private final JTextArea descriptionWithButtonArea = new JTextArea();
+    private final InfoCard overlayCard = new InfoCard();
+    private final InfoCard overviewCard = new InfoCard();
     private final JTextArea descriptionField = new JTextArea();
+    private JScrollPane scrollPaneDescription;
 
     /**
      * Contains the tablePanel, tabbedPanel and descriptionField
@@ -86,22 +99,93 @@ public class PEDetailsPanel extends JPanel {
      */
     private final JPanel tablePanel = new JPanel();
     private SectionsTabbedPanel sectionsPanel;
-    private VisualizerPanel visPanel = new VisualizerPanel(true, true, true, 180);
+    private InteractiveVisualizerPanel visualizerView;
 
     private IconPanel iconPanel = new IconPanel();
     private final SignaturesPanel signaturesPanel;
+    private final AuthenticodePanel authenticodePanel;
     private boolean isHexEnabled = true;
     private FileContentPreviewPanel previewPanel;
     private TabbedPanel tabbedPanel;
+    private final VisualizationModel visModel;
+    // true if this panel created the model itself and must load the files into it
+    private final boolean ownsVisModel;
 
+    /**
+     * Creates the panel with its own visualization model, e.g., for tests.
+     */
     public PEDetailsPanel(JPanel rightPanel, MainFrame mainFrame, PortexSettings settings, FileContentPreviewPanel previewPanel) {
+        this(rightPanel, mainFrame, settings, previewPanel, new VisualizationModel(), true);
+    }
+
+    /**
+     * @param visModel the visualization model that the owner loads the files into
+     */
+    public PEDetailsPanel(JPanel rightPanel, MainFrame mainFrame, PortexSettings settings, FileContentPreviewPanel previewPanel,
+                          VisualizationModel visModel) {
+        this(rightPanel, mainFrame, settings, previewPanel, visModel, false);
+    }
+
+    private PEDetailsPanel(JPanel rightPanel, MainFrame mainFrame, PortexSettings settings, FileContentPreviewPanel previewPanel,
+                           VisualizationModel visModel, boolean ownsVisModel) {
         super(new GridLayout(1, 0));
         this.rightPanel = rightPanel;
         this.parent = mainFrame;
         this.settings = settings;
         this.previewPanel = previewPanel;
-        signaturesPanel = new SignaturesPanel(settings, previewPanel);
+        this.visModel = visModel;
+        this.ownsVisModel = ownsVisModel;
+        signaturesPanel = new SignaturesPanel(previewPanel);
+        authenticodePanel = new AuthenticodePanel(previewPanel);
         initDetails();
+        linkVisualizationAndPreview();
+    }
+
+    /**
+     * @return the bytes per line of the hex view the user picked, 0 for auto
+     */
+    private int savedHexBytesPerLine() {
+        try {
+            return Integer.parseInt(settings.get(PortexSettingsKey.HEX_BYTES_PER_LINE));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Every navigation to an offset, e.g., in the tree or a table, goes through the preview. The visualization
+     * selects the structure there, and the preview shows the offsets the user clicks in the visualization.
+     */
+    private void linkVisualizationAndPreview() {
+        previewPanel.addOffsetListener((offset, source) -> {
+            if (source != visModel) {
+                visModel.reveal(offset);
+            } else {
+                // a signature picked in the visualization; clicks into the tables must not switch the tab
+                authenticodePanel.selectSignatureAt(offset);
+            }
+        });
+        visualizerView.setOffsetClickListener(offset -> previewPanel.showContentAtOffset(offset, visModel));
+        visModel.addListener(new VisualizationModel.Listener() {
+            @Override
+            public void selectionChanged() {
+                highlightSelectionInPreview();
+            }
+
+            @Override
+            public void dataChanged() {
+                previewPanel.setHighlight(-1, -1);
+            }
+        });
+    }
+
+    private void highlightSelectionInPreview() {
+        long[] selected = visModel.getSelectedBytes();
+        if (selected != null) {
+            previewPanel.setHighlight(selected[0], selected[1]);
+        } else {
+            previewPanel.setHighlight(-1, -1);
+        }
     }
 
     private void initDetails() {
@@ -111,15 +195,24 @@ public class PEDetailsPanel extends JPanel {
         descriptionField.setDropTarget(this.getDropTarget());
         enableDrag(descriptionField);
         descriptionField.setLineWrap(true);
-        JScrollPane scrollPaneDescription = new JScrollPane(descriptionField);
+        descriptionField.setBorder(Spacing.padding());
+        for (InfoCard card : new InfoCard[]{overviewCard, overlayCard}) {
+            card.setDropTarget(this.getDropTarget());
+            enableDrag(card);
+        }
+        scrollPaneDescription = new JScrollPane(descriptionField);
 
-        // visualizer page + button
-        JPanel bigVisuals = new JPanel();
-        bigVisuals.setLayout(new BorderLayout());
-        bigVisuals.add(visPanel, BorderLayout.CENTER);
-
-        JPanel visButtonPanel = initSaveVisualsButtonPanel();
-        bigVisuals.add(visButtonPanel, BorderLayout.PAGE_END);
+        // interactive visualization
+        visualizerView = new InteractiveVisualizerPanel(visModel);
+        visualizerView.setHexBytesPerLine(savedHexBytesPerLine());
+        visualizerView.setHexBytesPerLineListener(bytes -> {
+            settings.put(PortexSettingsKey.HEX_BYTES_PER_LINE, String.valueOf(bytes));
+            try {
+                settings.writeSettings();
+            } catch (IOException e) {
+                LOGGER.error(e);
+            }
+        });
 
         // icons page + button
         JPanel iconWrapperPanel = new JPanel();
@@ -129,15 +222,10 @@ public class PEDetailsPanel extends JPanel {
         iconWrapperPanel.add(icoButtonPanel, BorderLayout.PAGE_END);
 
         // description + dump button
-        descriptionWithButtonArea.setText("");
-        descriptionWithButtonArea.setEditable(false);
-        enableDrag(descriptionWithButtonArea);
-        descriptionWithButtonArea.setDropTarget(this.getDropTarget());
-        descriptionWithButtonArea.setLineWrap(true);
         JPanel descriptionAndButtonWrapperPanel = new JPanel();
         JPanel dumpButtonPanel = initDumpButtonPanel();
         descriptionAndButtonWrapperPanel.setLayout(new BorderLayout());
-        descriptionAndButtonWrapperPanel.add(new JScrollPane(descriptionWithButtonArea), BorderLayout.CENTER);
+        descriptionAndButtonWrapperPanel.add(new JScrollPane(overlayCard), BorderLayout.CENTER);
         descriptionAndButtonWrapperPanel.add(dumpButtonPanel, BorderLayout.PAGE_END);
 
         sectionsPanel = new SectionsTabbedPanel();
@@ -149,9 +237,10 @@ public class PEDetailsPanel extends JPanel {
         cardPanel.add(descriptionAndButtonWrapperPanel, "DESCBUTTON");
         cardPanel.add(tabbedPanel, "TABBED");
         cardPanel.add(sectionsPanel, "SECTIONS");
-        cardPanel.add(bigVisuals, "VISUALIZATION");
+        cardPanel.add(visualizerView, "VISUALIZATION");
         cardPanel.add(iconWrapperPanel, "ICONS");
         cardPanel.add(signaturesPanel, "SIGNATURES");
+        cardPanel.add(authenticodePanel, "AUTHENTICODE");
 
         //add the table to the frame
         setLayout(new BorderLayout());
@@ -389,79 +478,47 @@ public class PEDetailsPanel extends JPanel {
         }
     }
 
-    private JPanel initSaveVisualsButtonPanel() {
-        JPanel buttonPanel = new JPanel();
-        JButton saveImgButton = new JButton("Save to file");
-        saveImgButton.addActionListener(e -> {
-            String path = PortexSwingUtils.getSaveFileNameFromUser(this, DEFAULT_SAVE_FILENAME);
-            if(path != null) {
-
-                if (!path.toLowerCase().endsWith(".png")) {
-                    path += ".png";
-                }
-                Boolean canWrite = PortexSwingUtils.checkIfFileExistsAndAskIfOverwrite(this, new File(path));
-                if(canWrite){
-                    new SaveImageFileWorker(path).execute();
-                }
-            }
-        });
-
-        buttonPanel.add(saveImgButton);
-        return buttonPanel;
+    /**
+     * Shows a loaded file. Files that are no PE files only have hashes, signatures and the visualization.
+     */
+    public void setFileData(FileData data) {
+        this.fileData = data;
+        this.peData = data.asPE().orElse(null);
+        if (ownsVisModel) {
+            visModel.load(data);
+        }
+        if (peData != null) {
+            sectionsPanel.setPeData(peData);
+            iconPanel.setPeData(peData);
+        } else {
+            // releases the previous file
+            sectionsPanel.clear();
+            iconPanel.clear();
+        }
+        signaturesPanel.setFileData(data);
     }
 
-    private class SaveImageFileWorker extends SwingWorker<Boolean, Void> {
-        private String path;
-
-        public SaveImageFileWorker(String path) {
-            this.path = path;
-        }
-
-        @Override
-        protected Boolean doInBackground() {
-            try {
-                ImageIO.write(visPanel.getImage(), "png", new File(path));
-            } catch (IOException ex) {
-                LOGGER.error(ex);
-                ex.printStackTrace();
-                return false;
-            }
-            return true;
-        }
-
-        @Override
-        protected void done() {
-            try {
-                Boolean success = get();
-                if (success) {
-                    JOptionPane.showMessageDialog(PEDetailsPanel.this,
-                            "File successfully saved under " + path,
-                            "Success",
-                            JOptionPane.INFORMATION_MESSAGE);
-                } else {
-                    JOptionPane.showMessageDialog(null,
-                            "Unable to save file " + path,
-                            "Something went wrong :(",
-                            JOptionPane.ERROR_MESSAGE);
-                }
-            } catch (ExecutionException | InterruptedException e) {
-                LOGGER.error(e);
-                e.printStackTrace();
-            }
-        }
+    /**
+     * Zooms the visualization in to the offset and selects the structure there. Does not switch to the
+     * visualization, select its tree node for that.
+     */
+    public void zoomVisualizationTo(long offset) {
+        visualizerView.zoomToOffset(offset);
     }
 
-    public void setPeData(FullPEData peData) {
-        this.peData = peData;
-        sectionsPanel.setPeData(peData);
-        iconPanel.setPeData(peData);
-        signaturesPanel.setPeData(peData);
-        try {
-            visPanel.visualizePE(peData.getFile());
-        } catch (IOException e) {
-            e.printStackTrace();
-            LOGGER.error(e);
-        }
+    /**
+     * @param navigator shows structures that the user picks in the visualization in the tree
+     */
+    public void setRegionNavigator(RegionNavigator navigator) {
+        visualizerView.setRegionNavigator(navigator);
+    }
+
+    /**
+     * @param reload loads the user's signatures again and scans the shown file with them
+     * @param openFolder opens the folder of the user's signatures
+     */
+    public void setSignatureActions(Runnable reload, Runnable openFolder) {
+        signaturesPanel.setSignatureActions(reload, openFolder);
     }
 
     public void setHexEnabled(boolean hexEnabled) {
@@ -470,7 +527,10 @@ public class PEDetailsPanel extends JPanel {
         sectionsPanel.setHexEnabled(hexEnabled);
         signaturesPanel.setHexEnabled(hexEnabled);
         tabbedPanel.setHexEnabled(hexEnabled);
-        parent.refreshSelection();
+        visualizerView.setHexEnabled(hexEnabled);
+        if (parent != null) {
+            parent.refreshSelection();
+        }
     }
 
     public void showDosStub() {
@@ -512,9 +572,7 @@ public class PEDetailsPanel extends JPanel {
 
     private void showEmpty() {
         if (peData != null) {
-            descriptionField.setText("");
-            descriptionField.repaint();
-            showDescriptionPanel();
+            showDescriptionText("");
         } else {
             LOGGER.warn("PE Data is null!");
         }
@@ -590,6 +648,7 @@ public class PEDetailsPanel extends JPanel {
         String[] tableHeader = {"Description", "Value", "File offset"};
 
         String text = "Subsystem: " + header.getSubsystem().getDescription() + NL;
+        text += peData.getChecksumCheck().map(ChecksumCheck::getDescription).orElse("Checksum could not be computed") + NL;
 
         long entryPoint = header.get(ADDR_OF_ENTRY_POINT);
         Optional<SectionHeader> maybeHeader = new SectionLoader(peData.getPeData()).maybeGetSectionHeaderByRVA(entryPoint);
@@ -645,11 +704,13 @@ public class PEDetailsPanel extends JPanel {
 
     @Override
     public synchronized void setDropTarget(DropTarget dt) {
-        descriptionWithButtonArea.setDropTarget(dt);
+        overlayCard.setDropTarget(dt);
+        overviewCard.setDropTarget(dt);
         tablePanel.setDropTarget(dt);
         sectionsPanel.setDropTarget(dt);
         iconPanel.setDropTarget(dt);
         signaturesPanel.setDropTarget(dt);
+        authenticodePanel.setDropTarget(dt);
     }
 
     private void showCard(String name, boolean rightPanelVisible) {
@@ -666,8 +727,35 @@ public class PEDetailsPanel extends JPanel {
         return visibleCardName;
     }
 
+    VisualizationModel getVisualizationModel() {
+        return visModel;
+    }
+
     private void showDescriptionPanel() {
         showCard("DESCRIPTION", true);
+    }
+
+    /**
+     * Shows plain text on the description page.
+     */
+    private void showDescriptionText(String text) {
+        descriptionField.setText(text);
+        descriptionField.setCaretPosition(0);
+        scrollPaneDescription.setViewportView(descriptionField);
+        showDescriptionPanel();
+    }
+
+    /**
+     * @return a card with the lines of the text as rows, bullets and headings
+     */
+    private InfoCard descriptionCard(String text) {
+        return newDescriptionCard().addText(text).render();
+    }
+
+    private InfoCard newDescriptionCard() {
+        InfoCard card = new InfoCard();
+        enableDrag(card);
+        return card;
     }
 
     private void showDescriptionButtonPanel() {
@@ -743,7 +831,7 @@ public class PEDetailsPanel extends JPanel {
 
     private void showFieldEntriesAndDescription(List<StandardField> entries, String[] tableHeader, String text, int offsetColumn) {
         cleanUpTablePanel();
-        tablePanel.add(new JScrollPane(new JTextArea(text)));
+        tablePanel.add(new JScrollPane(descriptionCard(text)));
         PEFieldsTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
@@ -778,12 +866,15 @@ public class PEDetailsPanel extends JPanel {
     }
 
     private PEFieldsTable showTextEntriesAndDescription(List<Object[]> entries, String[] tableHeader, String text, int offsetColumn) {
+        return showTextEntriesAndCard(entries, tableHeader, descriptionCard(text), offsetColumn);
+    }
+
+    /**
+     * Shows the card above the table.
+     */
+    private PEFieldsTable showTextEntriesAndCard(List<Object[]> entries, String[] tableHeader, InfoCard card, int offsetColumn) {
         cleanUpTablePanel();
-        JTextArea t = new JTextArea(text); // if you end up using this again, create a class instead
-        t.setEditable(false);
-        enableDrag(t);
-        t.setLineWrap(true);
-        tablePanel.add(new JScrollPane(t));
+        tablePanel.add(new JScrollPane(card));
         PEFieldsTable table = new PEFieldsTable(isHexEnabled);
         DefaultTableModel model = new PEFieldsTable.PETableModel();
         model.setColumnIdentifiers(tableHeader);
@@ -801,8 +892,7 @@ public class PEDetailsPanel extends JPanel {
     }
 
     public void showPEHeaders() {
-        descriptionField.setText("");
-        showDescriptionPanel();
+        showDescriptionText("");
         previewPanel.showContentAtOffset(peData.getPeData().getPESignature().getOffset());
     }
 
@@ -819,20 +909,28 @@ public class PEDetailsPanel extends JPanel {
             long offset = peData.getOverlay().getOffset();
             long size = peData.getOverlay().getSize();
             double entropy = peData.getOverlayEntropy() * 8;
-            List<String> sigs = peData.getOverlaySignatures();
+            List<SignatureMatch> sigs = peData.getOverlaySignatures();
+            List<SignatureMatch> userSigs = peData.getUserSignatures().getMatches(LocationKind.OVERLAY);
 
-            String text = "Offset: " + toHexIfEnabled(offset) + NL + "Size: " + toHexIfEnabled(size) + NL;
-            String packed = entropy >= 7.0 ? " (packed)" : "";
-            text += "Entropy: " + String.format("%1.2f", entropy) + packed + NL + NL;
-            text += "Signatures: " + NL;
-            for (String s : sigs) {
-                text += s + NL;
+            overlayCard.clear().heading("Overlay");
+            overlayCard.row("Offset", toHexIfEnabled(offset)).row("Size", toHexIfEnabled(size));
+            if (entropy >= 7.0) {
+                overlayCard.rowWithBadge("Entropy", String.format("%1.2f", entropy), "packed", InfoCard.Kind.WARN);
+            } else {
+                overlayCard.row("Entropy", String.format("%1.2f", entropy));
             }
-            if (sigs.size() == 0) {
-                text += "no matches";
+            overlayCard.heading("Signatures");
+            for (SignatureMatch s : sigs) {
+                overlayCard.bullet(s.getName() + " at " + toHexIfEnabled(s.getOffset()) + " (" + s.getLength() + " bytes)");
             }
-
-            descriptionWithButtonArea.setText(text);
+            for (SignatureMatch s : userSigs) {
+                overlayCard.bullet(s.getName() + " at " + toHexIfEnabled(s.getOffset()) + " (" + s.getLength()
+                        + " bytes) from " + UserSignatureSet.sourceOf(s));
+            }
+            if (sigs.isEmpty() && userSigs.isEmpty()) {
+                overlayCard.paragraph("no matches");
+            }
+            overlayCard.render();
             showDescriptionButtonPanel();
             previewPanel.showContentAtOffset(offset);
         } catch (IOException e) {
@@ -894,8 +992,7 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         List<String> manifests = peData.getManifests();
         String MANIFEST_DELIMITER = "\n\n------------------------------------------------------------------------------------------------------------\n\n";
-        descriptionField.setText(String.join(MANIFEST_DELIMITER, manifests));
-        showDescriptionPanel();
+        showDescriptionText(String.join(MANIFEST_DELIMITER, manifests));
 
         // find offset for first RT_MANIFEST table
         Long offset = getMinOffsetForResourceTypeOrZero("RT_MANIFEST");
@@ -940,12 +1037,14 @@ public class PEDetailsPanel extends JPanel {
     private void showImportsForEntries(List<Object[]> entries, DataDirectoryKey dataDir) {
         if (peData == null) return;
         // Make beautiful with tabs
-        String[] tableHeader = {"DLL", "Category", "Name", "Description", "RVA", "Hint"};
-        PEFieldsTable table = showTextEntries(entries, tableHeader, -1);
+        String[] tableHeader = {"DLL", "Category", "Name", "Description", "RVA", "Hint", "Offset"};
+        PEFieldsTable table = showTextEntries(entries, tableHeader, 6);
         table.getColumnModel().getColumn(4).setPreferredWidth(100);
         table.getColumnModel().getColumn(5).setPreferredWidth(100);
         table.getColumnModel().getColumn(4).setMaxWidth(200);
         table.getColumnModel().getColumn(5).setMaxWidth(200);
+        table.getColumnModel().getColumn(6).setPreferredWidth(100);
+        table.getColumnModel().getColumn(6).setMaxWidth(200);
         showTablePanel();
         Long offset = getFileOffsetForDataDirectoryKeyOrZero(dataDir);
         previewPanel.showContentAtOffset(offset);
@@ -989,7 +1088,14 @@ public class PEDetailsPanel extends JPanel {
         if (peData == null) return;
         // Make beautiful with tabs
         String[] tableHeader = {"Name", "Ordinal", "Symbol RVA", "Forwarder"};
-        showTextEntries(peData.getExportTableEntries(), tableHeader, -1);
+        String dllName = peData.getExportDllName();
+        if (dllName.isEmpty()) {
+            showTextEntries(peData.getExportTableEntries(), tableHeader, -1);
+        } else {
+            // a row, not text, so that a name from the file stays one value
+            InfoCard card = newDescriptionCard().row("DLL name", dllName).render();
+            showTextEntriesAndCard(peData.getExportTableEntries(), tableHeader, card, -1);
+        }
         showTablePanel();
         //Long offset = peData.getPeData().get
         Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.EXPORT_TABLE);
@@ -1011,16 +1117,28 @@ public class PEDetailsPanel extends JPanel {
 
     public void showAnomalies() {
         if (peData == null) return;
-        String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure "};
+        String[] tableHeader = {"Description", "Type", "Subtype", "Field or Structure ", "Offset"};
         List<Object[]> entries = peData.getAnomaliesTable();
 
-        PEFieldsTable table = showTextEntries(entries, tableHeader, -1);
+        PEFieldsTable table = showTextEntries(entries, tableHeader, 4);
         table.getColumnModel().getColumn(0).setPreferredWidth(500);
+        table.getColumnModel().getColumn(4).setPreferredWidth(100);
+        table.getColumnModel().getColumn(4).setMaxWidth(200);
+        table.setWrappedColumn(0);
         showTablePanel();
     }
 
     public void showHashes() {
-        if (peData == null) return;
+        if (fileData == null) return;
+        if (peData == null) {
+            // no sections
+            cleanUpTablePanel();
+            tablePanel.add(new JScrollPane(descriptionCard(fileData.getHashesReport())));
+            showUpdatesInTablePanel();
+            showTablePanel();
+            previewPanel.showContentAtOffset(0L);
+            return;
+        }
         String[] tableHeader = {"Section", "Type", "Hash value"};
         List<Object[]> entries = peData.getSectionHashTableEntries();
         String text = peData.getHashesReport();
@@ -1035,18 +1153,68 @@ public class PEDetailsPanel extends JPanel {
         showSignaturesPanel();
     }
 
+    public void showAuthenticode() {
+        if (peData == null) return;
+        authenticodePanel.show(peData, isHexEnabled);
+        showCard("AUTHENTICODE", true);
+        Long offset = getFileOffsetForDataDirectoryKeyOrZero(DataDirectoryKey.CERTIFICATE_TABLE);
+        previewPanel.showContentAtOffset(offset);
+    }
+
+    /**
+     * @return the panel of the Authenticode node, for tests
+     */
+    AuthenticodePanel getAuthenticodePanel() {
+        return authenticodePanel;
+    }
+
     public void showPEFormat() {
         if (peData == null) return;
-        String summary = "";
-        summary += "Anomalies found: " + peData.getAnomaliesTable().size() + NL;
-        summary += "Sections: " + peData.getPeData().getSectionTable().getNumberOfSections() + NL;
-        summary += "Exported symbols: " + peData.getExportTableEntries().size() + NL;
-        summary += "Import entries: " + peData.getImportTableEntries().size() + NL;
-        summary += "Resources found: " + peData.getResources().size() + NL;
-        summary += "Debug entries loaded: " + peData.getDebugTableEntries().size() + NL;
-        summary += "Has overlay: " + (peData.overlayExists() ? "Yes" : "No") + NL;
-        summary += NL + peData.getReHintsReport() + NL;
-        descriptionField.setText(summary);
+        overviewCard.clear().heading("Overview");
+        overviewCard.tiles(3,
+                "Anomalies", String.valueOf(peData.getAnomaliesTable().size()),
+                "Sections", String.valueOf(peData.getPeData().getSectionTable().getNumberOfSections()),
+                "Exported symbols", String.valueOf(peData.getExportTableEntries().size()),
+                "Import entries", String.valueOf(peData.getImportTableEntries().size()),
+                "Resources", String.valueOf(peData.getResources().size()),
+                "Debug entries", String.valueOf(peData.getDebugTableEntries().size()));
+        overviewCard.badgeRow("Has overlay", peData.overlayExists() ? "Yes" : "No", InfoCard.Kind.NEUTRAL);
+        String signature = AuthenticodeTables.statusLine(peData.getCertificateTable(), peData.getAuthenticodeVerification());
+        String status = signature.substring(signature.indexOf(": ") + 2);
+        overviewCard.badgeRow("Authenticode", status, AuthenticodeTables.kindOf(status));
+        java.util.Optional<ChecksumCheck> checksum = peData.getChecksumCheck();
+        if (!checksum.isPresent()) {
+            overviewCard.badgeRow("Checksum", "Unknown", InfoCard.Kind.WARN);
+        } else if (checksum.get().isValid()) {
+            overviewCard.badgeRow("Checksum", "Valid", InfoCard.Kind.GOOD);
+        } else if (checksum.get().isSet()) {
+            overviewCard.badgeRow("Checksum", "Invalid", InfoCard.Kind.BAD);
+        } else {
+            // the default of linkers, only drivers and some system files need it
+            overviewCard.badgeRow("Checksum", "Not set", InfoCard.Kind.NEUTRAL);
+        }
+        overviewCard.heading("Reversing hints");
+        boolean hints = false;
+        for (String line : peData.getReHintsReport().split("\r?\n")) {
+            String hint = line.trim();
+            if (hint.isEmpty() || hint.startsWith("Scanned File:") || InfoCard.isUnderline(hint)
+                    || hint.equals("Reverse Engineering Hints")) {
+                continue; // the title and its underline make the text report of the CLI look nice
+            }
+            hints = true;
+            if (hint.startsWith("Total hints: ")) {
+                overviewCard.row("Total hints", hint.substring("Total hints: ".length()));
+            } else if (hint.startsWith("* ")) {
+                overviewCard.textBullet(hint.substring(2).trim());
+            } else {
+                overviewCard.lead(hint);
+            }
+        }
+        if (!hints) {
+            overviewCard.paragraph("no hints");
+        }
+        overviewCard.render();
+        scrollPaneDescription.setViewportView(overviewCard);
         showDescriptionPanel();
         previewPanel.showContentAtOffset(0L);
     }

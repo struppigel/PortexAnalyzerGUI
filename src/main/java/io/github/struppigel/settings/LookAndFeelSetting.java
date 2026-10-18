@@ -21,6 +21,8 @@ package io.github.struppigel.settings;
  * Available GUI themes
  */
 public enum LookAndFeelSetting {
+    /** the dark theme, named after the former PortEx theme */
     PORTEX,
+    /** the bright theme, named after the former system theme */
     SYSTEM;
 }

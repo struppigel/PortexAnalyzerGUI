@@ -1,6 +1,8 @@
 package io.github.struppigel.gui.utils;
 
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.FullPEData;
+import io.github.struppigel.gui.usersignatures.UserSignatures;
 import io.github.struppigel.testsupport.TestFiles;
 
 import javax.swing.*;
@@ -32,6 +34,21 @@ public final class TestPEData {
     }
 
     public static FullPEData load(File file) throws Exception {
+        return loadAny(file).asPE().orElseThrow(() -> new AssertionError(file + " was not loaded as PE file"));
+    }
+
+    /**
+     * @return the loaded data of any file, also of files that are no PE files; not cached
+     */
+    public static FileData loadAny(File file) throws Exception {
         return new PELoadWorker(file, null, new JLabel()).doInBackground();
+    }
+
+    /**
+     * @param signatureFolder the folder of the user's signatures that the file is scanned with
+     * @return the loaded data of any file, also of files that are no PE files; not cached
+     */
+    public static FileData loadAny(File file, File signatureFolder) throws Exception {
+        return new PELoadWorker(file, null, new JLabel(), new UserSignatures(signatureFolder)).doInBackground();
     }
 }

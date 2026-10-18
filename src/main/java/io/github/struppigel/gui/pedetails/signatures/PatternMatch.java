@@ -18,19 +18,24 @@
 package io.github.struppigel.gui.pedetails.signatures;
 
 public class PatternMatch {
-    final long offset;
+    // null if the match has no file offset; the table shows an empty cell and the preview ignores it
+    final Long offset;
     final String patternContent;
     String patternName;
-    String location = "NaN";
+    String location;
 
     public PatternMatch(long offset, String patternName, String patternContent) {
+        this(Long.valueOf(offset), patternName, patternContent, "");
+    }
+
+    public PatternMatch(Long offset, String patternName, String patternContent, String location) {
         this.offset = offset;
         this.patternName = patternName;
         this.patternContent = patternContent;
+        this.location = location;
     }
 
     // {"Rule name" , "Pattern name", "Pattern content", "Offset", "Location"};
-    // TODO location cannot be implemented here because it needs to parse the whole PE again and this is only a getter
     public Object[] toPatternRow(String rulename) {
         Object[] row = {rulename, patternName, patternContent, offset, location};
         return row;

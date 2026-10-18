@@ -2,13 +2,22 @@
 <Configuration status="ERROR">
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <RegexFilter regex=".*katjahahn.*" onMatch="DENY" onMismatch="ACCEPT"/>
+            <Filters>
+                <ThresholdFilter level="ERROR" onMatch="NEUTRAL" onMismatch="DENY"/>
+                <RegexFilter regex=".*katjahahn.*" onMatch="DENY" onMismatch="ACCEPT"/>
+            </Filters>
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
+        <!-- LogSetup sets the folder, override it with -Dportex.log.dir=<folder> -->
+        <File name="File" fileName="${sys:portex.log.dir:-${sys:java.io.tmpdir}}/portexanalyzer.log" append="false">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </File>
     </Appenders>
     <Loggers>
+        <Logger name="io.github.struppigel" level="INFO"/>
         <Root level="ERROR">
             <AppenderRef ref="Console"/>
+            <AppenderRef ref="File"/>
         </Root>
     </Loggers>
 </Configuration>

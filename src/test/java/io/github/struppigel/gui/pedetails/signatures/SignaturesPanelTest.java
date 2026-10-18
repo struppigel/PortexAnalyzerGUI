@@ -2,12 +2,9 @@ package io.github.struppigel.gui.pedetails.signatures;
 
 import io.github.struppigel.gui.PEFieldsTable;
 import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
-import io.github.struppigel.settings.PortexSettings;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import javax.swing.*;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,9 +13,6 @@ import static io.github.struppigel.testsupport.Swing.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SignaturesPanelTest {
-
-    @TempDir
-    Path tempDir;
 
     @Test
     void showsNoMatchesRow() throws Exception {
@@ -61,9 +55,36 @@ class SignaturesPanelTest {
         assertEquals("Second", patterns.getValueAt(0, 0));
     }
 
+    @Test
+    void signatureButtonsRunTheirActions() throws Exception {
+        SignaturesPanel panel = panel();
+        onEdt(() -> panel.buildPEiDTables(new ArrayList<>()));
+        assertFalse(button(panel, "Reload signatures").isEnabled());
+        assertFalse(button(panel, "Open signature folder").isEnabled());
+
+        List<String> ran = new ArrayList<>();
+        onEdt(() -> {
+            panel.setSignatureActions(() -> ran.add("reload"), () -> ran.add("open"));
+            panel.buildPEiDTables(new ArrayList<>());
+        });
+        JButton reload = button(panel, "Reload signatures");
+        JButton openFolder = button(panel, "Open signature folder");
+        onEdt(() -> {
+            reload.doClick();
+            openFolder.doClick();
+        });
+
+        assertEquals(List.of("reload", "open"), ran);
+    }
+
+    private static JButton button(SignaturesPanel panel, String text) throws Exception {
+        return onEdtGet(() -> findAll(panel, JButton.class).stream()
+                .filter(b -> b.getText().equals(text))
+                .findFirst().orElseThrow(() -> new AssertionError("no button " + text)));
+    }
+
     private SignaturesPanel panel() throws Exception {
-        PortexSettings settings = new PortexSettings(tempDir.resolve("settings.ini").toFile());
-        return onEdtGet(() -> new SignaturesPanel(settings, new FileContentPreviewPanel()));
+        return onEdtGet(() -> new SignaturesPanel(new FileContentPreviewPanel()));
     }
 
     /**
