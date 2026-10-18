@@ -82,6 +82,27 @@ public class PortexSwingUtils {
         return null;
     }
 
+    /**
+     * Lets the user choose an existing folder.
+     *
+     * @param start the folder that the dialog shows first, its parent if it does not exist
+     * @return the chosen folder, null if the user cancelled
+     */
+    public static File getFolderFromUser(Component parent, File start, String title) {
+        File dir = start;
+        while (dir != null && !dir.isDirectory()) {
+            dir = dir.getParentFile();
+        }
+        JFileChooser fc = new JFileChooser(dir == null ? userdir : dir);
+        fc.setDialogTitle(title);
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        fc.setAcceptAllFileFilterUsed(false);
+        if (fc.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
+            return fc.getSelectedFile();
+        }
+        return null;
+    }
+
     public static String getSaveFolderNameFromUser(PEDetailsPanel parent) {
         JFileChooser fc = new JFileChooser(userdir);
         fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);

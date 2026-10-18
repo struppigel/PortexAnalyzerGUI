@@ -95,9 +95,15 @@ public class DetailCanvas extends JComponent {
         }
     }
 
+    // where the left button was pressed, null if it is not pressed
     private Point dragStart;
-    private long dragStartRow;
-    private long rangeAnchor = -1;
+    // the track the user started marking in, dragging elsewhere marks as if the pointer were in it
+    private Track dragTrack;
+    // the bytes the marking started with, it extends from them; a range so that it is kept when the zoom changes
+    private long anchorFrom = -1;
+    private long anchorTo = -1;
+    // pixels the pointer must move until a press becomes a drag, so that a shaky click stays a click
+    private static final int DRAG_THRESHOLD = 3;
     // the area the user started marking in, decides whether Ctrl + C copies hex digits or characters
     private Track markTrack = Track.HEX;
     private static final long MAX_COPY_BYTES = 4L * 1024 * 1024;
@@ -396,6 +402,72 @@ public class DetailCanvas extends JComponent {
     }
 
     /**
+     * The offset at the point as if it were in the track, so that marking goes on when the pointer leaves the track
+     * or the view while dragging. Points behind the end of the file give the last byte.
+     *
+     * @return the first offset of the cell, -1 if there is nothing to show
+     */
+    private long offsetInTrack(Point p, Track track) {
+        if (!relayout()) {
+            return -1;
+        }
+        for (TrackLayout t : trackLayouts()) {
+            if (t.track == track) {
+                int x = Math.max(0, Math.min(t.width - 1, p.x - t.x));
+                int y = Math.max(0, Math.min(getHeight() - 1, p.y));
+                long offset = viewport().offsetAt(x, y, t.cellWidth);
+                return offset >= 0 ? offset : model.getVisualization().getFileLength() - 1;
+            }
+        }
+        return offsetAt(p); // the zoom level changed and the track is gone
+    }
+
+    /**
+     * @return start and exclusive end of the cell that starts at the offset
+     */
+    private long[] cellAt(long offset) {
+        return new long[]{offset, Math.min(model.getVisualization().getFileLength(), offset + level().bytesPerCell)};
+    }
+
+    /**
+     * Marks the bytes from the anchor to the cell.
+     */
+    private void markTo(long[] cell) {
+        model.selectRange(Math.min(anchorFrom, cell[0]), Math.max(anchorTo, cell[1]));
+    }
+
+    /**
+     * The bytes that Shift + click extends: the ones the marking started with if they are still marked, otherwise
+     * the start of the marked bytes or the selected byte.
+     */
+    private void anchorForExtension(long[] pressedCell) {
+        if (model.hasRangeSelection()) {
+            boolean anchorMarked = anchorFrom >= model.getRangeStart() && anchorTo <= model.getRangeEnd()
+                    && anchorFrom < anchorTo;
+            if (!anchorMarked) {
+                anchorFrom = model.getRangeStart();
+                anchorTo = anchorFrom + 1;
+            }
+        } else if (model.getSelectedOffset() >= 0) {
+            anchorFrom = model.getSelectedOffset();
+            anchorTo = anchorFrom + 1;
+        } else {
+            anchorFrom = pressedCell[0];
+            anchorTo = pressedCell[1];
+        }
+    }
+
+    private void updateCursor(Point p) {
+        Track track = trackAt(p);
+        int type = track == Track.HEX || track == Track.ASCII ? Cursor.TEXT_CURSOR
+                : track != null && model.getVisualization() != null ? Cursor.CROSSHAIR_CURSOR
+                : Cursor.DEFAULT_CURSOR;
+        if (getCursor().getType() != type) {
+            setCursor(Cursor.getPredefinedCursor(type));
+        }
+    }
+
+    /**
      * @return the upper left corner of the cell of the offset in the track, null if the track is not shown
      */
     public Point pixelOf(long offset, Track track) {
@@ -625,7 +697,7 @@ public class DetailCanvas extends JComponent {
         g.fillRect(0, 0, getWidth(), getHeight());
         if (!relayout()) {
             g.setColor(RULER_TEXT);
-            g.drawString(model.getPeData() == null ? "Drop file here" : "Nothing to show", 10, 20);
+            g.drawString(model.getFileData() == null ? "Drop file here" : "Nothing to show", 10, 20);
             return;
         }
         FileVisualization vis = model.getVisualization();
@@ -1024,6 +1096,9 @@ public class DetailCanvas extends JComponent {
             levelIndex = 0;
             firstRow = 0;
             viewState = null;
+            dragStart = null;
+            anchorFrom = -1;
+            anchorTo = -1;
             if (relayout()) {
                 viewChanged();
             }
@@ -1066,6 +1141,7 @@ public class DetailCanvas extends JComponent {
         @Override
         public void mouseMoved(MouseEvent e) {
             model.setHoverOffset(offsetAt(e.getPoint()));
+            updateCursor(e.getPoint());
         }
 
         @Override
@@ -1081,14 +1157,26 @@ public class DetailCanvas extends JComponent {
                 return;
             }
             dragged = false;
+            dragStart = null;
+            // dragging marks bytes like in a text at every zoom level, Shift + click extends the marked bytes
+            if (!SwingUtilities.isLeftMouseButton(e) || ladder == null) {
+                return;
+            }
+            long offset = offsetAt(e.getPoint());
+            if (offset < 0) {
+                return;
+            }
             dragStart = e.getPoint();
-            dragStartRow = firstRow;
-            // in the hex view dragging marks bytes like in a text, elsewhere it scrolls and Shift marks
-            boolean marking = SwingUtilities.isLeftMouseButton(e) && ladder != null
-                    && (e.isShiftDown() || level().hex);
-            rangeAnchor = marking ? offsetAt(e.getPoint()) : -1;
-            if (rangeAnchor >= 0) {
-                markTrack = trackAt(e.getPoint()) == Track.ASCII ? Track.ASCII : Track.HEX;
+            dragTrack = trackAt(e.getPoint());
+            markTrack = dragTrack == Track.ASCII ? Track.ASCII : Track.HEX;
+            long[] cell = cellAt(offset);
+            if (e.isShiftDown()) {
+                anchorForExtension(cell);
+                markTo(cell);
+                dragged = true; // not a click that selects a structure
+            } else {
+                anchorFrom = cell[0];
+                anchorTo = cell[1];
             }
         }
 
@@ -1102,29 +1190,24 @@ public class DetailCanvas extends JComponent {
 
         @Override
         public void mouseDragged(MouseEvent e) {
-            if (dragStart == null || ladder == null) {
+            if (dragStart == null || ladder == null || model.getVisualization() == null) {
+                return;
+            }
+            Point p = e.getPoint();
+            if (!dragged && Math.abs(p.x - dragStart.x) < DRAG_THRESHOLD
+                    && Math.abs(p.y - dragStart.y) < DRAG_THRESHOLD) {
                 return;
             }
             dragged = true;
-            if (rangeAnchor >= 0) {
-                Point p = e.getPoint();
-                // dragging above or below the view scrolls on, like in a text
-                if (p.y < 0) {
-                    setFirstRow(firstRow - Math.max(1, -p.y / level().cellHeight));
-                } else if (p.y >= getHeight()) {
-                    setFirstRow(firstRow + Math.max(1, (p.y - getHeight()) / level().cellHeight));
-                }
-                long offset = offsetAt(new Point(p.x, Math.max(0, Math.min(getHeight() - 1, p.y))));
-                if (offset >= 0) {
-                    long bytesPerCell = level().bytesPerCell;
-                    long from = Math.min(rangeAnchor, offset);
-                    long to = Math.min(model.getVisualization().getFileLength(),
-                            Math.max(rangeAnchor, offset) + bytesPerCell);
-                    model.selectRange(from, to);
-                }
-            } else {
-                long rows = (dragStart.y - e.getY()) / level().cellHeight;
-                setFirstRow(dragStartRow + rows);
+            // dragging above or below the view scrolls on, like in a text
+            if (p.y < 0) {
+                setFirstRow(firstRow - Math.max(1, -p.y / level().cellHeight));
+            } else if (p.y >= getHeight()) {
+                setFirstRow(firstRow + Math.max(1, (p.y - getHeight()) / level().cellHeight));
+            }
+            long offset = offsetInTrack(p, dragTrack);
+            if (offset >= 0) {
+                markTo(cellAt(offset));
             }
         }
 
@@ -1165,53 +1248,97 @@ public class DetailCanvas extends JComponent {
 
         private void showPopup(MouseEvent e) {
             long offset = offsetAt(e.getPoint());
-            FileRegion region = model.innermostAt(offset);
-            if (offset < 0) {
-                return;
+            if (offset >= 0) {
+                createMenu(offset).show(DetailCanvas.this, e.getX(), e.getY());
             }
-            JPopupMenu menu = new JPopupMenu();
-            long marked = markedByteCount();
-            if (marked > 0) {
-                String size = marked + (marked == 1 ? " byte" : " bytes");
-                JMenuItem hexItem = new JMenuItem("Copy " + size + " as hex");
-                hexItem.addActionListener(a -> copyMarkedBytes(false));
-                JMenuItem textItem = new JMenuItem("Copy " + size + " as text");
-                textItem.addActionListener(a -> copyMarkedBytes(true));
-                if (marked > MAX_COPY_BYTES) {
-                    hexItem.setEnabled(false);
-                    textItem.setEnabled(false);
-                    hexItem.setToolTipText("Mark at most " + MAX_COPY_BYTES / (1024 * 1024) + " MiB to copy");
-                    textItem.setToolTipText(hexItem.getToolTipText());
-                }
-                menu.add(hexItem);
-                menu.add(textItem);
-                JMenuItem saveMarkedItem = new JMenuItem("Save " + size + " as file...");
-                saveMarkedItem.addActionListener(a -> RegionSaver.saveWithDialog(DetailCanvas.this, model, "marked",
-                        Collections.singletonList(new long[]{model.getRangeStart(), model.getRangeStart() + marked})));
-                menu.add(saveMarkedItem);
-                menu.addSeparator();
-            }
-            if (region != null) {
-                JMenuItem zoomItem = new JMenuItem("Zoom to " + region.getName());
-                zoomItem.addActionListener(a -> zoomToRegion(region));
-                menu.add(zoomItem);
-                if (navigator != null) {
-                    JMenuItem treeItem = new JMenuItem("Show in tree");
-                    treeItem.addActionListener(a -> navigator.showInTree(region, offset));
-                    menu.add(treeItem);
-                }
-                menu.add(RegionSaver.menuItem(DetailCanvas.this, model, region));
-                FileRegion selected = model.getSelectedRegion();
-                if (selected != null && selected != region) {
-                    menu.add(RegionSaver.menuItem(DetailCanvas.this, model, selected));
-                }
-            }
-            JMenuItem copyItem = new JMenuItem("Copy offset");
-            copyItem.addActionListener(a -> Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
-                    new java.awt.datatransfer.StringSelection("0x" + Long.toHexString(offset)), null));
-            menu.add(copyItem);
-            menu.show(DetailCanvas.this, e.getX(), e.getY());
         }
+    }
+
+    /**
+     * @param offset the offset that was right-clicked
+     * @return the context menu: copying and saving the marked bytes, marking a range, the structure at the offset
+     *         and copying the offset
+     */
+    JPopupMenu createMenu(long offset) {
+        FileRegion region = model.innermostAt(offset);
+        JPopupMenu menu = new JPopupMenu();
+        long marked = markedByteCount();
+        if (marked > 0) {
+            String size = marked + (marked == 1 ? " byte" : " bytes");
+            JMenuItem hexItem = new JMenuItem("Copy " + size + " as hex");
+            hexItem.addActionListener(a -> copyMarkedBytes(false));
+            JMenuItem textItem = new JMenuItem("Copy " + size + " as text");
+            textItem.addActionListener(a -> copyMarkedBytes(true));
+            if (marked > MAX_COPY_BYTES) {
+                hexItem.setEnabled(false);
+                textItem.setEnabled(false);
+                hexItem.setToolTipText("Mark at most " + MAX_COPY_BYTES / (1024 * 1024) + " MiB to copy");
+                textItem.setToolTipText(hexItem.getToolTipText());
+            }
+            menu.add(hexItem);
+            menu.add(textItem);
+            JMenuItem saveMarkedItem = new JMenuItem("Save " + size + " as file...");
+            saveMarkedItem.addActionListener(a -> RegionSaver.saveWithDialog(this, model, "marked",
+                    Collections.singletonList(new long[]{model.getRangeStart(), model.getRangeStart() + marked})));
+            menu.add(saveMarkedItem);
+        }
+        JMenuItem rangeItem = new JMenuItem("Select range...");
+        rangeItem.addActionListener(a -> selectRangeWithDialog(offset));
+        menu.add(rangeItem);
+        menu.addSeparator();
+        if (region != null) {
+            JMenuItem zoomItem = new JMenuItem("Zoom to " + region.getName());
+            zoomItem.addActionListener(a -> zoomToRegion(region));
+            menu.add(zoomItem);
+            // the clicked offset is in the location that is shown now
+            RegionMenu.addLocationItems(menu, model, region, offset);
+            if (navigator != null) {
+                JMenuItem treeItem = new JMenuItem("Show in tree");
+                treeItem.addActionListener(a -> navigator.showInTree(region, offset));
+                menu.add(treeItem);
+            }
+            menu.add(RegionSaver.menuItem(this, model, region));
+            FileRegion selected = model.getSelectedRegion();
+            if (selected != null && selected != region) {
+                menu.add(RegionSaver.menuItem(this, model, selected));
+            }
+        }
+        JMenuItem copyItem = new JMenuItem("Copy offset");
+        copyItem.addActionListener(a -> Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+                new java.awt.datatransfer.StringSelection("0x" + Long.toHexString(offset)), null));
+        menu.add(copyItem);
+        return menu;
+    }
+
+    /**
+     * Asks the user for bytes and marks them. The dialog starts with the selected bytes, otherwise with the byte at
+     * the offset.
+     */
+    private void selectRangeWithDialog(long offset) {
+        FileVisualization vis = model.getVisualization();
+        if (vis == null) {
+            return;
+        }
+        long[] initial = model.getSelectedBytes();
+        if (initial == null) {
+            initial = new long[]{offset, offset + 1};
+        }
+        long[] range = RangeDialog.ask(this, initial, hexEnabled, vis.getFileLength());
+        if (range != null) {
+            selectBytes(range[0], range[1]);
+        }
+    }
+
+    /**
+     * Marks the bytes so that Ctrl + C copies them as hex digits and Shift + click extends them from their start, and
+     * scrolls to their start if it is not visible.
+     */
+    void selectBytes(long from, long toExclusive) {
+        markTrack = Track.HEX;
+        anchorFrom = from;
+        anchorTo = from + 1;
+        model.selectRange(from, toExclusive);
+        scrollToOffset(from, true);
     }
 
     /**

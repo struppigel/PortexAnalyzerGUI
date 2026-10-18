@@ -1,5 +1,6 @@
 package io.github.struppigel.gui.pedetails;
 
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.PEComponentTree;
 import io.github.struppigel.gui.utils.InfoCard;
@@ -25,6 +26,8 @@ import javax.swing.*;
 import javax.swing.tree.TreePath;
 import java.awt.*;
 import java.awt.event.MouseEvent;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -120,6 +123,19 @@ class PEDetailsPanelTest {
     }
 
     @Test
+    void exportsShowTheNameOfTheDllAboveTheExports() throws Exception {
+        FullPEData data = load(EXPORTS);
+        select("Exports");
+
+        assertEquals("TABLE", details.getVisibleCardName());
+        JTable table = singleVisibleTable();
+        assertEquals(Arrays.asList("Name", "Ordinal", "Symbol RVA", "Forwarder"), columnNames(table));
+        assertEquals(data.getExportTableEntries().size(), table.getRowCount());
+        assertEquals("winfw.dll", data.getExportDllName());
+        assertTrue(visibleText().contains("DLL name: winfw.dll"), visibleText());
+    }
+
+    @Test
     void selectingAnImportRowMarksOnlyTheDataOfTheFunction() throws Exception {
         load(NATIVE_X86);
         select("Imports");
@@ -181,6 +197,19 @@ class PEDetailsPanelTest {
         List<String> buttons = onEdtGet(() -> findVisible(details, JButton.class).stream()
                 .map(AbstractButton::getText).collect(Collectors.toList()));
         assertTrue(buttons.containsAll(Arrays.asList("Dump overlay", "Remove overlay")), buttons.toString());
+    }
+
+    @Test
+    void overlayShowsMatchesOfTheUserSignatures() throws Exception {
+        Path signatures = Files.createDirectories(tempDir.resolve("signatures"));
+        Files.write(signatures.resolve("mine.sig"),
+                "[My overlay MZ]\npattern = 'MZ'\nat = overlay\n".getBytes(StandardCharsets.UTF_8));
+        show(TestPEData.loadAny(TestFiles.file(OVERLAY), signatures.toFile()));
+        select("Overlay");
+
+        String text = visibleText();
+        assertTrue(text.contains("My overlay MZ at "), text);
+        assertTrue(text.contains(" bytes) from mine.sig"), text);
     }
 
     @Test
@@ -288,6 +317,10 @@ class PEDetailsPanelTest {
         load(SIGNED);
         select("PE Format");
         assertTrue(visibleText().contains("Authenticode: VALID, signed by Microsoft"), visibleText());
+        assertTrue(visibleText().contains("Checksum: Valid"), visibleText());
+
+        select("Windows Fields");
+        assertTrue(visibleText().contains("Checksum is valid (0x55d4a)"), visibleText());
 
         select("Hashes");
         assertTrue(visibleText().contains("Authentihash (SHA-256): "), visibleText());
@@ -469,8 +502,62 @@ class PEDetailsPanelTest {
         }
     }
 
+    @Test
+    void everyNodeOfANonPEFileCanBeSelected() throws Exception {
+        show(TestPEData.loadAny(TestFiles.file(NOT_PE)));
+
+        select("Hashes");
+        assertEquals("TABLE", details.getVisibleCardName());
+        select("Visualization");
+        assertEquals("VISUALIZATION", details.getVisibleCardName());
+        select("Signatures");
+        assertEquals("SIGNATURES", details.getVisibleCardName());
+    }
+
+    @Test
+    void hashesOfANonPEFile() throws Exception {
+        show(TestPEData.loadAny(TestFiles.file(NOT_PE)));
+        select("Hashes");
+
+        assertTrue(visibleText().contains("SHA1: "), visibleText());
+        assertTrue(onEdtGet(() -> findVisible(details, JTable.class)).isEmpty());
+    }
+
+    @Test
+    void switchingBetweenPEAndNonPEFilesKeepsWorking() throws Exception {
+        load(NATIVE_X86);
+        select("Section Table");
+        FileData notPE = TestPEData.loadAny(TestFiles.file(NOT_PE));
+        FullPEData pe = TestPEData.load(DOTNET);
+
+        onEdt(() -> {
+            details.setFileData(notPE);
+            componentTree.setFileData(notPE);
+            preview.setFileData(notPE);
+            componentTree.setSelectionRow(0);
+        });
+        assertEquals("TABLE", details.getVisibleCardName());
+        // refreshes the panels, which must not show the previous PE file
+        onEdt(() -> details.setHexEnabled(false));
+        onEdt(() -> details.setHexEnabled(true));
+        assertTrue(visibleText().contains("SHA1: "), visibleText());
+
+        onEdt(() -> {
+            details.setFileData(pe);
+            componentTree.setFileData(pe);
+            preview.setFileData(pe);
+        });
+        select("Section Table");
+        assertEquals("SECTIONS", details.getVisibleCardName());
+    }
+
     private FullPEData load(String sample) throws Exception {
         FullPEData data = TestPEData.load(sample);
+        show(data);
+        return data;
+    }
+
+    private void show(FileData data) throws Exception {
         PortexSettings settings = new PortexSettings(tempDir.resolve("settings.ini").toFile());
         onEdt(() -> {
             preview = new FileContentPreviewPanel();
@@ -478,13 +565,12 @@ class PEDetailsPanelTest {
             // the visualizer needs a size
             Swing.layout(details, 800, 600);
             componentTree = new PEComponentTree(details);
-            // same order as MainFrame.setPeData
-            details.setPeData(data);
-            componentTree.setPeData(data);
-            preview.setPeData(data);
+            // same order as MainFrame.setFileData
+            details.setFileData(data);
+            componentTree.setFileData(data);
+            preview.setFileData(data);
             tree = Swing.findAll(componentTree, JTree.class).get(0);
         });
-        return data;
     }
 
     private void select(String label) throws Exception {

@@ -11,9 +11,11 @@ import javax.swing.*;
 import javax.swing.tree.TreePath;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.github.struppigel.testsupport.Swing.onEdt;
 import static io.github.struppigel.testsupport.Swing.onEdtGet;
 import static io.github.struppigel.testsupport.TestFiles.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -108,14 +110,61 @@ class PEComponentTreeTest {
         PEComponentTree tree = onEdtGet(() -> new PEComponentTree(null));
 
         List<String> labels = onEdtGet(() -> {
-            tree.setPeData(dotNetWithOverlay);
-            tree.setPeData(nativeFile);
+            tree.setFileData(dotNetWithOverlay);
+            tree.setFileData(nativeFile);
             return Swing.treeLabels(jtree(tree));
         });
 
         assertFalse(labels.contains(".NET Headers"));
         assertFalse(labels.contains("Overlay"));
         assertEquals(1, labels.stream().filter(l -> l.equals("PE Format")).count());
+    }
+
+    @Test
+    void nonPEFileHasHashesVisualizationAndSignatures() throws Exception {
+        FileData data = TestPEData.loadAny(TestFiles.file(NOT_PE));
+        PEComponentTree tree = onEdtGet(() -> new PEComponentTree(null));
+
+        List<String> labels = onEdtGet(() -> {
+            tree.setFileData(data);
+            return Swing.treeLabels(jtree(tree));
+        });
+
+        assertEquals(Arrays.asList("Hashes", "Visualization", "Signatures"), labels);
+    }
+
+    @Test
+    void peFileAfterNonPEFileHasAllNodes() throws Exception {
+        FileData notPE = TestPEData.loadAny(TestFiles.file(NOT_PE));
+        FullPEData dotNet = TestPEData.load(DOTNET);
+        PEComponentTree tree = onEdtGet(() -> new PEComponentTree(null));
+
+        List<String> labels = onEdtGet(() -> {
+            tree.setFileData(dotNet);
+            tree.setFileData(notPE);
+            tree.setFileData(dotNet);
+            return Swing.treeLabels(jtree(tree));
+        });
+
+        assertTrue(labels.containsAll(Arrays.asList("PE Format", ".NET Headers", "Anomalies", "Hashes",
+                "Visualization", "Signatures")), labels.toString());
+        assertTrue(labels.containsAll(dotNet.getClrTables().keySet()));
+    }
+
+    @Test
+    void selectedNodeCanBeSelectedAgainAfterLoading() throws Exception {
+        PEComponentTree tree = tree(OVERLAY);
+        assertEquals(Optional.empty(), onEdtGet(tree::getSelectedLabel));
+
+        assertTrue(onEdtGet(() -> tree.selectNode("Signatures")));
+        assertEquals(Optional.of("Signatures"), onEdtGet(tree::getSelectedLabel));
+
+        // the GUI loads the file again after the signatures were reloaded
+        FullPEData data = TestPEData.load(OVERLAY);
+        onEdt(() -> tree.setFileData(data));
+        assertTrue(onEdtGet(() -> tree.selectNode("Signatures")));
+        assertEquals(Optional.of("Signatures"), onEdtGet(tree::getSelectedLabel));
+        assertFalse(onEdtGet(() -> tree.selectNode("no such node")));
     }
 
     private static List<String> treeLabels(String sample) throws Exception {
@@ -130,7 +179,7 @@ class PEComponentTreeTest {
         FullPEData data = TestPEData.load(sample);
         return onEdtGet(() -> {
             PEComponentTree tree = new PEComponentTree(null);
-            tree.setPeData(data);
+            tree.setFileData(data);
             return tree;
         });
     }

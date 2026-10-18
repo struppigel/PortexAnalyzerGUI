@@ -24,6 +24,8 @@ public enum PortexSettingsKey {
     VALUES_AS_HEX,
     CONTENT_PREVIEW,
     // bytes per line of the hex view of the visualization, 0 fits the width of the window
-    HEX_BYTES_PER_LINE;
+    HEX_BYTES_PER_LINE,
+    // folder of the user's signature databases, empty for the folder "signatures" next to the settings file
+    USER_SIGNATURES_FOLDER;
 
 }

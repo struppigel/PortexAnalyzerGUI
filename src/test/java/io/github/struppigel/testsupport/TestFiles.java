@@ -35,6 +35,8 @@ public final class TestFiles {
     public static final String SIGNED_SHA1 = "Haus/firefox_invalid_x64.exe";
     /** a certificate table with invalid entries inside a section */
     public static final String CERT_BROKEN = "Haus/cff-chrome_elf.dll";
+    /** a DLL whose export directory names it winfw.dll */
+    public static final String EXPORTS = "CVE_2013_3900/CVE_2013_3900";
 
     public static final List<String> ALL_PE = Arrays.asList(
             DOTNET, OVERLAY, RESOURCES, SMALLEST_PE, DEBUG_INFO, NATIVE_X86, ICONS_X64, SIGNED, CERT_BROKEN);

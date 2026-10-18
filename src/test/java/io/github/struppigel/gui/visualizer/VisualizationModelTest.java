@@ -1,8 +1,10 @@
 package io.github.struppigel.gui.visualizer;
 
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.utils.HexFont;
 import io.github.struppigel.gui.utils.TestPEData;
+import io.github.struppigel.parser.PhysicalLocation;
 import io.github.struppigel.parser.sections.idata.ImportDLL;
 import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.layout.RegionType;
@@ -10,7 +12,11 @@ import io.github.struppigel.tools.visualizer.engine.ByteSourceClosedException;
 import io.github.struppigel.tools.visualizer.engine.FileVisualization;
 import io.github.struppigel.tools.visualizer.render.Track;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -31,6 +37,92 @@ class VisualizationModelTest {
         assertTrue(vis.getStatistics().isComplete());
         assertSame(data.getStructureMap(), vis.getStructureMap());
         model.dispose();
+    }
+
+    @Test
+    void nonPEFileIsVisualizedWithItsMarkers(@TempDir Path dir) throws Exception {
+        File file = dir.resolve("archive.zip").toFile();
+        byte[] bytes = new byte[0x1000];
+        bytes[0] = 0x50;
+        bytes[1] = 0x4B;
+        bytes[2] = 0x03;
+        bytes[3] = 0x04;
+        Files.write(file.toPath(), bytes);
+        FileData data = TestPEData.loadAny(file);
+        VisualizationModel model = new VisualizationModel();
+        model.loadSynchronously(data);
+        try {
+            FileVisualization vis = model.getVisualization();
+            assertNotNull(vis);
+            assertEquals(file.length(), vis.getFileLength());
+            assertTrue(vis.getStatistics().isComplete());
+            assertSame(data.getStructureMap(), vis.getStructureMap());
+            FileRegion marker = model.innermostAt(0);
+            assertEquals(RegionType.SIGNATURE_MATCH, marker.getType());
+            model.select(0);
+            assertArrayEquals(new long[]{marker.getStart(), marker.getEnd()}, model.getSelectedBytes());
+        } finally {
+            model.dispose();
+        }
+    }
+
+    @Test
+    void emptyFileShowsNothing(@TempDir Path dir) throws Exception {
+        File file = dir.resolve("empty.bin").toFile();
+        Files.write(file.toPath(), new byte[0]);
+        VisualizationModel model = new VisualizationModel();
+        model.loadSynchronously(TestPEData.loadAny(file));
+        try {
+            assertNotNull(model.getFileData());
+            assertNull(model.innermostAt(0));
+            if (model.getVisualization() != null) {
+                assertEquals(0, model.getVisualization().getFileLength());
+            }
+        } finally {
+            model.dispose();
+        }
+    }
+
+    @Test
+    void theSelectedBytesAreTheMarkedOnesOrThePartOfTheSelectedStructure() throws Exception {
+        FullPEData data = TestPEData.load(NATIVE_X86);
+        VisualizationModel model = new VisualizationModel();
+        model.loadSynchronously(data);
+        try {
+            assertNull(model.getSelectedBytes(), "nothing selected");
+
+            model.selectRange(0x10, 0x14);
+            assertArrayEquals(new long[]{0x10, 0x14}, model.getSelectedBytes());
+
+            FileRegion coff = data.getStructureMap().getRegions(RegionType.COFF_FILE_HEADER).get(0);
+            model.selectRegion(coff, coff.getStart() + 2);
+            assertArrayEquals(new long[]{coff.getStart(), coff.getEnd()}, model.getSelectedBytes());
+
+            // an import function consists of its lookup table entry, its name and its IAT slot
+            FileRegion function = null;
+            for (FileRegion region : data.getStructureMap().getRegions(RegionType.IMPORT_FUNCTION)) {
+                if (region.getLocations().size() > 1) {
+                    function = region;
+                    break;
+                }
+            }
+            assertNotNull(function, "an import function with several parts");
+            PhysicalLocation last = function.getLocations().get(function.getLocations().size() - 1);
+            model.selectRegion(function, last.from());
+            assertArrayEquals(new long[]{last.from(), last.from() + last.size()}, model.getSelectedBytes());
+            model.selectRegion(function, -1);
+            assertArrayEquals(new long[]{function.getStart(), function.getEnd()}, model.getSelectedBytes(),
+                    "the whole structure if no part contains the offset");
+
+            long length = data.getFile().length();
+            model.selectRange(length - 2, length + 10);
+            assertArrayEquals(new long[]{length - 2, length}, model.getSelectedBytes(), "within the file");
+
+            model.clearSelection();
+            assertNull(model.getSelectedBytes());
+        } finally {
+            model.dispose();
+        }
     }
 
     @Test

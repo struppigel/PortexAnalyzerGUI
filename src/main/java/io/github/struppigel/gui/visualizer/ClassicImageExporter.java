@@ -17,6 +17,7 @@
  */
 package io.github.struppigel.gui.visualizer;
 
+import io.github.struppigel.parser.FileFormatException;
 import io.github.struppigel.tools.visualizer.ColorableItem;
 import io.github.struppigel.tools.visualizer.ImageUtil;
 import io.github.struppigel.tools.visualizer.Visualizer;
@@ -29,7 +30,7 @@ import java.io.IOException;
 
 /**
  * Creates the classic picture of the whole file: byte plot, entropy, PE structure and legend, as earlier versions
- * of the PortexAnalyzer GUI showed it.
+ * of the PortexAnalyzer GUI showed it. Files that are no PE files get no PE structure.
  */
 final class ClassicImageExporter {
 
@@ -43,7 +44,7 @@ final class ClassicImageExporter {
     /**
      * Parses the file anew, so that this may run in any thread without sharing the PEData of the GUI.
      *
-     * @param file the PE file
+     * @param file the file, PE file or not
      * @param maxHeight the maximum height of the picture, at least {@value #PIXEL_SIZE}
      */
     static BufferedImage render(File file, int maxHeight) throws IOException {
@@ -61,8 +62,13 @@ final class ClassicImageExporter {
                 .setColor(ColorableItem.ENTROPY, Color.cyan)
                 .build();
         BufferedImage image = ImageUtil.appendImages(visualizer.createBytePlot(file), visualizer.createEntropyImage(file));
-        image = ImageUtil.appendImages(image, visualizer.createImage(file));
-        return ImageUtil.appendImages(image, visualizer.createLegendImage(true, true, true));
+        boolean structure = true;
+        try {
+            image = ImageUtil.appendImages(image, visualizer.createImage(file));
+        } catch (FileFormatException e) {
+            structure = false; // PortEx could not parse it as PE file
+        }
+        return ImageUtil.appendImages(image, visualizer.createLegendImage(true, true, structure));
     }
 
     private static long heightFor(long length, long bytesPerPixel) {

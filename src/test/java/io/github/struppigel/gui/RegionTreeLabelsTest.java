@@ -32,7 +32,7 @@ class RegionTreeLabelsTest {
         StructureMap map = data.getStructureMap();
         List<String> treeLabels = onEdtGet(() -> {
             PEComponentTree tree = new PEComponentTree(null);
-            tree.setPeData(data);
+            tree.setFileData(data);
             return Swing.treeLabels(Swing.findAll(tree, JTree.class).get(0));
         });
         List<String> clrTableNames = new ArrayList<>(data.getClrTables().keySet());

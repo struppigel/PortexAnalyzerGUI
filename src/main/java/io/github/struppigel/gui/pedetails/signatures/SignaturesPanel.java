@@ -17,9 +17,10 @@
  */
 package io.github.struppigel.gui.pedetails.signatures;
 
-import io.github.struppigel.gui.FullPEData;
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.PEFieldsTable;
 import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
+import io.github.struppigel.gui.usersignatures.UserSignatureMatches;
 import io.github.struppigel.gui.utils.WorkerKiller;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -36,7 +37,10 @@ public class SignaturesPanel extends JPanel {
     private static final Logger LOGGER = LogManager.getLogger();
     private final JProgressBar scanRunningBar = new JProgressBar();
     private final FileContentPreviewPanel previewPanel;
-    private FullPEData pedata;
+    private final UserSignaturesNotice userSignaturesNotice = new UserSignaturesNotice();
+    private FileData data;
+    private Runnable reloadAction;
+    private Runnable openFolderAction;
 
     // e.g. PEiD, Filetype
     private final String[] summaryHeaders = {"Source", "Match name", "Scan mode"};
@@ -85,13 +89,22 @@ public class SignaturesPanel extends JPanel {
         splitPane.setDividerLocation(200);
 
         this.setLayout(new BorderLayout());
+        userSignaturesNotice.showSignatures(data == null ? UserSignatureMatches.NONE : data.getUserSignatures());
+        this.add(userSignaturesNotice, BorderLayout.NORTH);
         this.add(splitPane, BorderLayout.CENTER);
 
         // set up buttons
         JPanel buttonPanel = new JPanel();
-        JButton rescan = new JButton("Rescan");
-        buttonPanel.add(rescan);
-        rescan.addActionListener(e -> scan());
+        JButton reload = new JButton("Reload signatures");
+        reload.setToolTipText("Loads your signatures again and scans the file with them");
+        reload.setEnabled(reloadAction != null);
+        reload.addActionListener(e -> reloadAction.run());
+        JButton openFolder = new JButton("Open signature folder");
+        openFolder.setToolTipText("Opens the folder of your signatures, the .sig files in it are scanned");
+        openFolder.setEnabled(openFolderAction != null);
+        openFolder.addActionListener(e -> openFolderAction.run());
+        buttonPanel.add(reload);
+        buttonPanel.add(openFolder);
 
         this.add(buttonPanel, BorderLayout.SOUTH);
 
@@ -159,19 +172,28 @@ public class SignaturesPanel extends JPanel {
 
     private void scan() {
         initProgressBar();
-        PEidScanner peidScanner = new PEidScanner(this, pedata);
+        PEidScanner peidScanner = new PEidScanner(this, data);
         peidScanner.execute();
         WorkerKiller.getInstance().addWorker(peidScanner);
     }
 
-    public void setPeData(FullPEData data) {
-        this.pedata = data;
+    public void setFileData(FileData data) {
+        this.data = data;
         scan();
+    }
+
+    /**
+     * @param reload loads the user's signatures again and scans the shown file with them, null to disable the button
+     * @param openFolder opens the folder of the user's signatures, null to disable the button
+     */
+    public void setSignatureActions(Runnable reload, Runnable openFolder) {
+        this.reloadAction = reload;
+        this.openFolderAction = openFolder;
     }
 
     public void setHexEnabled(boolean hexEnabled) {
         this.hexEnabled = hexEnabled;
-        if(pedata == null){return;}
+        if(data == null){return;}
         buildTables(); // new renderer settings, refresh the panel
     }
 

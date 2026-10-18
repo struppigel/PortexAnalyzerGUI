@@ -55,6 +55,34 @@ class SignaturesPanelTest {
         assertEquals("Second", patterns.getValueAt(0, 0));
     }
 
+    @Test
+    void signatureButtonsRunTheirActions() throws Exception {
+        SignaturesPanel panel = panel();
+        onEdt(() -> panel.buildPEiDTables(new ArrayList<>()));
+        assertFalse(button(panel, "Reload signatures").isEnabled());
+        assertFalse(button(panel, "Open signature folder").isEnabled());
+
+        List<String> ran = new ArrayList<>();
+        onEdt(() -> {
+            panel.setSignatureActions(() -> ran.add("reload"), () -> ran.add("open"));
+            panel.buildPEiDTables(new ArrayList<>());
+        });
+        JButton reload = button(panel, "Reload signatures");
+        JButton openFolder = button(panel, "Open signature folder");
+        onEdt(() -> {
+            reload.doClick();
+            openFolder.doClick();
+        });
+
+        assertEquals(List.of("reload", "open"), ran);
+    }
+
+    private static JButton button(SignaturesPanel panel, String text) throws Exception {
+        return onEdtGet(() -> findAll(panel, JButton.class).stream()
+                .filter(b -> b.getText().equals(text))
+                .findFirst().orElseThrow(() -> new AssertionError("no button " + text)));
+    }
+
     private SignaturesPanel panel() throws Exception {
         return onEdtGet(() -> new SignaturesPanel(new FileContentPreviewPanel()));
     }

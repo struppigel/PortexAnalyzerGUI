@@ -18,7 +18,7 @@
 package io.github.struppigel.gui.pedetails;
 
 import io.github.struppigel.parser.IOUtil;
-import io.github.struppigel.gui.FullPEData;
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.utils.HexFont;
 import io.github.struppigel.gui.utils.OffsetListener;
 import org.apache.logging.log4j.LogManager;
@@ -52,7 +52,7 @@ public class FileContentPreviewPanel extends JPanel {
     private final List<OffsetListener> offsetListeners = new ArrayList<>();
     private LongConsumer openVisualization;
 
-    private FullPEData pedata;
+    private FileData fileData;
     private boolean isHexEnabled = true;
     private long currentOffset = 0;
     private long requestCount = 0;
@@ -96,8 +96,8 @@ public class FileContentPreviewPanel extends JPanel {
         return new Dimension(width, super.getPreferredSize().height);
     }
 
-    public void setPeData(FullPEData data) {
-        this.pedata = data;
+    public void setFileData(FileData data) {
+        this.fileData = data;
         showContentAtOffset(0);
     }
 
@@ -151,7 +151,7 @@ public class FileContentPreviewPanel extends JPanel {
         for (OffsetListener listener : new ArrayList<>(offsetListeners)) {
             listener.offsetChanged(offset, source);
         }
-        if (pedata == null) {return;}
+        if (fileData == null) {return;}
         final long request = ++requestCount;
         final boolean hex = isHexEnabled;
         (new SwingWorker<byte[], Void>() {
@@ -256,7 +256,7 @@ public class FileContentPreviewPanel extends JPanel {
     }
 
     private byte[] readContentAtOffset(long offset) {
-        try (RandomAccessFile raf = new RandomAccessFile(pedata.getFile(), "r")) {
+        try (RandomAccessFile raf = new RandomAccessFile(fileData.getFile(), "r")) {
             return IOUtil.loadBytesSafely(offset, PREVIEW_SIZE, raf);
         } catch (IOException e) {
             LOGGER.error(e);

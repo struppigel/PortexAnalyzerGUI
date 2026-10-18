@@ -17,18 +17,26 @@ class LegendPanelTest {
      * Labels can come from the file, e.g., names of resource types, and could start with &lt;html&gt;.
      */
     @Test
-    @SuppressWarnings("unchecked")
     void htmlInLabelsIsShownAsText() throws Exception {
         String html = "<html><b>bold</b></html>";
 
         JLabel label = onEdtGet(() -> {
             LegendPanel panel = new LegendPanel(new VisualizationModel());
-            JList<LegendEntry> list = (JList<LegendEntry>) findAll(panel, JList.class).get(0);
-            return (JLabel) list.getCellRenderer().getListCellRendererComponent(list,
-                    LegendEntry.entry(html, Color.red, false), 0, false, false);
+            JTree tree = findAll(panel, JTree.class).get(0);
+            Object node = LegendPanel.categoryNode(LegendEntry.entry(html, Color.red, false), LegendPanel.MAX_LISTED);
+            return (JLabel) tree.getCellRenderer().getTreeCellRendererComponent(tree, node, false, false, true, 0,
+                    false);
         });
 
         assertNull(label.getClientProperty(BasicHTML.propertyKey));
         assertEquals(html, label.getText());
+    }
+
+    @Test
+    void tooltipsShowHtmlAsText() throws Exception {
+        JToolTip tip = onEdtGet(() -> findAll(new LegendPanel(new VisualizationModel()), JTree.class).get(0)
+                .createToolTip());
+
+        assertEquals(Boolean.TRUE, tip.getClientProperty("html.disable"));
     }
 }

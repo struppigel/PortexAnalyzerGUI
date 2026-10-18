@@ -28,10 +28,12 @@ import io.github.struppigel.parser.sections.edata.ExportEntry;
 import io.github.struppigel.parser.sections.idata.ImportDLL;
 import io.github.struppigel.parser.sections.rsrc.Resource;
 import io.github.struppigel.parser.sections.rsrc.icon.IconParser;
+import io.github.struppigel.tools.ChecksumCheck;
 import io.github.struppigel.tools.Overlay;
 import io.github.struppigel.tools.anomalies.Anomaly;
 import io.github.struppigel.tools.layout.StructureMap;
 import io.github.struppigel.tools.sigscanner.SignatureMatch;
+import io.github.struppigel.gui.usersignatures.UserSignatureMatches;
 import io.github.struppigel.gui.utils.TableContent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -48,7 +50,7 @@ import java.util.Optional;
  * definitely do not want to compute in the event dispatch thread.
  * It stores that data in a form that is easily digestible by the GUI and does not need intensive transformations.
  */
-public class FullPEData {
+public class FullPEData extends FileData {
     private static final Logger LOGGER = LogManager.getLogger();
     private final PEData pedata;
     private final Overlay overlay;
@@ -63,13 +65,13 @@ public class FullPEData {
     private final List<Object[]> resourceTableEntries;
     private final List<Resource> resources;
     private final List<ExportEntry> exports;
-    private final String hashes;
     private final List<Object[]> anomaliesTable;
     private final List<TableContent> debugTableEntries;
     private final List<Object[]> vsInfoTable;
     private final List<String> manifests;
 
     private final List<Object[]> exportTableEntries;
+    private final String exportDllName;
     private final List<Object[]> sectionHashTableEntries;
     private final String rehintsReport;
     private final List<Object[]> stringTableEntries;
@@ -82,7 +84,6 @@ public class FullPEData {
     private final Map<String, List<List<Object>>> clrTables;
     private final Map<String, List<String>> clrTableHeaders;
     private final List<Anomaly> anomalies;
-    private final StructureMap structureMap;
     private final Optional<CertificateTable> certificateTable;
     private final Optional<AuthenticodeVerification> authenticodeVerification;
 
@@ -91,15 +92,17 @@ public class FullPEData {
                       double[] sectionEntropies, List<ImportDLL> imports, List<Object[]> importTableEntries, List<Object[]> delayLoadEntries,
                       List<Object[]> boundImportEntries,
                       List<Object[]> resourceTableEntries, List<Resource> resources, List<String> manifests,
-                      List<Object[]> exportTableEntries, List<ExportEntry> exports,
+                      List<Object[]> exportTableEntries, List<ExportEntry> exports, String exportDllName,
                       String hashes, List<Object[]> sectionHashTableEntries,
                       List<Object[]> anomaliesTable, List<TableContent> debugTableEntries, List<Object[]> vsInfoTable,
                       String rehintsReport, List<Object[]> stringTableEntries, List<StandardField> dotNetMetadataRootTableEntries,
                       java.util.Optional<CLRSection> maybeCLR, List<Object[]> dotNetStreamHeaders, List<StandardField> optimizedStreamEntries,
                       Map<String, List<List<Object>>> clrTables, Map<String, List<String>> clrTableHeaders,
-                      List<Anomaly> anomalies, StructureMap structureMap,
+                      List<Anomaly> anomalies, StructureMap structureMap, List<SignatureMatch> signatureMatches,
                       Optional<CertificateTable> certificateTable,
-                      Optional<AuthenticodeVerification> authenticodeVerification) {
+                      Optional<AuthenticodeVerification> authenticodeVerification,
+                      UserSignatureMatches userSignatures) {
+        super(data.getFile(), hashes, signatureMatches, structureMap, null, userSignatures);
         this.pedata = data;
         this.overlay = overlay;
         this.overlayEntropy = overlayEntropy;
@@ -114,7 +117,7 @@ public class FullPEData {
         this.manifests = manifests;
         this.exportTableEntries = exportTableEntries;
         this.exports = exports;
-        this.hashes = hashes;
+        this.exportDllName = exportDllName;
         this.sectionHashTableEntries = sectionHashTableEntries;
         this.anomaliesTable = anomaliesTable;
         this.debugTableEntries = debugTableEntries;
@@ -128,7 +131,6 @@ public class FullPEData {
         this.clrTables = clrTables;
         this.clrTableHeaders = clrTableHeaders;
         this.anomalies = anomalies;
-        this.structureMap = structureMap;
         this.certificateTable = certificateTable;
         this.authenticodeVerification = authenticodeVerification;
     }
@@ -147,12 +149,15 @@ public class FullPEData {
      */
     public Optional<AuthenticodeVerification> getAuthenticodeVerification() { return authenticodeVerification; }
 
+    /**
+     * @return the checksum of the Optional Header compared with the one of the file, computed by the load worker
+     */
+    public Optional<ChecksumCheck> getChecksumCheck() { return pedata.loadChecksumCheck(); }
+
     public List<Anomaly> getAnomalies() { return anomalies; }
 
-    /**
-     * @return the structures of the file by offset; built while loading, immutable and safe to use in any thread
-     */
-    public StructureMap getStructureMap() { return structureMap; }
+    @Override
+    public Optional<FullPEData> asPE() { return Optional.of(this); }
 
     public Map<String, List<List<Object>>> getClrTables() { return clrTables; }
 
@@ -168,12 +173,11 @@ public class FullPEData {
         return overlayEntropy;
     }
 
+    /**
+     * @return the matches of the bundled signatures in the overlay, see {@link #getUserSignatures()} for the user's
+     */
     public List<SignatureMatch> getOverlaySignatures() {
         return overlaySignatures;
-    }
-
-    public File getFile() {
-        return pedata.getFile();
     }
 
     public List<Object[]> getImportTableEntries() {
@@ -254,12 +258,15 @@ public class FullPEData {
         return this.exportTableEntries;
     }
 
-    public boolean hasDebugInfo() {
-        return debugTableEntries.size() > 0;
+    /**
+     * @return the name of the DLL that the export directory points to, empty if there is none
+     */
+    public String getExportDllName() {
+        return exportDllName;
     }
 
-    public String getHashesReport() {
-        return this.hashes;
+    public boolean hasDebugInfo() {
+        return debugTableEntries.size() > 0;
     }
 
     public List<Object[]> getSectionHashTableEntries() {

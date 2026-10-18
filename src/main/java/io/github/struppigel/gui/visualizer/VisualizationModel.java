@@ -17,9 +17,10 @@
  */
 package io.github.struppigel.gui.visualizer;
 
-import io.github.struppigel.gui.FullPEData;
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.utils.HexFont;
 import io.github.struppigel.gui.utils.WorkerKiller;
+import io.github.struppigel.parser.PhysicalLocation;
 import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.layout.PaintMode;
 import io.github.struppigel.tools.layout.RegionType;
@@ -40,8 +41,6 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -81,14 +80,11 @@ public class VisualizationModel {
 
         /** the range of the file that the detail view shows changed */
         default void visibleRangeChanged() {}
-
-        /** a listing of structures was set or cleared, see {@link VisualizationModel#showRegions} */
-        default void listedRegionsChanged() {}
     }
 
     private final List<Listener> listeners = new ArrayList<>();
 
-    private FullPEData peData;
+    private FileData fileData;
     private FileVisualization visualization;
     private CachedByteSource source;
     private VisualizationLoadWorker statisticsWorker;
@@ -102,9 +98,6 @@ public class VisualizationModel {
     private long visibleStart = 0;
     private long visibleEnd = 0;
     private boolean revealSuppressed = false;
-    // the structures that the structures view lists instead of the ones at the pointer, null title if none
-    private String listedTitle;
-    private List<FileRegion> listedRegions = Collections.emptyList();
 
     private RenderStyle style = RenderStyle.defaults();
     private Track hexBackground = Track.STRUCTURE;
@@ -126,24 +119,22 @@ public class VisualizationModel {
      *
      * @param data the loaded file, null to show nothing
      */
-    public void load(FullPEData data) {
+    public void load(FileData data) {
         load(data, true);
     }
 
     /**
-     * Like {@link #load(FullPEData)}, but computes the statistics in the calling thread. For tests.
+     * Like {@link #load(FileData)}, but computes the statistics in the calling thread. For tests.
      */
-    void loadSynchronously(FullPEData data) {
+    void loadSynchronously(FileData data) {
         load(data, false);
     }
 
-    private void load(FullPEData data, boolean inBackground) {
+    private void load(FileData data, boolean inBackground) {
         dispose();
         generation++;
-        this.peData = data;
+        this.fileData = data;
         resetSelection();
-        listedTitle = null;
-        listedRegions = Collections.emptyList();
         if (data != null) {
             visualization = createVisualization(data);
         }
@@ -164,7 +155,7 @@ public class VisualizationModel {
         }
     }
 
-    private FileVisualization createVisualization(FullPEData data) {
+    private FileVisualization createVisualization(FileData data) {
         File file = data.getFile();
         StructureMap map = data.getStructureMap();
         if (map == null) {
@@ -231,8 +222,8 @@ public class VisualizationModel {
         return visualization;
     }
 
-    public FullPEData getPeData() {
-        return peData;
+    public FileData getFileData() {
+        return fileData;
     }
 
     /**
@@ -271,6 +262,15 @@ public class VisualizationModel {
     public void showRegion(FileRegion region, long offset) {
         selectRegion(region, offset);
         fireViewRequested(region.getStart(), true);
+    }
+
+    /**
+     * Marks the structure with the part at the offset as the selected one, and asks the views to show the offset if
+     * they do not. Used to go to another location of a structure that has several.
+     */
+    public void showLocation(FileRegion region, long offset) {
+        selectRegion(region, offset);
+        fireViewRequested(offset, true);
     }
 
     /**
@@ -371,6 +371,35 @@ public class VisualizationModel {
 
     public long getRangeEnd() {
         return rangeEnd;
+    }
+
+    /**
+     * @return start and exclusive end of the selected bytes, null if none: the marked bytes, otherwise the part of
+     *         the selected structure at the selected offset, since structures may consist of several parts; within
+     *         the file
+     */
+    public long[] getSelectedBytes() {
+        long start;
+        long end;
+        if (hasRangeSelection()) {
+            start = rangeStart;
+            end = rangeEnd;
+        } else if (selectedRegion != null) {
+            start = selectedRegion.getStart();
+            end = selectedRegion.getEnd();
+            for (PhysicalLocation location : selectedRegion.getLocations()) {
+                if (selectedOffset >= location.from() && selectedOffset < location.from() + location.size()) {
+                    start = location.from();
+                    end = location.from() + location.size();
+                }
+            }
+        } else {
+            return null;
+        }
+        if (visualization != null) {
+            end = Math.min(end, visualization.getFileLength());
+        }
+        return start < end ? new long[]{start, end} : null;
     }
 
     // --- hover ---
@@ -492,55 +521,7 @@ public class VisualizationModel {
         return structureVisible;
     }
 
-    // --- listing of structures ---
-
-    /**
-     * Makes the structures view list the structures, e.g. all of a type, instead of the ones at the pointer.
-     *
-     * @param title what the structures have in common
-     * @param regions the structures, they are shown by offset
-     */
-    public void showRegions(String title, List<FileRegion> regions) {
-        List<FileRegion> sorted = new ArrayList<>(regions);
-        sorted.sort(Comparator.comparingLong(FileRegion::getStart).thenComparingInt(FileRegion::getDepth));
-        listedTitle = title;
-        listedRegions = Collections.unmodifiableList(sorted);
-        fireListedRegionsChanged();
-    }
-
-    /**
-     * Makes the structures view show the structures at the pointer again.
-     */
-    public void clearListedRegions() {
-        if (listedTitle != null) {
-            listedTitle = null;
-            listedRegions = Collections.emptyList();
-            fireListedRegionsChanged();
-        }
-    }
-
-    public boolean hasListedRegions() {
-        return listedTitle != null;
-    }
-
-    /**
-     * @return what the listed structures have in common, null if no structures are listed
-     */
-    public String getListedTitle() {
-        return listedTitle;
-    }
-
-    public List<FileRegion> getListedRegions() {
-        return listedRegions;
-    }
-
     // --- events ---
-
-    private void fireListedRegionsChanged() {
-        for (Listener l : new ArrayList<>(listeners)) {
-            l.listedRegionsChanged();
-        }
-    }
 
     private void fireDataChanged() {
         for (Listener l : new ArrayList<>(listeners)) {

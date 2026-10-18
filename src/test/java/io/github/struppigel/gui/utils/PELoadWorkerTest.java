@@ -1,7 +1,11 @@
 package io.github.struppigel.gui.utils;
 
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.FullPEData;
-import io.github.struppigel.parser.FileFormatException;
+import io.github.struppigel.gui.usersignatures.UserSignatureSet;
+import io.github.struppigel.gui.usersignatures.UserSignatures;
+import io.github.struppigel.parser.AnalysisInterruptedException;
+import io.github.struppigel.parser.PEData;
 import io.github.struppigel.parser.PhysicalLocation;
 import io.github.struppigel.parser.sections.idata.ImportDLL;
 import io.github.struppigel.parser.sections.idata.NameImport;
@@ -9,20 +13,27 @@ import io.github.struppigel.parser.sections.idata.OrdinalImport;
 import io.github.struppigel.testsupport.TestFiles;
 import io.github.struppigel.tools.Hasher;
 import io.github.struppigel.tools.anomalies.Anomaly;
+import io.github.struppigel.tools.layout.FileRegion;
 import io.github.struppigel.tools.layout.RegionType;
 import io.github.struppigel.tools.layout.StructureMap;
 import io.github.struppigel.tools.sigscanner.LocationKind;
 import io.github.struppigel.tools.sigscanner.SignatureMatch;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import javax.swing.*;
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static io.github.struppigel.testsupport.TestFiles.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -325,10 +336,203 @@ class PELoadWorkerTest {
     }
 
     @Test
-    void noPeFileIsRejected() {
+    void noPeFileOpensWithoutPEStructures() throws Exception {
         File file = TestFiles.file(NOT_PE);
+        FileData data = TestPEData.loadAny(file);
 
-        assertThrows(FileFormatException.class, () -> TestPEData.load(file));
+        assertFalse(data.isPE());
+        assertFalse(data.getPeParseError().isPresent());
+        assertEquals(file, data.getFile());
+        assertEquals(file.length(), data.getStructureMap().getFileLength());
+        for (FileRegion region : data.getStructureMap().getRegions()) {
+            assertEquals(RegionType.SIGNATURE_MATCH, region.getType(), region.toString());
+        }
+        assertThrows(AssertionError.class, () -> TestPEData.load(file));
+    }
+
+    @Test
+    void textFileHasMd5Sha1Sha256(@TempDir Path dir) throws Exception {
+        File file = dir.resolve("text.txt").toFile();
+        byte[] bytes = "no PE file, just some text".getBytes(StandardCharsets.US_ASCII);
+        Files.write(file.toPath(), bytes);
+        String report = TestPEData.loadAny(file).getHashesReport();
+
+        assertTrue(report.startsWith("Full File Hashes"));
+        assertTrue(report.contains("MD5: " + hex("MD5", bytes)), report);
+        assertTrue(report.contains("SHA1: " + hex("SHA-1", bytes)), report);
+        assertTrue(report.contains("SHA256: " + hex("SHA-256", bytes)), report);
+    }
+
+    @Test
+    void emptyFileOpens(@TempDir Path dir) throws Exception {
+        File file = dir.resolve("empty.bin").toFile();
+        Files.write(file.toPath(), new byte[0]);
+        FileData data = TestPEData.loadAny(file);
+
+        assertFalse(data.isPE());
+        assertTrue(data.getSignatureMatches().isEmpty());
+        assertEquals(0, data.getStructureMap().getFileLength());
+        assertTrue(data.getHashesReport().contains("MD5: d41d8cd98f00b204e9800998ecf8427e"), data.getHashesReport());
+    }
+
+    @Test
+    void zipMagicIsASignatureAndAMarker(@TempDir Path dir) throws Exception {
+        File file = dir.resolve("archive.zip").toFile();
+        byte[] bytes = new byte[0x40];
+        bytes[0] = 0x50;
+        bytes[1] = 0x4B;
+        bytes[2] = 0x03;
+        bytes[3] = 0x04;
+        Files.write(file.toPath(), bytes);
+        FileData data = TestPEData.loadAny(file);
+
+        assertTrue(data.getSignatureMatches().stream().anyMatch(m -> m.getName().equals("PKZIP archive_1")),
+                data.getSignatureMatches().toString());
+        FileRegion marker = data.getStructureMap().innermostAt(0).get();
+        assertEquals(RegionType.SIGNATURE_MATCH, marker.getType());
+        assertEquals("PKZIP archive_1", marker.getName());
+    }
+
+    @Test
+    void malformedPEFallsBackWithTheError() throws Exception {
+        File file = TestFiles.file(SMALLEST_PE);
+        PELoadWorker worker = new PELoadWorker(file, null, new JLabel()) {
+            @Override
+            FullPEData loadPE(PEData data) {
+                throw new IllegalStateException("broken header");
+            }
+        };
+        FileData data = worker.doInBackground();
+
+        assertFalse(data.isPE());
+        assertEquals(Optional.of("broken header"), data.getPeParseError());
+        assertTrue(data.getHashesReport().contains("SHA1: "), data.getHashesReport());
+        assertEquals(file.length(), data.getStructureMap().getFileLength());
+    }
+
+    @Test
+    void interruptionIsNotAFallback() {
+        PELoadWorker worker = new PELoadWorker(TestFiles.file(SMALLEST_PE), null, new JLabel()) {
+            @Override
+            FullPEData loadPE(PEData data) {
+                throw new AnalysisInterruptedException("stopped");
+            }
+        };
+
+        assertThrows(AnalysisInterruptedException.class, worker::doInBackground);
+    }
+
+    @Test
+    void directoryIsRejected(@TempDir Path dir) {
+        assertThrows(IOException.class, () -> TestPEData.loadAny(dir.toFile()));
+    }
+
+    private static final String MINE_SIG = "[My overlay MZ]\npattern = 'MZ'\nat = overlay\n\n"
+            + "[My resource MZ]\npattern = 'MZ'\nat = resource\n\n"
+            + "[My ZIP]\npattern = 'PK' 03 04\nat = file\n";
+
+    private static Path signatureFolder(Path dir, String fileName, String text) throws IOException {
+        Path folder = dir.resolve("signatures");
+        Files.createDirectories(folder);
+        Files.write(folder.resolve(fileName), text.getBytes(StandardCharsets.UTF_8));
+        return folder;
+    }
+
+    private static FileData loadWithUserSignatures(File file, Path signatureFolder) throws Exception {
+        return new PELoadWorker(file, null, new JLabel(), new UserSignatures(signatureFolder.toFile()))
+                .doInBackground();
+    }
+
+    private static File zipFile(Path dir) throws IOException {
+        File file = dir.resolve("archive.zip").toFile();
+        byte[] bytes = new byte[0x40];
+        bytes[0] = 0x50;
+        bytes[1] = 0x4B;
+        bytes[2] = 0x03;
+        bytes[3] = 0x04;
+        Files.write(file.toPath(), bytes);
+        return file;
+    }
+
+    private static List<String> names(List<SignatureMatch> matches) {
+        List<String> names = new ArrayList<>();
+        matches.forEach(m -> names.add(m.getName()));
+        return names;
+    }
+
+    @Test
+    void invalidChecksumIsAnAnomaly(@TempDir Path dir) throws Exception {
+        Path copy = dir.resolve("strings.exe");
+        byte[] bytes = Files.readAllBytes(TestFiles.file(SIGNED).toPath());
+        // the file was valid, changing its last byte invalidates the checksum
+        bytes[bytes.length - 1] ^= 0x11;
+        Files.write(copy, bytes);
+        FullPEData data = TestPEData.load(copy.toFile());
+
+        assertTrue(data.getChecksumCheck().get().isInvalid());
+        assertTrue(data.getAnomaliesTable().stream().anyMatch(row ->
+                        String.valueOf(row[0]).startsWith("Optional Header: checksum is invalid (0x55d4a)")),
+                () -> data.getAnomaliesTable().stream().map(row -> String.valueOf(row[0]))
+                        .collect(java.util.stream.Collectors.toList()).toString());
+        assertTrue(TestPEData.load(SIGNED).getChecksumCheck().get().isValid());
+    }
+
+    @Test
+    void withoutUserSignaturesThereAreNoUserMatches() throws Exception {
+        FileData data = TestPEData.load(OVERLAY);
+        assertNull(data.getUserSignatures().getSignatures().getFolder());
+        assertTrue(data.getUserSignatureMatches().isEmpty());
+    }
+
+    @Test
+    void userSignaturesInTheOverlay(@TempDir Path dir) throws Exception {
+        FullPEData data = (FullPEData) loadWithUserSignatures(TestFiles.file(OVERLAY),
+                signatureFolder(dir, "mine.sig", MINE_SIG));
+        long overlayOffset = data.getOverlay().getOffset();
+
+        List<SignatureMatch> overlay = data.getUserSignatures().getMatches(LocationKind.OVERLAY);
+        assertEquals(List.of("My overlay MZ"), names(overlay));
+        assertEquals(overlayOffset, overlay.get(0).getOffset());
+        assertEquals("mine.sig", UserSignatureSet.sourceOf(overlay.get(0)));
+        // the matches of the bundled signatures stay apart, the markers show both
+        assertTrue(data.getSignatureMatches().stream().noneMatch(m -> m.getName().startsWith("My ")));
+        assertTrue(data.getOverlaySignatures().stream().noneMatch(m -> m.getName().startsWith("My ")));
+        assertTrue(data.getStructureMap().getRegions(RegionType.SIGNATURE_MATCH).stream()
+                .anyMatch(r -> r.getName().equals("My overlay MZ") && r.getStart() == overlayOffset));
+    }
+
+    @Test
+    void userSignaturesInTheResourceTable(@TempDir Path dir) throws Exception {
+        FullPEData data = (FullPEData) loadWithUserSignatures(TestFiles.file(RESOURCES),
+                signatureFolder(dir, "mine.sig", MINE_SIG));
+
+        assertTrue(data.getResourceTableEntries().stream()
+                        .anyMatch(row -> ((String) row[5]).contains("My resource MZ from mine.sig")),
+                () -> data.getResourceTableEntries().stream().map(row -> (String) row[5])
+                        .collect(java.util.stream.Collectors.toList()).toString());
+    }
+
+    @Test
+    void userSignaturesInFilesThatAreNoPEFiles(@TempDir Path dir) throws Exception {
+        FileData data = loadWithUserSignatures(zipFile(dir), signatureFolder(dir, "mine.sig", MINE_SIG));
+
+        assertFalse(data.isPE());
+        assertEquals(List.of("My ZIP"), names(data.getUserSignatureMatches()));
+        assertTrue(data.getStructureMap().getRegions(RegionType.SIGNATURE_MATCH).stream()
+                .anyMatch(r -> r.getName().equals("My ZIP")));
+    }
+
+    @Test
+    void malformedUserSignaturesAreSkippedWithWarnings(@TempDir Path dir) throws Exception {
+        Path folder = signatureFolder(dir, "broken.sig",
+                "[Broken]\npattern = 0G\nat = file\n\n[My ZIP]\npattern = 'PK' 03 04\nat = file\n");
+        FileData data = loadWithUserSignatures(zipFile(dir), folder);
+
+        assertEquals(List.of("My ZIP"), names(data.getUserSignatureMatches()));
+        UserSignatureSet signatures = data.getUserSignatures().getSignatures();
+        assertTrue(signatures.hasSkippedSignatures());
+        assertTrue(signatures.getLoadWarnings().get(0).startsWith("broken.sig:2:"),
+                signatures.getLoadWarnings().toString());
     }
 
     private static String hex(String algorithm, byte[] bytes) throws Exception {

@@ -294,6 +294,197 @@ class InteractiveVisualizerPanelTest {
         });
     }
 
+    private static final int LEFT = java.awt.event.InputEvent.BUTTON1_DOWN_MASK;
+    private static final int SHIFT = java.awt.event.InputEvent.SHIFT_DOWN_MASK;
+
+    private void mouse(int id, Point p, int modifiers, int clickCount, int button) {
+        canvas.dispatchEvent(new java.awt.event.MouseEvent(canvas, id, System.currentTimeMillis(), modifiers, p.x, p.y,
+                clickCount, false, button));
+    }
+
+    private void click(Point p, int modifiers) {
+        mouse(java.awt.event.MouseEvent.MOUSE_PRESSED, p, LEFT | modifiers, 1, java.awt.event.MouseEvent.BUTTON1);
+        mouse(java.awt.event.MouseEvent.MOUSE_RELEASED, p, modifiers, 1, java.awt.event.MouseEvent.BUTTON1);
+        mouse(java.awt.event.MouseEvent.MOUSE_CLICKED, p, modifiers, 1, java.awt.event.MouseEvent.BUTTON1);
+    }
+
+    @Test
+    void draggingWhenZoomedOutMarksWholeCells() throws Exception {
+        load(DOTNET_PINVOKE);
+        onEdt(() -> {
+            assertEquals(0, canvas.getLevelIndex());
+            long bytesPerCell = canvas.level().bytesPerCell;
+            assertTrue(bytesPerCell > 1);
+            long to = bytesPerCell * (canvas.level().columns + 2); // in the second row
+            assertTrue(to + bytesPerCell < data.getFile().length());
+
+            drag(centerOf(0, Track.BYTEPLOT), centerOf(to, Track.BYTEPLOT));
+
+            assertEquals(0, canvas.getFirstRow(), "dragging does not scroll");
+            assertEquals(0, model.getRangeStart());
+            assertEquals(to + bytesPerCell, model.getRangeEnd());
+            String status = panel.statusText();
+            assertTrue(status.contains(String.format(", marked 0x0 - 0x%X (", to + bytesPerCell - 1)), status);
+        });
+    }
+
+    @Test
+    void draggingUpwardsMarksWithoutScrolling() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            zoomToBytes();
+            canvas.setFirstRow(10);
+            long firstRow = canvas.getFirstRow();
+            long bytesPerRow = canvas.mapping().getBytesPerRow();
+            long from = model.getVisibleStart() + 5 * bytesPerRow;
+            long to = model.getVisibleStart() + 2 * bytesPerRow;
+
+            drag(centerOf(from, Track.ENTROPY), centerOf(to, Track.ENTROPY));
+
+            assertEquals(firstRow, canvas.getFirstRow());
+            assertEquals(to, model.getRangeStart());
+            assertEquals(from + 1, model.getRangeEnd());
+        });
+    }
+
+    @Test
+    void draggingBelowTheViewScrollsOn() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            zoomToBytes();
+            canvas.setFirstRow(0);
+            Point from = centerOf(0, Track.BYTEPLOT);
+
+            drag(from, new Point(from.x, canvas.getHeight() + 5 * canvas.level().cellHeight));
+
+            assertTrue(canvas.getFirstRow() > 0);
+            assertEquals(0, model.getRangeStart());
+            assertTrue(model.getRangeEnd() > model.getVisibleStart());
+        });
+    }
+
+    @Test
+    void shiftClickExtendsTheMarkedBytes() throws Exception {
+        load(DOTNET_PINVOKE);
+        onEdt(() -> {
+            long cell = canvas.level().bytesPerCell;
+            drag(centerOf(10 * cell, Track.BYTEPLOT), centerOf(12 * cell, Track.BYTEPLOT));
+            assertEquals(10 * cell, model.getRangeStart());
+            assertEquals(13 * cell, model.getRangeEnd());
+
+            click(centerOf(20 * cell, Track.STRUCTURE), SHIFT);
+            assertEquals(10 * cell, model.getRangeStart());
+            assertEquals(21 * cell, model.getRangeEnd());
+
+            click(centerOf(5 * cell, Track.ENTROPY), SHIFT);
+            assertEquals(5 * cell, model.getRangeStart(), "backwards from the cell the marking started with");
+            assertEquals(11 * cell, model.getRangeEnd());
+        });
+    }
+
+    @Test
+    void shiftClickExtendsFromTheSelectedOffset() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            zoomToBytes();
+            canvas.setFirstRow(0);
+            click(centerOf(0x10, Track.BYTEPLOT), 0);
+            assertFalse(model.hasRangeSelection());
+            assertEquals(0x10, model.getSelectedOffset());
+
+            click(centerOf(0x30, Track.BYTEPLOT), SHIFT);
+
+            assertEquals(0x10, model.getRangeStart());
+            assertEquals(0x31, model.getRangeEnd());
+        });
+    }
+
+    @Test
+    void shiftClickKeepsTheAnchorAcrossZoomLevels() throws Exception {
+        load(DOTNET_PINVOKE);
+        onEdt(() -> {
+            long cell = canvas.level().bytesPerCell;
+            drag(centerOf(10 * cell, Track.BYTEPLOT), centerOf(12 * cell, Track.BYTEPLOT));
+            canvas.zoom(1, null);
+            long finerCell = canvas.level().bytesPerCell;
+            assertTrue(finerCell < cell);
+            long target = 20 * cell;
+            canvas.scrollToOffset(target, false);
+            Point p = centerOf(target, Track.BYTEPLOT);
+
+            click(p, SHIFT);
+
+            assertEquals(10 * cell, model.getRangeStart());
+            assertEquals(canvas.offsetAt(p) + finerCell, model.getRangeEnd());
+        });
+    }
+
+    @Test
+    void aClickStillSelectsTheStructure() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            zoomToBytes();
+            canvas.scrollToOffset(peSignature(), false);
+
+            click(centerOf(peSignature(), Track.STRUCTURE), 0);
+
+            assertFalse(model.hasRangeSelection());
+            assertEquals(RegionType.PE_SIGNATURE, model.getSelectedRegion().getType());
+        });
+    }
+
+    @Test
+    void aSmallMoveMarksNothing() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            zoomToBytes();
+            canvas.setFirstRow(0);
+            Point p = centerOf(0x10, Track.BYTEPLOT);
+
+            drag(p, new Point(p.x + 2, p.y + 1));
+
+            assertFalse(model.hasRangeSelection());
+        });
+    }
+
+    @Test
+    void draggingWithTheRightButtonDoesNothing() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            zoomToBytes();
+            canvas.setFirstRow(10);
+            long firstRow = canvas.getFirstRow();
+            Point from = centerOf(model.getVisibleStart(), Track.BYTEPLOT);
+            Point to = new Point(from.x, from.y + 100);
+            int right = java.awt.event.InputEvent.BUTTON3_DOWN_MASK;
+
+            mouse(java.awt.event.MouseEvent.MOUSE_PRESSED, from, right, 1, java.awt.event.MouseEvent.BUTTON3);
+            mouse(java.awt.event.MouseEvent.MOUSE_DRAGGED, to, right, 0, java.awt.event.MouseEvent.BUTTON3);
+
+            assertFalse(model.hasRangeSelection());
+            assertEquals(firstRow, canvas.getFirstRow());
+        });
+    }
+
+    @Test
+    void draggingIntoAnotherTrackMarksInTheFirstOne() throws Exception {
+        load(DOTNET_PINVOKE);
+        onEdt(() -> {
+            List<DetailCanvas.TrackLayout> layouts = canvas.trackLayouts();
+            DetailCanvas.TrackLayout plot = layouts.get(0);
+            assertEquals(Track.BYTEPLOT, plot.track);
+            long cell = canvas.level().bytesPerCell;
+            Point from = centerOf(0, Track.BYTEPLOT);
+            int y = from.y + 3 * canvas.level().cellHeight;
+
+            drag(from, new Point(layouts.get(1).x + 2, y));
+
+            long rowEnd = canvas.offsetAt(new Point(plot.x + plot.width - 1, y));
+            assertEquals(0, model.getRangeStart());
+            assertEquals(rowEnd + cell, model.getRangeEnd(), "up to the end of the row in the byte plot");
+        });
+    }
+
     @Test
     void nothingMarkedCopiesNothing() throws Exception {
         load(NATIVE_X86);
@@ -566,13 +757,54 @@ class InteractiveVisualizerPanelTest {
     }
 
     @Test
+    void theLegendIsATabNextToTheStructuresAtThePointer() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            JTabbedPane tabs = panel.getInfoPane().getTabs();
+            assertEquals(4, tabs.getTabCount());
+            assertEquals("At pointer", tabs.getTitleAt(0));
+            assertEquals("In selection", tabs.getTitleAt(1));
+            assertEquals("Bytes", tabs.getTitleAt(2));
+            assertEquals("Navigate", tabs.getTitleAt(3));
+            assertSame(panel.getLegendPanel(), tabs.getComponentAt(3));
+            assertEquals(0, tabs.getSelectedIndex(), "the structures at the pointer are shown first");
+            assertEquals(1, Swing.findAll(panel, JSplitPane.class).size(), "only the split next to the side panel");
+        });
+    }
+
+    @Test
+    void doubleClickingAStructureInTheLegendZoomsToIt() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            JTree tree = Swing.findAll(panel.getLegendPanel(), JTree.class).get(2); // structure
+            javax.swing.tree.TreePath path = null;
+            for (int row = 0; row < tree.getRowCount() && path == null; row++) {
+                if (LegendPanel.regionOf(tree.getPathForRow(row)) != null) {
+                    path = tree.getPathForRow(row);
+                }
+            }
+            assertNotNull(path, "a color with one structure, e.g. a section");
+            FileRegion region = LegendPanel.regionOf(path);
+            Rectangle bounds = tree.getPathBounds(path);
+            for (int clicks = 1; clicks <= 2; clicks++) {
+                tree.dispatchEvent(new java.awt.event.MouseEvent(tree, java.awt.event.MouseEvent.MOUSE_CLICKED, 0, 0,
+                        bounds.x + 2, bounds.y + bounds.height / 2, clicks, false,
+                        java.awt.event.MouseEvent.BUTTON1));
+            }
+
+            assertSame(region, model.getSelectedRegion());
+            assertEquals(canvas.getLadder().size() - 1, canvas.getLevelIndex(), "zoomed in fully");
+        });
+    }
+
+    @Test
     void layerCheckBoxesSwitchTheLayersAndTheSectionsStay() throws Exception {
         load(OVERLAY);
         onEdt(() -> {
             LegendPanel legend = panel.getLegendPanel();
             int entries = legend.entryCount();
             List<JCheckBox> boxes = Swing.findAll(legend, JCheckBox.class);
-            assertEquals(Arrays.asList("Byte plot", "Entropy", "PE structure", "Markers"),
+            assertEquals(Arrays.asList("Byte plot", "Entropy", "Structure", "Markers"),
                     boxes.stream().map(AbstractButton::getText).collect(Collectors.toList()));
 
             boxes.get(0).doClick();
@@ -600,6 +832,33 @@ class InteractiveVisualizerPanelTest {
             assertFalse(boxes.get(1).isSelected());
             model.setEntropyVisible(true);
             assertTrue(boxes.get(1).isSelected());
+        });
+    }
+
+    private static List<String> menuTexts(JPopupMenu menu) {
+        List<String> texts = new ArrayList<>();
+        for (MenuElement element : menu.getSubElements()) {
+            texts.add(((JMenuItem) element).getText());
+        }
+        return texts;
+    }
+
+    @Test
+    void theMenuOfTheHexViewSelectsARange() throws Exception {
+        load(NATIVE_X86);
+        onEdt(() -> {
+            canvas.zoom(100, null);
+            canvas.setFirstRow(0);
+            List<String> items = menuTexts(canvas.createMenu(0x10));
+            assertEquals("Select range...", items.get(0), "also without marked bytes: " + items);
+            assertTrue(items.contains("Copy offset"), "" + items);
+
+            canvas.selectBytes(0x40, 0x44);
+            assertEquals(0x40, model.getRangeStart());
+            assertEquals(0x44, model.getRangeEnd());
+            assertEquals(8, canvas.markedBytes(false).length(), "4 bytes in hex");
+            assertEquals(List.of("Copy 4 bytes as hex", "Copy 4 bytes as text", "Save 4 bytes as file...",
+                    "Select range..."), menuTexts(canvas.createMenu(0x10)).subList(0, 4));
         });
     }
 

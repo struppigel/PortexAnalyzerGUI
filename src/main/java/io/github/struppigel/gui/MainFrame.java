@@ -19,6 +19,9 @@ package io.github.struppigel.gui;
 
 import io.github.struppigel.gui.pedetails.FileContentPreviewPanel;
 import io.github.struppigel.gui.pedetails.PEDetailsPanel;
+import io.github.struppigel.gui.pedetails.signatures.UserSignaturesNotice;
+import io.github.struppigel.gui.usersignatures.UserSignatureSet;
+import io.github.struppigel.gui.usersignatures.UserSignatures;
 import io.github.struppigel.gui.utils.AppIcon;
 import io.github.struppigel.gui.utils.PELoadWorker;
 import io.github.struppigel.gui.utils.PortexSwingUtils;
@@ -35,6 +38,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
+import javax.swing.event.MenuEvent;
+import javax.swing.event.MenuListener;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -68,7 +73,16 @@ public class MainFrame extends JFrame {
     private final PortexSettings settings;
     // the theme the GUI started with, a changed theme setting applies after a restart
     private final boolean darkTheme;
-    private FullPEData pedata = null;
+    // tells that a file with PE signature is shown without PE structures, because it could not be parsed
+    private final JLabel parseNotice = new JLabel();
+    private FileData fileData = null;
+    private PELoadWorker loadWorker = null;
+    // the file of the running or the last load
+    private File requestedFile = null;
+    // the node to select again after the user's signatures were reloaded, so that the user stays in the same view
+    private File reselectFile = null;
+    private String reselectLabel = null;
+    private final UserSignatures userSignatures;
     private PEComponentTree peComponentTree;
     ;
     private JFrame progressBarFrame;
@@ -100,7 +114,9 @@ public class MainFrame extends JFrame {
 
         this.settings = settings;
         this.darkTheme = ThemeIcon.isDarkTheme(settings);
+        this.userSignatures = new UserSignatures(settings.userSignaturesFolder());
         peDetailsPanel = new PEDetailsPanel(cardPanel, this, settings, fileContent, visModel);
+        peDetailsPanel.setSignatureActions(this::reloadUserSignatures, this::openUserSignatureFolder);
         peComponentTree = new PEComponentTree(peDetailsPanel);
         peDetailsPanel.setRegionNavigator(this::showInTree);
         visualizerPanel.setRegionNavigator(this::showInTree);
@@ -225,8 +241,19 @@ public class MainFrame extends JFrame {
     }
 
     private void loadFile(File file) {
-        PELoadWorker worker = new PELoadWorker(file, this, progressText);
+        // the shown file stays until the new one is loaded, so only a load that is still running is stopped
+        if (loadWorker != null) {
+            loadWorker.cancel(true);
+        }
+        requestedFile = file;
+        reselectFile = null;
+        reselectLabel = null;
+        PELoadWorker worker = new PELoadWorker(file, this, progressText, userSignatures);
+        loadWorker = worker;
         worker.addPropertyChangeListener(evt -> {
+            if (evt.getSource() != loadWorker) {
+                return; // a cancelled load must not hide the progress of the current one
+            }
             String name = evt.getPropertyName();
             if (name.equals("progress")) {
                 int progress = (Integer) evt.getNewValue();
@@ -243,19 +270,132 @@ public class MainFrame extends JFrame {
             }
         });
         progressBarFrame.setVisible(true);
-        WorkerKiller.getInstance().cancelAndDeleteWorkers();
-        WorkerKiller.getInstance().addWorker(worker); // need to add this in case a user loads another PE during load process
         worker.execute();
     }
 
-    public void setPeData(FullPEData data) {
-        this.pedata = data;
+    /**
+     * Shows a loaded file, PE file or not, instead of the previous one.
+     */
+    public void setFileData(FileData data) {
+        // the workers of the previous file, e.g., its statistics and signature scan
+        WorkerKiller.getInstance().cancelAndDeleteWorkers();
+        this.fileData = data;
+        filePathLabel.setText(data.getFile().getAbsolutePath());
+        updateParseNotice(parseNotice, data);
         // first, so that the visualization knows the file when the other panels navigate to offsets
-        visModel.load(pedata);
-        peDetailsPanel.setPeData(pedata);
-        peComponentTree.setPeData(pedata);
-        peComponentTree.setSelectionRow(0);
-        fileContent.setPeData(pedata);
+        visModel.load(data);
+        peDetailsPanel.setFileData(data);
+        peComponentTree.setFileData(data);
+        if (!reselect(data.getFile())) {
+            peComponentTree.setSelectionRow(0);
+        }
+        fileContent.setFileData(data);
+    }
+
+    /**
+     * Selects the node that was selected before the user's signatures were reloaded.
+     *
+     * @return true if the node was selected
+     */
+    private boolean reselect(File file) {
+        String label = reselectLabel;
+        boolean sameFile = file.equals(reselectFile);
+        reselectFile = null;
+        reselectLabel = null;
+        return sameFile && label != null && peComponentTree.selectNode(label);
+    }
+
+    /**
+     * Loads the user's signatures again, also if no database file changed, and loads the shown file again, so that
+     * it is scanned with them. If a file is being loaded, that file is loaded instead.
+     */
+    private void reloadUserSignatures() {
+        userSignatures.invalidate();
+        File shown = fileData == null ? null : fileData.getFile();
+        boolean loading = loadWorker != null && !loadWorker.isDone();
+        File target = loading ? requestedFile : shown;
+        if (target == null) {
+            showUserSignatures();
+            return;
+        }
+        String label = target.equals(shown) ? peComponentTree.getSelectedLabel().orElse(null) : null;
+        loadFile(target);
+        reselectFile = target;
+        reselectLabel = label;
+    }
+
+    /**
+     * Loads the user's signatures and shows how many there are and their warnings, for the case that no file is open.
+     */
+    private void showUserSignatures() {
+        new SwingWorker<UserSignatureSet, Void>() {
+            @Override
+            protected UserSignatureSet doInBackground() {
+                return userSignatures.current();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    UserSignaturesNotice notice = new UserSignaturesNotice();
+                    notice.showSignatures(get(), java.util.Optional.empty());
+                    JOptionPane.showMessageDialog(MainFrame.this, notice, "Your signatures",
+                            JOptionPane.INFORMATION_MESSAGE);
+                } catch (InterruptedException | ExecutionException e) {
+                    LOGGER.error("Could not load the user's signatures", e);
+                    JOptionPane.showMessageDialog(MainFrame.this, "Could not load your signatures: " + e.getMessage(),
+                            "Your signatures", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
+    }
+
+    /**
+     * Opens the folder of the user's signatures in the file manager, creates it first if it does not exist.
+     */
+    private void openUserSignatureFolder() {
+        File folder = userSignatures.getFolder();
+        if (!folder.isDirectory() && !folder.mkdirs()) {
+            JOptionPane.showMessageDialog(this, "Could not create the signature folder " + folder.getAbsolutePath(),
+                    "Signature folder", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        Desktop desktop = Desktop.isDesktopSupported() ? Desktop.getDesktop() : null;
+        if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
+            try {
+                desktop.open(folder);
+                return;
+            } catch (IOException | RuntimeException e) {
+                LOGGER.error("Could not open the signature folder " + folder.getAbsolutePath(), e);
+            }
+        }
+        JOptionPane.showMessageDialog(this, "Your signatures are the .sig files in " + folder.getAbsolutePath(),
+                "Signature folder", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    /**
+     * Stores the folder of the user's signatures and scans the shown file with the signatures in it.
+     *
+     * @param value the folder, empty for the default folder
+     */
+    private void setUserSignaturesFolder(String value) {
+        settings.put(PortexSettingsKey.USER_SIGNATURES_FOLDER, value);
+        try {
+            settings.writeSettings();
+        } catch (IOException e) {
+            LOGGER.error(e);
+        }
+        userSignatures.setFolder(settings.userSignaturesFolder());
+        reloadUserSignatures();
+    }
+
+    /**
+     * Shows the notice if the file could not be parsed as PE file, with the reason as tool tip, hides it otherwise.
+     */
+    static void updateParseNotice(JLabel notice, FileData data) {
+        java.util.Optional<String> error = data.getPeParseError();
+        notice.setVisible(error.isPresent());
+        notice.setToolTipText(error.map(e -> "Could not parse the PE structures: " + e).orElse(null));
     }
 
     private void initGUI() {
@@ -294,7 +434,29 @@ public class MainFrame extends JFrame {
         initProgressBar();
     }
 
+    private void initParseNotice() {
+        parseNotice.setText("PE parsing failed, showing the raw file");
+        Icon warning = UIManager.getIcon("OptionPane.warningIcon");
+        if (warning != null && warning.getIconHeight() > 0) {
+            // the dialog icon is too large for the toolbar
+            int size = Math.max(12, parseNotice.getFontMetrics(parseNotice.getFont()).getHeight());
+            Image image = new java.awt.image.BufferedImage(warning.getIconWidth(), warning.getIconHeight(),
+                    java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            Graphics g = image.getGraphics();
+            warning.paintIcon(parseNotice, g, 0, 0);
+            g.dispose();
+            parseNotice.setIcon(new ImageIcon(image.getScaledInstance(size, size, Image.SCALE_SMOOTH)));
+        }
+        Color warningColor = UIManager.getColor("Actions.Yellow");
+        if (warningColor != null) {
+            parseNotice.setForeground(warningColor);
+        }
+        PortexSwingUtils.disableHtml(parseNotice);
+        parseNotice.setVisible(false);
+    }
+
     private void initToolbar() {
+        initParseNotice();
         JToolBar toolBar = new JToolBar();
 
         ImageIcon ico = ThemeIcon.HEX.load(darkTheme);
@@ -333,6 +495,8 @@ public class MainFrame extends JFrame {
         toolBar.add(imgButton);
         toolBar.add(Box.createHorizontalGlue());
         toolBar.add(filePathLabel);
+        toolBar.add(Box.createHorizontalStrut(12));
+        toolBar.add(parseNotice);
         toolBar.add(Box.createHorizontalGlue());
         toolBar.setOpaque(true);
 
@@ -346,7 +510,7 @@ public class MainFrame extends JFrame {
     }
 
     private void initProgressBar() {
-        this.progressBarFrame = new JFrame("Loading PE file");
+        this.progressBarFrame = new JFrame("Loading file");
         AppIcon.applyTo(progressBarFrame);
         JPanel panel = new JPanel();
         this.progressBar = new JProgressBar();
@@ -400,6 +564,7 @@ public class MainFrame extends JFrame {
 
         settingsMenu.add(disableUpdateCheck);
         settingsMenu.add(themeMenu);
+        settingsMenu.add(createSignaturesMenu());
 
         disableUpdateCheck.addActionListener(e -> {
             if(disableUpdateCheck.getState()) {
@@ -435,6 +600,50 @@ public class MainFrame extends JFrame {
         return settingsMenu;
     }
 
+    private JMenu createSignaturesMenu() {
+        JMenu menu = new JMenu("Signatures");
+        JMenuItem reload = new JMenuItem("Reload signatures");
+        JMenuItem open = new JMenuItem("Open signature folder");
+        JMenuItem choose = new JMenuItem("Choose signature folder...");
+        JMenuItem useDefault = new JMenuItem("Use default signature folder");
+        menu.add(reload);
+        menu.add(open);
+        menu.addSeparator();
+        menu.add(choose);
+        menu.add(useDefault);
+
+        reload.addActionListener(e -> reloadUserSignatures());
+        open.addActionListener(e -> openUserSignatureFolder());
+        choose.addActionListener(e -> {
+            File folder = PortexSwingUtils.getFolderFromUser(this, userSignatures.getFolder(),
+                    "Folder of your signatures");
+            if (folder != null) {
+                setUserSignaturesFolder(folder.getAbsolutePath());
+            }
+        });
+        useDefault.addActionListener(e -> setUserSignaturesFolder(""));
+        menu.addMenuListener(new MenuListener() {
+            @Override
+            public void menuSelected(MenuEvent e) {
+                // shows the folders, because they are not visible anywhere else before a file is loaded
+                String folder = userSignatures.getFolder().getAbsolutePath();
+                reload.setToolTipText("Loads the .sig files in " + folder + " again");
+                open.setToolTipText(folder);
+                useDefault.setEnabled(!settings.valueEquals(PortexSettingsKey.USER_SIGNATURES_FOLDER, ""));
+                useDefault.setToolTipText(settings.defaultUserSignaturesFolder().getAbsolutePath());
+            }
+
+            @Override
+            public void menuDeselected(MenuEvent e) {
+            }
+
+            @Override
+            public void menuCanceled(MenuEvent e) {
+            }
+        });
+        return menu;
+    }
+
     private JMenu createHelpMenu() {
         JMenu help = new JMenu("Help");
         JMenuItem about = new JMenuItem("About");
@@ -454,7 +663,6 @@ public class MainFrame extends JFrame {
         open.addActionListener(arg0 -> {
             String path = PortexSwingUtils.getOpenFileNameFromUser(this);
             if (path != null) {
-                filePathLabel.setText(path);
                 loadFile(new File(path));
             }
         });
@@ -496,12 +704,10 @@ public class MainFrame extends JFrame {
                 List<File> droppedFiles = (List<File>)
                         evt.getTransferable().getTransferData(DataFlavor.javaFileListFlavor);
                 if (droppedFiles.size() > 0) {
-                    File file = droppedFiles.get(0);
-                    filePathLabel.setText(file.getAbsolutePath());
-                    loadFile(file);
+                    loadFile(droppedFiles.get(0));
                 }
             } catch (IOException | UnsupportedFlavorException ex) {
-                String message = "Could not load PE file from dropper! Reason: " + ex.getMessage();
+                String message = "Could not load the dropped file! Reason: " + ex.getMessage();
                 LOGGER.error(message);
                 ex.printStackTrace();
                 JOptionPane.showMessageDialog(null,

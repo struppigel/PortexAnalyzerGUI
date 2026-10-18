@@ -47,6 +47,17 @@ public class IconPanel extends JPanel {
         worker.execute();
     }
 
+    /**
+     * Shows no icons, e.g., for a file that is no PE file.
+     */
+    public void clear() {
+        peData = null;
+        icons = null;
+        removeAll();
+        revalidate();
+        repaint();
+    }
+
     public List<BufferedImage> getIcons() {
         return icons;
     }

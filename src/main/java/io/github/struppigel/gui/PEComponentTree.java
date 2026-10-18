@@ -76,7 +76,7 @@ public class PEComponentTree extends JPanel {
     private List<String> clrTableNames = new ArrayList<>();
 
     private final PEDetailsPanel peDetailsPanel;
-    private FullPEData peData = null;
+    private FileData fileData = null;
     private JTree peTree;
 
     public PEComponentTree(PEDetailsPanel peDetailsPanel) {
@@ -84,8 +84,8 @@ public class PEComponentTree extends JPanel {
         initTree();
     }
 
-    public void setPeData(FullPEData peData) {
-        this.peData = peData;
+    public void setFileData(FileData fileData) {
+        this.fileData = fileData;
         updateTree();
     }
 
@@ -93,6 +93,34 @@ public class PEComponentTree extends JPanel {
         LOGGER.debug("Updating tree");
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) peTree.getModel().getRoot();
         root.removeAllChildren();
+        clrTableNames = new ArrayList<>();
+        DefaultMutableTreeNode dotNetOptStream = null;
+        if (fileData.asPE().isPresent()) {
+            dotNetOptStream = addPENodes(root, fileData.asPE().get());
+        }
+        // every file has these, also files that are no PE files
+        root.add(new DefaultMutableTreeNode(HASHES_TEXT));
+        root.add(new DefaultMutableTreeNode(VISUALIZATION_TEXT));
+        root.add(new DefaultMutableTreeNode(SIGNATURES_TEXT));
+
+        // no root
+        peTree.setRootVisible(false);
+        // reload the tree model to actually show the update
+        DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
+        model.reload();
+        // expand the tree per default except for .NET CLR tables
+        setTreeExpandedState(peTree, true);
+        if (dotNetOptStream != null) {
+            setNodeExpandedState(peTree, dotNetOptStream, false);
+        }
+    }
+
+    /**
+     * Adds the nodes of the PE structures and the anomalies.
+     *
+     * @return the node of the .NET tables, which stays collapsed
+     */
+    private DefaultMutableTreeNode addPENodes(DefaultMutableTreeNode root, FullPEData peData) {
         // create the child nodes
         // PE related
         // DOS/PE Headers
@@ -127,11 +155,7 @@ public class PEComponentTree extends JPanel {
         DefaultMutableTreeNode dotNetStreams = new DefaultMutableTreeNode(DOT_NET_STREAM_HEADERS_TEXT);
         DefaultMutableTreeNode dotNetOptStream = new DefaultMutableTreeNode(DOT_NET_OPTIMIZED_STREAM_TEXT);
 
-        // Non-PE
         DefaultMutableTreeNode anomaly = new DefaultMutableTreeNode(ANOMALY_TEXT);
-        DefaultMutableTreeNode hashes = new DefaultMutableTreeNode(HASHES_TEXT);
-        DefaultMutableTreeNode vis = new DefaultMutableTreeNode(VISUALIZATION_TEXT);
-        DefaultMutableTreeNode signatures = new DefaultMutableTreeNode(SIGNATURES_TEXT);
 
         // adding the sub nodes for optional header
         optional.add(standard);
@@ -207,18 +231,7 @@ public class PEComponentTree extends JPanel {
         }
 
         root.add(anomaly);
-        root.add(hashes);
-        root.add(vis);
-        root.add(signatures);
-
-        // no root
-        peTree.setRootVisible(false);
-        // reload the tree model to actually show the update
-        DefaultTreeModel model = (DefaultTreeModel) peTree.getModel();
-        model.reload();
-        // expand the tree per default except for .NET CLR tables
-        setTreeExpandedState(peTree, true);
-        setNodeExpandedState(peTree, dotNetOptStream, false);
+        return dotNetOptStream;
     }
 
     // this method is from https://www.logicbig.com/tutorials/java-swing/jtree-expand-collapse-all-nodes.html
@@ -294,7 +307,20 @@ public class PEComponentTree extends JPanel {
         selectNode(VISUALIZATION_TEXT);
     }
 
-    private boolean selectNode(String label) {
+    /**
+     * @return the label of the selected node, e.g. to select the same node after the file was loaded again
+     */
+    public Optional<String> getSelectedLabel() {
+        TreePath path = peTree.getSelectionPath();
+        return path == null ? Optional.empty() : Optional.of(path.getLastPathComponent().toString());
+    }
+
+    /**
+     * Selects the first node with the label and thus shows it in the details panel.
+     *
+     * @return true if there is a node with the label
+     */
+    public boolean selectNode(String label) {
         TreePath path = findPath(label);
         if (path == null) {
             return false;

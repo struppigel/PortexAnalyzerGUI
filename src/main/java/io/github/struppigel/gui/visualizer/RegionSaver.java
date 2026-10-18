@@ -85,10 +85,10 @@ final class RegionSaver {
      */
     static void saveWithDialog(Component parent, VisualizationModel model, String name, List<long[]> ranges) {
         FileVisualization vis = model.getVisualization();
-        if (vis == null || ranges.isEmpty() || model.getPeData() == null) {
+        if (vis == null || ranges.isEmpty() || model.getFileData() == null) {
             return;
         }
-        File input = model.getPeData().getPeData().getFile();
+        File input = model.getFileData().getFile();
         String path = PortexSwingUtils.getSaveFileNameFromUser(parent,
                 suggestedFileName(input, name, ranges.get(0)[0]));
         if (path == null) {

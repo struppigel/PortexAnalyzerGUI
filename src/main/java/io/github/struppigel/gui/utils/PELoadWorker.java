@@ -39,10 +39,15 @@ import io.github.struppigel.tools.layout.Detail;
 import io.github.struppigel.tools.layout.SignatureHit;
 import io.github.struppigel.tools.layout.StructureMap;
 import io.github.struppigel.tools.layout.StructureMapBuilder;
+import io.github.struppigel.tools.sigscanner.DefaultSignatures;
 import io.github.struppigel.tools.sigscanner.LocationKind;
 import io.github.struppigel.tools.sigscanner.SignatureMatch;
+import io.github.struppigel.gui.FileData;
 import io.github.struppigel.gui.FullPEData;
 import io.github.struppigel.gui.MainFrame;
+import io.github.struppigel.gui.usersignatures.UserSignatureMatches;
+import io.github.struppigel.gui.usersignatures.UserSignatureSet;
+import io.github.struppigel.gui.usersignatures.UserSignatures;
 import java.util.Optional;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -63,26 +68,90 @@ import java.util.stream.Collectors;
 
 /**
  * Loads and computes all the data related to PE files, so that this code does not run in the event dispatch thread.
+ * Files that are no PE files or cannot be parsed as one are loaded with the data that every file has.
  * Everything that is too complicated here must be improved in the library PortEx.
  */
-public class PELoadWorker extends SwingWorker<FullPEData, String> {
+public class PELoadWorker extends SwingWorker<FileData, String> {
     private static final Logger LOGGER = LogManager.getLogger();
     private final String NL = System.getProperty("line.separator");
     private final File file;
     private final MainFrame frame;
     private final JLabel progressText;
+    private final UserSignatures userSignatures;
+    // loaded at the start, so that the fallback to a file that is no PE file uses the same signatures
+    private UserSignatureSet userSignatureSet = UserSignatureSet.NONE;
 
+    /**
+     * Loads the file without the user's signatures.
+     */
     public PELoadWorker(File file, MainFrame frame, JLabel progressText) {
+        this(file, frame, progressText, UserSignatures.none());
+    }
+
+    /**
+     * @param userSignatures the user's signatures, which are scanned in addition to the bundled ones
+     */
+    public PELoadWorker(File file, MainFrame frame, JLabel progressText, UserSignatures userSignatures) {
         this.file = file;
         this.frame = frame;
         this.progressText = progressText;
+        this.userSignatures = userSignatures;
     }
 
     @Override
-    protected FullPEData doInBackground() throws Exception {
+    protected FileData doInBackground() throws Exception {
         setProgress(0);
+        if (!file.isFile()) {
+            throw new IOException("Not a readable file: " + file.getAbsolutePath());
+        }
+        publish("Loading your signatures...");
+        // loaded again only if a database file changed
+        userSignatureSet = userSignatures.current();
+        if (!new PESignature(file).exists()) {
+            return loadNonPE(null);
+        }
+        try {
+            return loadPE(PELoader.loadPE(file));
+        } catch (Exception e) {
+            if (e instanceof AnalysisInterruptedException || e instanceof InterruptedException
+                    || isCancelled() || Thread.currentThread().isInterrupted()) {
+                throw e;
+            }
+            LOGGER.error("Could not parse " + file.getName() + " as PE file, showing it without PE structures", e);
+            String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            return loadNonPE(reason);
+        }
+    }
+
+    /**
+     * Loads the data of a file that is no PE file or cannot be parsed as one.
+     *
+     * @param peParseError why the file could not be parsed as PE file, null if it is no PE file
+     */
+    private FileData loadNonPE(String peParseError) throws IOException {
+        publish("Calculating Hashes...");
+        setProgress(10);
+        String hashesReport = createFileHashesReport();
+        setProgress(40);
+
+        publish("Scanning for signatures...");
+        List<SignatureMatch> signatureMatches = DefaultSignatures.scanFile(file);
+        UserSignatureMatches userMatches = UserSignatureMatches.scanFile(userSignatureSet, file);
+        setProgress(80);
+
+        publish("Mapping structures...");
+        StructureMap structureMap = createStructureMap(concat(signatureMatches, userMatches.getMatches()));
+        setProgress(100);
+
+        publish("Done!");
+        return new FileData(file, hashesReport, signatureMatches, structureMap, peParseError, userMatches);
+    }
+
+    /**
+     * Loads all data of a PE file. Package-private, so that tests can make it fail.
+     */
+    FullPEData loadPE(PEData data) throws Exception {
         publish("Loading Headers...");
-        PEData data = PELoader.loadPE(file);
         java.util.Optional<CLRSection> maybeCLR = loadCLRSection(data);
         List<StandardField> dotnetMetaDataRootEntries = createDotNetMetadataRootEntries(maybeCLR);
         List<Object[]> dotNetStreamHeaders = createDotNetStreamHeaders(maybeCLR);
@@ -92,6 +161,8 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(10);
 
         publish("Calculating Hashes...");
+        // reads the whole file, the anomaly scans and the views use the cached result
+        data.loadChecksumCheck();
         ReportCreator r = new ReportCreator(data);
         String hashesReport = createHashesReport(data);
         List<Object[]> hashesForSections = createHashTableEntries(data);
@@ -111,12 +182,13 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Scanning for signatures...");
         // scans all default locations once, later calls of getSignatureMatches are cache hits
-        data.getSignatureMatches();
+        List<SignatureMatch> signatureMatches = data.getSignatureMatches();
+        UserSignatureMatches userMatches = UserSignatureMatches.scan(userSignatureSet, data);
         String rehintsReport = r.reversingHintsReport();
         setProgress(50);
 
         publish("Loading Resources...");
-        List<Object[]> resourceTableEntries = createResourceTableEntries(data);
+        List<Object[]> resourceTableEntries = createResourceTableEntries(data, userMatches);
         List<String> manifests = data.loadManifests();
         List<Object[]> vsInfoTable = createVersionInfoEntries(data);
         List<Object[]> stringTableEntries = createStringTableEntries(data);
@@ -124,6 +196,7 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
 
         publish("Loading Exports...");
         List<ExportEntry> exports = data.loadExports();
+        String exportDllName = data.loadExportDllName();
         List<Object[]> exportEntries = createExportTableEntries(data);
         setProgress(70);
 
@@ -151,16 +224,26 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         setProgress(95);
 
         publish("Mapping structures...");
-        StructureMap structureMap = createStructureMap(data, anomalies);
+        StructureMap structureMap = createStructureMap(data, anomalies,
+                concat(signatureMatches, userMatches.getMatches()));
         setProgress(100);
 
         publish("Done!");
         return new FullPEData(data, overlay, overlayEntropy, overlaySignatures, sectionEntropies, importDLLs,
                 impEntries, delayLoadEntries, boundImportEntries, resourceTableEntries, data.loadResources(), manifests, exportEntries, exports,
-                hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
+                exportDllName, hashesReport, hashesForSections, anomaliesTable, debugTableEntries, vsInfoTable,
                 rehintsReport, stringTableEntries, dotnetMetaDataRootEntries, maybeCLR, dotNetStreamHeaders,
-                optimizedStreamEntries, clrTables, clrTableHeaders, anomalies, structureMap,
-                certificateTable, verification);
+                optimizedStreamEntries, clrTables, clrTableHeaders, anomalies, structureMap, signatureMatches,
+                certificateTable, verification, userMatches);
+    }
+
+    private static List<SignatureMatch> concat(List<SignatureMatch> bundled, List<SignatureMatch> user) {
+        if (user.isEmpty()) {
+            return bundled;
+        }
+        List<SignatureMatch> all = new ArrayList<>(bundled);
+        all.addAll(user);
+        return all;
     }
 
     /**
@@ -236,18 +319,35 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
      * Builds the structure map for the visualization. Must run in this thread, because the caches of PEData are not
      * thread-safe. A file whose structures cannot be mapped is still shown, only without structures.
      */
-    private StructureMap createStructureMap(PEData data, List<Anomaly> anomalies) {
+    private StructureMap createStructureMap(PEData data, List<Anomaly> anomalies,
+                                            List<SignatureMatch> signatureMatches) {
         try {
             return new StructureMapBuilder(data)
                     .withDetail(Detail.FINE)
                     .withAnomalies(anomalies)
-                    .withSignatureMatches(SignatureHit.fromMatches(data.getSignatureMatches()))
+                    .withSignatureMatches(SignatureHit.fromMatches(signatureMatches))
                     .build();
         } catch (AnalysisInterruptedException e) {
             throw e;
         } catch (RuntimeException e) {
             LOGGER.error("Could not map the structures of the file", e);
             return StructureMap.empty(data.getFile().length());
+        }
+    }
+
+    /**
+     * Builds the structure map of a file that is not parsed as PE file: only the signature matches.
+     */
+    private StructureMap createStructureMap(List<SignatureMatch> signatureMatches) {
+        try {
+            return StructureMapBuilder.forUnparsedFile(file)
+                    .withSignatureMatches(SignatureHit.fromMatches(signatureMatches))
+                    .build();
+        } catch (AnalysisInterruptedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            LOGGER.error("Could not map the signatures of the file", e);
+            return StructureMap.empty(file.length());
         }
     }
 
@@ -363,6 +463,21 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return text;
     }
 
+    /**
+     * @return the hashes of a file that is not parsed as PE file
+     */
+    private String createFileHashesReport() throws IOException {
+        String text = "Full File Hashes" + NL + NL;
+        try {
+            text += "MD5: " + hash(Hasher.fileHash(file, MessageDigest.getInstance("MD5"))) + NL;
+            text += "SHA1: " + hash(Hasher.fileHash(file, MessageDigest.getInstance("SHA-1"))) + NL;
+            text += "SHA256: " + hash(Hasher.fileHash(file, MessageDigest.getInstance("SHA-256"))) + NL;
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        return text;
+    }
+
     private List<Object[]> createHashTableEntries(PEData data) {
         List<Object[]> entries = new ArrayList<>();
         SectionTable sectionTable = data.getSectionTable();
@@ -459,11 +574,15 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
         return entries;
     }
 
-    private List<Object[]> createResourceTableEntries(PEData pedata) {
+    private List<Object[]> createResourceTableEntries(PEData pedata, UserSignatureMatches userMatches) {
         List<Resource> resources = pedata.loadResources();
         Map<Long, List<String>> signaturesByResource = new HashMap<>();
         for (SignatureMatch m : pedata.getSignatureMatches(LocationKind.RESOURCE)) {
             signaturesByResource.computeIfAbsent(m.getRegionStart(), k -> new ArrayList<>()).add(m.getName());
+        }
+        for (SignatureMatch m : userMatches.getMatches(LocationKind.RESOURCE)) {
+            signaturesByResource.computeIfAbsent(m.getRegionStart(), k -> new ArrayList<>())
+                    .add(UserSignatureSet.label(m));
         }
         List<Object[]> entries = new ArrayList<>();
         for (Resource r : resources) {
@@ -541,16 +660,11 @@ public class PELoadWorker extends SwingWorker<FullPEData, String> {
     protected void done() {
         if(isCancelled()) {return;}
         try {
-            FullPEData data = get();
-            frame.setPeData(data);
+            frame.setFileData(get());
         } catch (InterruptedException | ExecutionException e) {
-            String message = "Could not load PE file! Reason: " + e.getMessage();
-            if (e.getMessage().contains("given file is no PE file")) {
-                message = "Could not load PE file! The given file is no PE file";
-            }
-            LOGGER.warn(message);
-            LOGGER.warn(e);
-            e.printStackTrace();
+            Throwable cause = e instanceof ExecutionException && e.getCause() != null ? e.getCause() : e;
+            String message = "Could not load file! Reason: " + cause.getMessage();
+            LOGGER.warn(message, e);
             JOptionPane.showMessageDialog(null,
                     message,
                     "Unable to load",

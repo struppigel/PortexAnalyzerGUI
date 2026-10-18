@@ -47,7 +47,7 @@ import java.util.function.LongConsumer;
 
 /**
  * The interactive visualization of the file: overview, zoomable detail view and the description of the offset under
- * the mouse.
+ * the mouse. Below the description, tabs show the structures at the offset or all structures by color.
  */
 public class InteractiveVisualizerPanel extends JPanel {
 
@@ -62,6 +62,7 @@ public class InteractiveVisualizerPanel extends JPanel {
     private final LegendPanel legendPanel;
     private JComboBox<String> hexColorChooser;
     private JComboBox<String> hexWidthChooser;
+    private JLabel status;
     private IntConsumer hexWidthListener;
     private boolean settingHexWidth;
 
@@ -77,6 +78,9 @@ public class InteractiveVisualizerPanel extends JPanel {
         this.infoPane = new InfoPane(model, canvas::getBytesPerCell);
         this.legendPanel = new LegendPanel(model);
         infoPane.setZoomAction(canvas::zoomToRegion);
+        legendPanel.setZoomAction(canvas::zoomToRegion);
+        infoPane.addTab("Navigate",
+                "All structures by color: a click marks one, a double click unfolds it and zooms to it", legendPanel);
         initOverviewNavigation();
 
         JPanel visuals = new JPanel(new BorderLayout(Spacing.GAP, 0));
@@ -89,13 +93,7 @@ public class InteractiveVisualizerPanel extends JPanel {
         main.add(visuals, BorderLayout.CENTER);
         main.add(createStatusBar(), BorderLayout.SOUTH);
 
-        legendPanel.setPreferredSize(new Dimension(300, 150));
-        JSplitPane side = new JSplitPane(JSplitPane.VERTICAL_SPLIT, infoPane, legendPanel);
-        side.setResizeWeight(0.6);
-        side.setContinuousLayout(true);
-        side.setBorder(null);
-
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, main, side);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, main, infoPane);
         split.setResizeWeight(1.0);
         split.setContinuousLayout(true);
         split.setBorder(null);
@@ -128,16 +126,23 @@ public class InteractiveVisualizerPanel extends JPanel {
             public void styleChanged() {
                 status.setText(statusText());
             }
+
+            @Override
+            public void selectionChanged() {
+                status.setText(statusText()); // the marked bytes, also while dragging
+            }
         };
         model.addListener(refresh);
         status.setText(statusText());
+        status.setToolTipText("Drag to mark bytes, Shift + click extends the marking");
+        this.status = status;
         return bar;
     }
 
     /**
-     * @return the zoom level and the part of the file that is visible
+     * @return the zoom level, the part of the file that is visible and the marked bytes
      */
-    private String statusText() {
+    String statusText() {
         FileVisualization vis = model.getVisualization();
         if (vis == null || canvas.getLadder().isEmpty()) {
             return " ";
@@ -146,9 +151,22 @@ public class InteractiveVisualizerPanel extends JPanel {
         long end = Math.min(model.getVisibleEnd(), vis.getFileLength());
         String cells = canvas.level().hex ? "hex, " + canvas.level().columns + " bytes per line"
                 : bytesPerCell + (bytesPerCell == 1 ? " byte" : " bytes") + " per cell";
-        return String.format("Zoom %d of %d, %s, showing 0x%X - 0x%X of 0x%X",
+        String text = String.format("Zoom %d of %d, %s, showing 0x%X - 0x%X of 0x%X",
                 canvas.getLevelIndex() + 1, canvas.getLadder().size(), cells, model.getVisibleStart(),
                 Math.max(0, end - 1), Math.max(0, vis.getFileLength() - 1));
+        if (model.hasRangeSelection()) {
+            long markedEnd = Math.min(model.getRangeEnd(), vis.getFileLength());
+            text += String.format(", marked 0x%X - 0x%X (%s)", model.getRangeStart(), Math.max(0, markedEnd - 1),
+                    ByteConversions.size(markedEnd - model.getRangeStart()));
+        }
+        return text;
+    }
+
+    /**
+     * @return the status bar below the visualization, for tests
+     */
+    JLabel getStatus() {
+        return status;
     }
 
     private void initOverviewNavigation() {
@@ -382,10 +400,10 @@ public class InteractiveVisualizerPanel extends JPanel {
     }
 
     private Callable<BufferedImage> classicRenderer() {
-        if (model.getPeData() == null) {
+        if (model.getFileData() == null) {
             return null;
         }
-        File file = model.getPeData().getFile();
+        File file = model.getFileData().getFile();
         return () -> ClassicImageExporter.render(file, ClassicImageExporter.DEFAULT_HEIGHT);
     }
 
@@ -451,6 +469,7 @@ public class InteractiveVisualizerPanel extends JPanel {
     public void setRegionNavigator(RegionNavigator navigator) {
         canvas.setRegionNavigator(navigator);
         infoPane.setRegionNavigator(navigator);
+        legendPanel.setRegionNavigator(navigator);
     }
 
     /**

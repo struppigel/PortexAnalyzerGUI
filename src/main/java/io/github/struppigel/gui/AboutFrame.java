@@ -52,7 +52,7 @@ public class AboutFrame extends JFrame {
         card.heading("Portex Analyzer GUI")
                 .row("Version", version)
                 .row("Author", "Karsten Hahn")
-                .row("Last update", "11. October 2026")
+                .row("Last update", "18. October 2026")
                 .paragraph("I develop this software as a hobby in my free time.")
                 .paragraph("If you like it, please consider buying me a coffee.")
                 .link("Ko-fi", "ko-fi.com/struppigel", COFFEE_URL)

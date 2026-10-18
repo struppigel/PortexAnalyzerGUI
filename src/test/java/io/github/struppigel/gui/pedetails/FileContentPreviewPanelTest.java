@@ -116,7 +116,7 @@ class FileContentPreviewPanelTest {
 
     private static FileContentPreviewPanel loadedPreview() throws Exception {
         FileContentPreviewPanel preview = onEdtGet(FileContentPreviewPanel::new);
-        onEdt(() -> preview.setPeData(TestPEData.load(NATIVE_X86)));
+        onEdt(() -> preview.setFileData(TestPEData.load(NATIVE_X86)));
         waitFor(() -> preview.getText().startsWith("Offset: 0x0\nMZ"));
         return preview;
     }

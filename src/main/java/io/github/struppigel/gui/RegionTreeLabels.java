@@ -117,6 +117,8 @@ final class RegionTreeLabels {
             case EXPORT_NAME_POINTER_TABLE:
             case EXPORT_ORDINAL_TABLE:
             case EXPORT_NAME:
+            case EXPORT_DLL_NAME:
+            case EXPORT_FORWARDER:
                 return list("Exports");
             case DEBUG_DIRECTORY:
             case DEBUG_DATA:
