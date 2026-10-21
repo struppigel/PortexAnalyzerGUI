@@ -45,6 +45,20 @@ type = packer
 
 I test this program on Linux and Windows. But it should work on any OS with JRE version 17 or higher.
 
+## Building
+
+You need a JDK 17 or higher and [Maven](https://maven.apache.org). PortEx is downloaded from Maven Central.
+
+```
+mvn package
+java -jar target/PortexAnalyzerGUI-<version>-jar-with-dependencies.jar
+```
+
+* Tests that need PE samples read them from `../PortEx/portextestfiles` and are skipped if the folder does not exist.
+  `-Dportex.testfiles=<folder>` reads them from another folder, `-DskipTests` skips all tests.
+* To build against your own PortEx build, run `sbt publishM2` in the PortEx folder and pass its version, e.g.
+  `mvn package -Dportex.version=6.0.1-SNAPSHOT`.
+
 ## Future
 
 I will be including more and more features that PortEx already provides.

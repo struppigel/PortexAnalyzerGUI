@@ -15,9 +15,16 @@
             </resource>
         </resources>
         <plugins>
+        <!-- fixed plugin versions, otherwise they depend on the Maven version of whoever builds -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.13.0</version>
+        </plugin>
         <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-assembly-plugin</artifactId>
+            <version>3.7.1</version>
             <executions>
                 <execution>
                     <phase>package</phase>
@@ -63,8 +70,9 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- PE samples are never committed, tests read them from the local PortEx corpus -->
         <portex.testfiles>${project.basedir}/../PortEx/portextestfiles</portex.testfiles>
-        <!-- override to build against a local PortEx snapshot, e.g. -Dportex.version=6.0.0-SNAPSHOT -->
-        <portex.version>5.0.7</portex.version>
+        <!-- PortEx from Maven Central. Override to build against a local PortEx snapshot published with
+             sbt publishM2, e.g. -Dportex.version=6.0.1-SNAPSHOT -->
+        <portex.version>6.0.0</portex.version>
     </properties>
     <profiles>
         <!-- compile against the Java 17 API when building with a newer JDK -->
@@ -84,15 +92,16 @@
             <artifactId>image4j</artifactId>
             <version>0.7.2</version>
         </dependency>
+        <!-- the same versions as PortEx, because direct dependencies win over the ones PortEx brings along -->
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
-            <version>2.12.13</version>
+            <version>2.12.20</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.19.0</version>
+            <version>2.25.0</version>
         </dependency>
         <dependency>
             <groupId>com.formdev</groupId>
